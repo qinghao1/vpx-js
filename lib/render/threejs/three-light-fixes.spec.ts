@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 // Behavior specs for the three.js light-generator fixes:
 // falloffPower passthrough, centralized authored visibility, and the
 // glow renderOrder contract.

@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import { Color, DoubleSide, EquirectangularReflectionMapping, type Texture as ThreeTexture } from 'three'
 import { MeshStandardNodeMaterial } from 'three/webgpu'
 import { BALL_BASE_COLOR } from '../../../vpt/ball/ball-data.js'

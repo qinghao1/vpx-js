@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import { Color, DoubleSide, type Object3D } from 'three'
 import { Fn, texture, uniform, uv, vec4 } from 'three/tsl'
 import { BALL_BASE_COLOR } from '../../vpt/ball/ball-data.js'

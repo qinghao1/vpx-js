@@ -2,7 +2,6 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 export interface ILogger {
-	wtf(format: string, ...args: unknown[]): void
 	error(format: string, ...args: unknown[]): void
 	warn(format: string, ...args: unknown[]): void
 	info(format: string, ...args: unknown[]): void
@@ -47,9 +46,6 @@ export class Logger implements ILogger {
 	}
 	warn(format: string, ...args: unknown[]): void {
 		console.warn(format, ...args)
-	}
-	wtf(format: string, ...args: unknown[]): void {
-		console.error(format, ...args)
 	}
 }
 

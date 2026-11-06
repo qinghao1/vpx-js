@@ -16,7 +16,7 @@ type Kind = 'vpx' | 'rom'
 
 interface BrowserViewer {
 	table?: { tableScript?: string } | null
-	load(): Promise<unknown>
+	load(vpx: string): Promise<unknown>
 	preloadRom(url: string): Promise<unknown>
 }
 
@@ -181,7 +181,7 @@ export function initTableBrowser(viewer: BrowserViewer, syncParam: (key: Kind, v
 				)
 			} else {
 				dialog.close()
-				viewer.load().catch(error => console.error('[catalog] table load failed', error))
+				viewer.load(url).catch(error => console.error('[catalog] table load failed', error))
 			}
 		})
 		return button

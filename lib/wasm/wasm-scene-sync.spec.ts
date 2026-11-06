@@ -24,7 +24,7 @@ import {
 	DmdFrameFormat,
 	floatRowView,
 	HEADLESS_ABI_VERSION,
-	HeadlessEngineMissingError,
+	HeadlessEngineError,
 	loadHeadlessEngine,
 	MoverType,
 	WASM_STRIDES,
@@ -501,8 +501,11 @@ describe('WASM scene sync', () => {
 		expect([...view]).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
 	})
 
-	it('fails honestly when the headless artifact is absent', async () => {
-		await expect(loadHeadlessEngine('wasm/does-not-exist.js')).rejects.toThrow(HeadlessEngineMissingError)
+	it('fails honestly when the headless artifact cannot load', async () => {
+		// Without an HTTP status the absence cannot sort as a 404, so the
+		// failure is a typed load error, not the missing-artifact error.
+		await expect(loadHeadlessEngine('wasm/does-not-exist.js')).rejects.toMatchObject({ op: 'load' })
+		await expect(loadHeadlessEngine('wasm/does-not-exist.js')).rejects.toBeInstanceOf(HeadlessEngineError)
 	})
 
 	it('maps the facade onto raw heap calls', async () => {
@@ -1090,6 +1093,22 @@ describe('WASM scene sync', () => {
 			const identity = [1, 0, 0, 0, 1, 0, 0, 0, 1]
 			sync.syncBalls(new Float32Array([7, 10, 20, 30, 25, ...identity, 0xff0000, 1]))
 			expect(sync.ballPoses()).toEqual([{ id: 7, x: 10, y: 20, z: 30 }])
+		})
+
+		it('exposes plunger travel with its frame range', () => {
+			const table = new TableBuilder().build()
+			const api = new RecordingApi()
+			const PlungerDataCtor = PlungerData as unknown as new (itemName: string) => PlungerData
+			const data = new PlungerDataCtor('P1')
+			data.center = new Vertex2D(500, 500)
+			const state = PlungerState.claim('P1', 0, true)
+			const slots = new Map<number, PartSlot<object>>([
+				[2, slotFor({}, state, new PlungerUpdater(state, new PlungerMeshGenerator(data)))],
+			])
+			const sync = new WasmSceneSync<object, unknown, unknown>(mockScene(slots), mockBalls(), api as any, table)
+			expect(sync.plungerPositions()).toEqual([])
+			sync.syncMovers(new Float32Array([2, MoverType.Plunger, 50, 0, 100, 0, 1, 0]))
+			expect(sync.plungerPositions()).toEqual([{ partIdx: 2, pos: 50, start: 0, end: 100 }])
 		})
 
 		it('counts applied light changes for activity signals', () => {

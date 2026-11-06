@@ -10,9 +10,10 @@ WASM. This seam is the only boundary between them.
 
 | File                      | Purpose                                                                                                                                                                                                                |
 | :------------------------ | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `vpinball-wasm.ts`        | C ABI surface (`VpxWasm_*`), buffer kinds/strides/tags, and `loadHeadlessEngine`, which rejects with `HeadlessEngineMissingError` when the artifact is missing. No fake engine.                                        |
+| `vpinball-wasm.ts`        | C ABI surface (`VpxWasm_*`), buffer kinds/strides/tags, and `loadHeadlessEngine`, which rejects with `HeadlessEngineMissingError` when the artifact 404s (`HeadlessEngineError` otherwise). No fake engine.            |
+| `vpinball-wasm.spec.ts`   | Facade unit tests on a heap-backed fake bridge: ABI refusal, buffer/DMD/audio decoding, hostile descriptors, failure codes, load-error sorting, suspendable receiver.                                                  |
 | `wasm-scene-sync.ts`      | `WasmSceneSync`: writes WASM buffer rows into the existing `*State` objects and calls the existing `*Updater.applyState`. The host (viewer) owns scene nodes, updaters, and the lightmap fan-out. No three.js imports. |
-| `wasm-scene-sync.spec.ts` | Mocked-buffer unit tests: ball spawn/move/remove, every mover row, light rows, prim/flasher dirty rows, buffer contract, honest loader failure.                                                                        |
+| `wasm-scene-sync.spec.ts` | Mocked-buffer unit tests: ball spawn/move/remove, every mover row, light rows, prim/flasher dirty rows, diff gating, phase timings, flasher image policy.                                                              |
 
 ## Constraints
 
@@ -32,29 +33,18 @@ WASM. This seam is the only boundary between them.
 ## Status
 
 Bridge live, built from the pinned `external/vpinball` submodule
-(`@64a480a96`) — never from a side checkout. The bridge is sixteen patches in
-`wasm/modules/headless/patches/` (`0001` new `src/web/vpx_wasm_bridge.cpp`;
-`0002` part-state getters; `0003` headless step + script-error record;
-`0004` Noop render-device guards; `0005` CMake target; `0006` DMD mirror;
-`0007` IsPlaying ignores window focus headless; `0008` host-paced
-PinMAME time fence; `0009` PinMAME ROM-audio capture to a drained int16
-PCM ring; `0010` drop of the SDL echo of ring-forwarded lanes; `0011`
-silence of the refresh-rate probe error; `0012` FlexDMD mirror; `0013` flasher
-image; `0014` audio level; `0015` VR player mode; `0016` wasm source maps), applied idempotently at build time
-like the PinMAME patches. Do not hand-edit the
-submodule; change the patch files. Build with `npm run build:wasm:headless`
-(`wasm/build-headless.sh`: patches → third-party libs → configure →
-`vpinball-headless` target → deploy), which outputs
-`demo-browser/public/wasm/vpinball-headless.{js,wasm,data}` (gitignored).
+(`@64a480a96`) — never from a side checkout — plus the patch series in
+`wasm/modules/headless/patches/` (one concern per patch; see `wasm/README.md`).
+Build with `npm run build:wasm:headless`, which outputs
+`demo-browser/public/wasm/vpinball-headless.{js,wasm,wasm.map,data}` (gitignored).
 `HeadlessEngine` is the only boundary: byte-array in, typed rows/DMD/PCM
 audio/script errors out. Calls that may block on engine threads (`loadTable`,
 `destroyTable`) enter WASM through `WebAssembly.promising` (JSPI).
 
-Patch `0017` adds `VpxWasm_GetAbiVersion`, which the facade checks once per
-module against `HEADLESS_ABI_VERSION` (a mismatch throws `HeadlessEngineError`
-with `op: 'abi'`). It also JSON-escapes the part catalog, clears the FlexDMD
-publish latch and the captured audio format on every table load/teardown, and
-lists every bridge export in `-sEXPORTED_FUNCTIONS`.
+The facade checks `VpxWasm_GetAbiVersion` once per module against
+`HEADLESS_ABI_VERSION`; a mismatch throws `HeadlessEngineError` (`op: 'abi'`)
+instead of degrading per frame. Bump both together when the row layout or an
+export signature changes.
 
 Keys (`pushKey`) fire script KeyDown/KeyUp events; buffered `getDmdFrame`
 frames and solenoid motion need a scripted table plus VPinMAME.Controller.
@@ -71,8 +61,8 @@ in `demo-browser/src/wasm-engine.ts`.
 ## Viewer wiring
 
 `demo-browser/src/wasm-engine.ts` (`WasmEngine`) owns the engine lifetime:
-root-absolute artifact load, `init`, ROM mount (explicit `?rom=` preload,
-then `__pendingRom` file bytes), `loadTable`, per-rAF
+page-relative artifact load (via `document.baseURI`, so subpath deploys work),
+ROM mount (explicit `?rom=` preload, then `__pendingRom` file bytes), `loadTable`, per-rAF
 `stepFrame` + `WasmSceneSync` fan-out, ball spawn/remove, lamp-change set,
 SDL-scancode input, nudge, destroy. The headless bridge is the only engine:
 the viewer boots it at mount (a missing artifact stays viewer-only; play
@@ -83,30 +73,16 @@ adapter → viewer `_sendKey`), and teardown all route through it. SRGB DMD
 triplets decode to dots-per-byte in the `dmdFrame` getter; reload clears
 part names, cached DMD, balls, and destroys the prior engine.
 
-A/B (`integration.mjs`, `table-empty.vpx`): the former TS-player legs
-(transpile, ball, physics) skip honestly and a `wasmEngine` leg asserts the
-Stage-1 guarantees (ready, catalog, zero script errors, tick + input).
-(Stage/phase/§ references below are to the rescope plan at
-`/home/qinghao1/docs/vpx-js-threejs-rescope-plan.md`.)
-Shared legs keep their Phase-3 shapes (pageerrors, diagnostics, playfield,
-plunger, nudge, dmd, backbox, camera, runErrors); `sound` now exercises the
-WASM module (drained ROM PCM energy on game events; script sounds ride the
-engine's miniaudio/SDL path and need a viewer gesture); the only flake is
-the camera leg, which intermittently stalls on run start in shared transition
-code under SwiftShader (passes on retry). No leg thresholds changed.
+Browser e2e (`integration.mjs`) drives the engine through the dev-only typed
+test API (`window.vpx`, `demo-browser/src/test-api.ts`): a `wasmEngine` leg
+asserts ready, catalog, zero script errors, tick + input; the gameplay legs
+(ball, plunger, flipper, nudge, DMD) read engine state, never viewer privates.
 
-§5.2 (TS engine removal) is executed: `lib/scripting`, `lib/physics`,
-`lib/audio`, `lib/game`, and the per-item runtime (`*-api`, `*-hit`,
-`*-mover`, `*-physics`, hit generators, collections, timers,
-lightseqs, textboxes, dispreels, sounds) are deleted — mesh `FrameData`
-stays, its drivers are gone; the viewer, input,
-harness, and bench are WASM-only. The seam above is the only boundary.
-Scripted-table behavior (script execution, PinMAME.Controller, DMD frames,
-credit/start/eject, plunger launch, playfield ball, flipper drive and
-solenoids, drain relaunch, tilt) is verified live in the WASM build on the
-TWD table: coin pulses register credits, start ejects to the shooter lane,
-plunger and flippers behave, and the DMD/trough track the game. Probe at
-realtime pacing with wall-time key holds (tight bursts starve the PinMAME
-thread, and short holds are sub-millisecond in wall time); this ROM prices
-several coins per credit. Regression legs must stay honest: skips/fails keep
-their reasons and must not be edited into passes.
+## Browser requirements
+
+The threaded engine needs a cross-origin-isolated page (`COOP`/`COEP` from
+server headers, or the `VITE_COI_SW=1` service worker on static hosts) and a
+browser with WebAssembly JSPI (`WebAssembly.promising`); the viewer renders
+through WebGPU. `loadHeadlessEngine` fails fast with `HeadlessEngineError`
+(`op: 'environment'`) without isolation, and the viewer adapter refuses to
+start with `WasmEngineStartError` without JSPI.

@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import type { Group } from 'three'
 import { BufferAttribute, BufferGeometry, Color, DoubleSide, Matrix4, Mesh, Vector2 } from 'three'
 import { attribute, clamp, Fn, float, length, max, mix, positionLocal, pow, sqrt, uniform } from 'three/tsl'

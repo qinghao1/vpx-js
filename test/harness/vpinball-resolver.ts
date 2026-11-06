@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import { type ChildProcess, execSync, spawn } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as os from 'node:os'

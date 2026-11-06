@@ -11,7 +11,7 @@ npm run build:wasm:headless # emscripten headless build (needs emsdk; artifact �
 npx tsc --noEmit           # typecheck
 npx biome check .          # lint/format (tabs, width 120)
 npm test                   # vitest --coverage
-npx tsx test/harness/verify-all.ts   # E2E TAP 1..5: table → twd-render → ab → cadet → browser
+npx tsx test/harness/verify-all.ts   # E2E TAP 1..6: table → twd-render → ab → cadet → pages → browser
 npm run verify:ab          # A/B + regression vs OLD worktree (needs VPX/ROM + /tmp/vpx-js-old)
 ```
 
@@ -19,10 +19,10 @@ Node via `fnm` — `.nvmrc` `24`, `.node-version` `24.19.0`. Activate with `eval
 
 ## Layout
 
-- `lib/` — core: `vpt/` table/items, `io/` OLE/BIFF readers, `math/` numerics, `render/threejs/` scene pipeline, `wasm/` headless-engine seam (ABI types + scene sync; no three.js), `emu/` ROM fetcher
+- `lib/` — core: `vpt/` table/items, `io/` OLE/BIFF readers, `math/` numerics, `render/threejs/` scene pipeline, `wasm/` headless-engine seam (ABI types + scene sync; no three.js), `emu/` VPS table/ROM catalog
 - `lib/refs.node.ts` / `lib/refs.browser.ts` — explicit env split; demo-browser aliases `refs.node` → `refs.browser`
 - `test/fixtures/*.vpx` + `test/harness/` + `lib/**/*.spec.ts`
-- `wasm/modules/headless/` (patches) + `external/vpinball` (pinned submodule) → `npm run build:wasm:headless` → `demo-browser/public/wasm/`; `external/pinmame` (pinned submodule) mounted as ROM source
+- `wasm/modules/headless/` (patches) + `external/vpinball` (pinned submodule) → `npm run build:wasm:headless` → `demo-browser/public/wasm/` (see `wasm/README.md`)
 - `demo-browser/` — local static Three.js WebGPU viewer + E2E (`demo-browser/e2e/`)
 - `dist-esm/`, `coverage/`, `node_modules/`, `*.vpx` — ignored, do not commit
 
@@ -36,10 +36,11 @@ Node via `fnm` — `.nvmrc` `24`, `.node-version` `24.19.0`. Activate with `eval
 ## Testing
 
 - `vitest` on `lib/**/*.spec.ts` + `test/harness/*.spec.ts` + `demo-browser/src/**/*.spec.ts` (`pool:forks`, 10s timeout).
-- `test/harness/` is the single E2E entry: `verify-all.ts` (TAP 1..5: table → twd-render → ab → cadet → browser). `verify-ab.mjs` needs a VPX/ROM plus the OLD worktree (`git worktree add /tmp/vpx-js-old HEAD` with built `dist-esm`); without them it SKIPs honestly. Keep it unified.
+- `test/harness/` is the single E2E entry: `verify-all.ts` (TAP 1..6: table → twd-render → ab → cadet → pages → browser). `verify-ab.mjs` needs a VPX/ROM plus the OLD worktree (`git worktree add /tmp/vpx-js-old HEAD` with built `dist-esm`); without them it SKIPs honestly. Keep it unified.
 
 ## Gotchas
 
 - `Failed to resolve import ../dist-esm/...` → run `npm run build:esm`.
 - Submodules must stay pristine — never hand-edit; if dirty, `git submodule foreach 'git reset --hard && git clean -fd'` to clean (`reset` alone keeps patch-created files, which the build rejects as broken).
+- "The engine needs a cross-origin-isolated page" → the threaded engine needs COOP/COEP: send them from your server, or build the demo with `VITE_COI_SW=1` for static hosts (see `wasm/README.md`).
 - SIGILL in the shipped engine → repro with devtools open (WASM debugging on). The `.wasm.map` carries no sourcesContent and no third-party code, so bgfx frames stay raw addresses.

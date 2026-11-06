@@ -30,20 +30,18 @@
  *
  * Run: node test/harness/verify-ab.mjs [--vpx=...] [--rom=...]
  *   [--old-dir=/tmp/vpx-js-old] [--out=/tmp/ab]
- *   [--phase=A|B|C|all] [--port=3199] [--old-port=3200] [--seed=1337]
+ *   [--phase=A|B|C|all] [--seed=1337]
  * Legs: A = NEW headless paced match, B = NEW viewer, C = OLD viewer+match
- * (served by the OLD tree's own vite on --old-port, default port+1).
+ * (served by the OLD tree's own vite). Each tree gets a per-run vite port.
  * Default `all` runs A->B->C and takes a host-wide full-run lock; single legs
- * skip it but MUST use a distinct --port AND --out so concurrent runs cannot
- * collide on the vite servers, screenshots, or report JSON (keep --port
- * values 2 apart so the OLD server never collides either).
+ * skip it but MUST use a distinct --out so concurrent runs cannot collide on
+ * screenshots or the report JSON.
  * Exit: 0 pass, 77 skip (no VPX/ROM, no puppeteer, artifact or OLD missing), 1 fail.
  */
 import { execSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
-import { findWalkingDead } from './bench-shared.ts'
+import { findWalkingDead, findWalkingDeadRom } from './bench-shared.ts'
 import { attachLogging, ensureVite, launchBrowser, loadPuppeteer, newPage } from './utils.mjs'
 
 const arg = name => {
@@ -58,8 +56,8 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 // ---- leg selection + isolation ---------------------------------------------
 // --phase=A|B|C (comma list) runs legs independently; default `all` runs
 // A->B->C and takes a host-wide full-run lock so two full runs cannot share
-// vite servers, profile, or OUT dir. Single-leg validation runs bypass the
-// lock and MUST pass a distinct --port AND --out (ports 2 apart).
+// the OUT dir. Single-leg validation runs bypass the lock and MUST pass a
+// distinct --out.
 const PHASES = (() => {
 	const raw = (arg('--phase') || 'all').toUpperCase()
 	const parts = raw
@@ -77,13 +75,11 @@ const PHASES = (() => {
 })()
 const wantPhase = l => PHASES.includes(l)
 const FULL_RUN = PHASES.length === 3
-const PORT = arg('--port') || process.env.VPX_AB_PORT || '3000'
-const BASE = `https://localhost:${PORT}`
-// OLD viewer runs on its own vite (old tree, old aliases, old dist-esm) so the
-// NEW server config can never break it; defaults to the next port. Concurrent
-// runs need distinct --port values at least 2 apart plus distinct --out.
-const OLD_PORT = arg('--old-port') || String(Number(PORT) + 1)
-const OLD_BASE = `https://localhost:${OLD_PORT}`
+// Origins of the NEW tree's vite and, for leg C, the OLD tree's own vite (old
+// aliases, old dist-esm, so the NEW server config can never break it). Both
+// are per-run ports assigned by ensureVite.
+let BASE
+let OLD_BASE
 const SEED = Number(arg('--seed') ?? 1337)
 // Browser watchdog budget: viewer legs + ball gates exceed the 5 min launcher
 // default under SwiftShader (sibling drain probes use 40 min); the exit-cleanup
@@ -191,7 +187,7 @@ function ensureOldTree() {
 			mkdirSync(OLD_DIR, { recursive: true })
 			execSync(`git archive HEAD | tar -x -C ${OLD_DIR}`, { cwd: process.cwd(), timeout: 180000, stdio: 'pipe' })
 		}
-		for (const f of ['package.json', 'demo-browser/src/viewer.ts', 'lib/game/player.ts']) {
+		for (const f of ['package.json', 'demo-browser/src/viewer.ts', 'lib/wasm/wasm-scene-sync.ts']) {
 			const want = execSync(`git show HEAD:${f}`, { encoding: 'buffer', timeout: 30000, stdio: 'pipe' })
 			const got = readFileSync(join(OLD_DIR, f))
 			if (!want.equals(got)) {
@@ -309,19 +305,13 @@ async function runScriptedMatch(driver) {
 }
 
 // ---- inputs ---------------------------------------------------------------
-const home = homedir()
 function resolveInput(_kind, cli, candidates) {
 	if (cli && existsSync(cli)) return resolve(cli)
 	for (const c of candidates) if (existsSync(c)) return c
 	return null
 }
 const vpxPath = resolveInput('vpx', arg('--vpx'), []) ?? findWalkingDead()
-const romPath = resolveInput('rom', arg('--rom'), [
-	join(home, 'Downloads/walking_dead/twd_160h.zip'),
-	join(home, 'Downloads/twd_160h.zip'),
-	'/tmp/twd_160h.zip',
-	resolve('demo-browser/public/ab-tmp/twd.zip'),
-])
+const romPath = resolveInput('rom', arg('--rom'), []) ?? findWalkingDeadRom()
 // Mount name must be the game name PinMAME looks for, not the file basename:
 // mirrors romMountFileName() in lib/wasm/vpinball-wasm.ts over the raw table
 // script (stored uncompressed in the VPX), falling back to the ROM basename.
@@ -1627,15 +1617,13 @@ async function main() {
 	if (FULL_RUN) {
 		const lock = acquireFullLock()
 		if (!lock.ok)
-			skipAll(
-				`another full verify:ab run live (pid ${lock.pid}); use --phase with --port/--out for isolated legs`,
-			)
-		comment(`full-run lock held; legs=${PHASES.join(',')} port=${PORT} seed=${SEED}`)
+			skipAll(`another full verify:ab run live (pid ${lock.pid}); use --phase with --out for isolated legs`)
+		comment(`full-run lock held; legs=${PHASES.join(',')} seed=${SEED}`)
 	} else {
-		comment(`single-leg run; legs=${PHASES.join(',')} port=${PORT} seed=${SEED} out=${OUT}`)
+		comment(`single-leg run; legs=${PHASES.join(',')} seed=${SEED} out=${OUT}`)
 	}
 
-	await ensureVite(`${BASE}/`, { label: 'verify-ab' })
+	BASE = new URL((await ensureVite('https://localhost/', { label: 'verify-ab' })).url).origin
 	const repoRoot = process.cwd()
 	let browser = await launchBrowser(puppeteer, { protocolTimeout: 300_000, autoKillMs: BROWSER_BUDGET_MS })
 	const report = { when: new Date().toISOString(), vpx: vpxPath, rom: romPath, headSha, tol: TOL, new: {}, old: {} }
@@ -1760,7 +1748,10 @@ async function main() {
 		// shims) must not resolve OLD imports. Tab death under SwiftShader
 		// memory pressure is retried once with a fresh browser.
 		if (wantPhase('C')) {
-			await ensureVite(`${OLD_BASE}/`, { cwd: join(OLD_DIR, 'demo-browser'), label: 'verify-ab-old' })
+			OLD_BASE = new URL(
+				(await ensureVite('https://localhost/', { cwd: join(OLD_DIR, 'demo-browser'), label: 'verify-ab-old' }))
+					.url,
+			).origin
 			const oldUrl = `${OLD_BASE}/index.html?vpx=${encodeURIComponent(vpxUrl)}&rom=${encodeURIComponent(romUrl)}&mode=play`
 			let phaseCOk = false
 			for (let cAttempt = 1; cAttempt <= 2 && !phaseCOk; cAttempt++) {

@@ -53,11 +53,11 @@ const check = (ok, name, detail = '') => {
 
 let browser
 try {
-	await ensureVite('https://localhost:3000/?vpx=/test/fixtures/table-empty.vpx', { label: 'verify-cadet' })
+	const BASE = new URL((await ensureVite('https://localhost/', { label: 'verify-cadet' })).url).origin
 	const puppeteer = await loadPuppeteer()
 	browser = await launchBrowser(puppeteer, {})
 	const page = await newPage(browser)
-	await page.goto(`https://localhost:3000/?vpx=/@fs${vpxPath}&mode=play`, { waitUntil: 'load', timeout: 90000 })
+	await page.goto(`${BASE}/?vpx=/@fs${vpxPath}&mode=play`, { waitUntil: 'load', timeout: 90000 })
 	await page.waitForFunction('window.viewer && window.viewer.wasmEngine && window.viewer.wasmEngine.ready', {
 		timeout: 240000,
 	})

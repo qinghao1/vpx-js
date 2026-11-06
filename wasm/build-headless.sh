@@ -18,24 +18,20 @@ IFS=$'\n\t'
 readonly ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly VPINBALL="$ROOT/external/vpinball"
 readonly PATCH_DIR="$ROOT/wasm/modules/headless/patches"
-readonly BUILD_DIR_THREADED="$VPINBALL/build/wasm-wasm32"
-readonly BUILD_DIR_SINGLE="$VPINBALL/build/wasm-wasm32-st"
+readonly BUILD_DIR="$VPINBALL/build/wasm-wasm32"
 readonly OUT_DIR="$ROOT/demo-browser/public/wasm"
 
 log() { printf '[headless] %s\n' "$*"; }
 
 BUILD_TYPE="Release"
 CLEAN=0
-SINGLE_THREADED=0
 for arg in "$@"; do
   case "$arg" in
     --debug) BUILD_TYPE="Debug" ;;
     --release) BUILD_TYPE="Release" ;;
     --clean) CLEAN=1 ;;
-    --single-threaded) SINGLE_THREADED=1 ;;
     -h|--help)
-      printf 'Usage: %s [--debug|--release] [--clean] [--single-threaded]\n' "$0"
-      printf '  --single-threaded: no pthreads (for static hosting without COOP/COEP)\n'
+      printf 'Usage: %s [--debug|--release] [--clean]\n' "$0"
       exit 0
       ;;
     --*) log "unknown option $arg"; exit 1 ;;
@@ -121,23 +117,16 @@ if (( CLEAN )); then
   rm -rf "$BUILD_DIR"
 fi
 
-# Third-party wasm libs + shaderc (cached per lib; re-runs are cheap).
-if ! ls "$VPINBALL/third-party/build-libs/wasm-wasm32"/libbgfx.a >/dev/null 2>&1; then
+# Third-party wasm libs + their headers (cached per lib; re-runs are cheap).
+# external.sh copies this header last, so its presence means both the
+# build-libs and the generated (untracked) third-party/include are complete.
+if [[ ! -f "$VPINBALL/third-party/include/spatialaudio/SpatialaudioConfig.h" ]]; then
   log "building third-party wasm libs (one-time; cached per lib)"
   (cd "$VPINBALL" && BUILD_TYPE="$BUILD_TYPE" bash platforms/wasm-wasm32/external.sh)
 fi
 
-if (( SINGLE_THREADED )); then
-  BUILD_DIR="$BUILD_DIR_SINGLE"
-  CMAKE_THREADS_OFF="-DVPX_WASM_PTHREADS=OFF"
-  log "single-threaded build (no pthreads — for static hosting without COOP/COEP)"
-else
-  BUILD_DIR="$BUILD_DIR_THREADED"
-  CMAKE_THREADS_OFF=""
-fi
 log "configuring ($BUILD_TYPE)"
-# shellcheck disable=SC2086
-emcmake cmake -DPLATFORM=wasm -DARCH=wasm32 "-DCMAKE_BUILD_TYPE=$BUILD_TYPE" $CMAKE_THREADS_OFF -B "$BUILD_DIR" -S "$VPINBALL" >/dev/null
+emcmake cmake -DPLATFORM=wasm -DARCH=wasm32 "-DCMAKE_BUILD_TYPE=$BUILD_TYPE" -B "$BUILD_DIR" -S "$VPINBALL" >/dev/null
 log "building vpinball-headless — $(emcc --version 2>/dev/null | head -n1)"
 JOBS="${JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
 cmake --build "$BUILD_DIR" --target vpinball-headless --parallel "$JOBS"

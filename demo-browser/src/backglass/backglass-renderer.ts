@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 // Desktop backglass overlay: backdrop art plus EM score-reel digit quads,
 // glued to the camera like native's screen-space backdrop pass — but
 // contain-fitted to keep authored proportions true instead of stretching

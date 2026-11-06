@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 // @ts-nocheck — viewer is a DOM/three coordinator over loosely-typed runtime
 // subsystems (wasm engine, controls); strict-typing it is a separate migration.
 // Viewer coordinator - delegates to subsystems
@@ -149,14 +150,14 @@ export class Viewer {
 		ensureGlobals()
 		ensureBvh()
 		const {
-			vpx = null,
 			viewerMode = 'viewer',
 			antialias = true,
 			batched = true,
 			forceWebGL = false,
+			autoplay = true,
 			dom = {},
 		} = opts
-		this.options = { vpx, requestedMode: viewerMode, antialias, batched, forceWebGL }
+		this.options = { requestedMode: viewerMode, antialias, batched, forceWebGL, autoplay }
 		this.viewerMode = viewerMode
 		this.dom = {
 			canvas: dom.canvas || $('canvas'),
@@ -616,18 +617,11 @@ export class Viewer {
 		await this._animateCameraTo(target, CAM_ANIM.durationMode)
 		syncRoom(this.scene, this.tableGroup, target.center, target.size)
 		if (!this.wasmEngine?.ready) {
-			if (this.table) {
-				try {
-					await this._createWasmEngine()
-				} catch (e) {
-					this.log(`Play load failed: ${e.message}`, 'error')
-					this._revertFailedPlay()
-				}
-			} else {
-				this.load().catch(e => {
-					this.log(`Play load failed: ${e.message}`, 'error')
-					this._revertFailedPlay()
-				})
+			try {
+				await this._createWasmEngine()
+			} catch (e) {
+				this.log(`Play load failed: ${e.message}`, 'error')
+				this._revertFailedPlay()
 			}
 		}
 	}
@@ -675,21 +669,8 @@ export class Viewer {
 	}
 	async _animateCameraTo(state, duration = CAM_ANIM.durationMode) {
 		if (!state || !this.controls) return
-		this._cameraGen = (this._cameraGen ?? 0) + 1
+		this.cancelCameraAnimation()
 		const _gen = this._cameraGen
-		if (this._cameraRaf) {
-			cancelAnimationFrame(this._cameraRaf)
-			this._cameraRaf = null
-		}
-		if (this._cameraTimeout) {
-			clearTimeout(this._cameraTimeout)
-			this._cameraTimeout = null
-		}
-		if (this._cameraTimeoutResolver) {
-			const resolver = this._cameraTimeoutResolver
-			this._cameraTimeoutResolver = null
-			resolver()
-		}
 		const fromPos = this.camera.position.clone()
 		const fromTarget = this.controls.target.clone()
 		const fromNear = this.camera.near
@@ -847,6 +828,12 @@ export class Viewer {
 		this.setBar(pct, title)
 		if (this.dom.loadTitle) this.dom.loadTitle.textContent = title
 		if (this.dom.loadDetail) this.dom.loadDetail.textContent = detail
+	}
+	/** Coarse load lifecycle for the test API (`whenReady` polls this, not the log). */
+	_setLoadState(state) {
+		try {
+			document.body.dataset.loadState = state
+		} catch {}
 	}
 	_setStreamProgress(done, total) {
 		const pct = total ? Math.round((done / total) * 100) : 0
@@ -1316,6 +1303,7 @@ export class Viewer {
 						: 'Ready — VIEWER: drag to orbit, wheel to zoom — click table to Play (Esc to return)'
 			this.log(this.dom.loadTitle.textContent)
 			logMem(this.harnessLog, 'Ready final')
+			this._setLoadState('ready')
 		} else {
 			this._loading(88, 'Finishing up…', 'Finishing up…')
 		}
@@ -1333,7 +1321,9 @@ export class Viewer {
 		if (this._buttonMeshes.length)
 			this.harnessLog?.(`[input] ${this._buttonMeshes.length} cabinet button meshes (BVH)`, 'debug')
 		this.startLoop()
-		if (this.viewerMode === 'viewer' && this.options.requestedMode === 'play') {
+		// Timed, cancellable only by option: e2e drives play entry explicitly
+		// through the test API with ?autoplay=0 instead of clearing timers.
+		if (this.viewerMode === 'viewer' && this.options.requestedMode === 'play' && this.options.autoplay) {
 			this.log('[viewer] auto-switch to play (vpx URL)', 'info')
 			setTimeout(() => {
 				this._switchToPlay()
@@ -1815,7 +1805,8 @@ export class Viewer {
 		}
 		return mounted
 	}
-	async load() {
+	/** Load a table by name, path or URL (`?vpx=` semantics, see resolveVpxCandidates). */
+	async load(vpx) {
 		this._loadId = (this._loadId ?? 0) + 1
 		const _loadGen = this._loadId
 		if (this._loadAbort) this._loadAbort.abort()
@@ -1830,11 +1821,13 @@ export class Viewer {
 		const _h = typeof window !== 'undefined' ? window.innerHeight : 600
 		this.renderer?.setSize(_w, _h)
 		this._loading(2, 'Getting ready…', 'Looking for table…')
-		const candidates = resolveVpxCandidates(this.options.vpx)
+		const candidates = resolveVpxCandidates(vpx)
 		if (!candidates.length) {
 			this.log('No VPX candidate (pass ?vpx=name)', 'warn')
+			this._setLoadState('error')
 			return
 		}
+		this._setLoadState('loading')
 		this.log(`Trying ${candidates.join(', ')}`, 'debug')
 		for (const cand of candidates) {
 			if (_loadGen !== this._loadId) return
@@ -1907,6 +1900,7 @@ export class Viewer {
 		}
 		if (_loadGen !== this._loadId) return
 		if (_loadGen === this._loadId) this._loadAbort = null
+		this._setLoadState('error')
 		throw new Error(`Failed: none of ${candidates.join(', ')}`)
 	}
 	async loadFromFile(file) {
@@ -1915,19 +1909,25 @@ export class Viewer {
 		if (this._loadAbort) this._loadAbort.abort()
 		this._loadAbort = new AbortController()
 		this._streamId++
+		this._setLoadState('loading')
 		this._loading(5, 'Reading file…', `Reading ${file.name}…`)
 		this.log(`Reading ${file.name}…`, 'debug')
-		const bytes = new Uint8Array(await file.arrayBuffer())
-		this._vpxBytes = bytes
-		const reader = new BrowserBinaryReader(bytes)
-		await reader.open()
-		if (_loadGen !== this._loadId) {
-			await this._cleanupReader(reader)
-			return null
+		try {
+			const bytes = new Uint8Array(await file.arrayBuffer())
+			this._vpxBytes = bytes
+			const reader = new BrowserBinaryReader(bytes)
+			await reader.open()
+			if (_loadGen !== this._loadId) {
+				await this._cleanupReader(reader)
+				return null
+			}
+			const _res = await this._fromReader(reader, file.name, _loadGen)
+			if (_loadGen === this._loadId) this._loadAbort = null
+			return _res
+		} catch (e) {
+			if (_loadGen === this._loadId) this._setLoadState('error')
+			throw e
 		}
-		const _res = await this._fromReader(reader, file.name, _loadGen)
-		if (_loadGen === this._loadId) this._loadAbort = null
-		return _res
 	}
 	async loadRomFile(file) {
 		const buf = new Uint8Array(await file.arrayBuffer())
@@ -1980,16 +1980,6 @@ export class Viewer {
 			lastFpsUpdate = timestamp
 			frames = 0
 			return true
-		}
-		// expose immediate physics tick for tests
-		;(this as any)._tickPhysicsImmediate = () => {
-			if (!this.wasmEngine?.ready) return
-			if (this.isPaused || this.viewerMode !== 'play' || isLowQuality()) return
-			if (this._syncWasmTransforms(performance.now())) {
-				this.renderApi?.flushMatrixUpdates?.(this.tableGroup)
-				if (this.renderPipeline) this.renderPipeline.render()
-				else this.renderer.render(this.scene, this.camera)
-			}
 		}
 		this.renderer.setAnimationLoop((timestamp, frame) => {
 			if (this.isPaused) {
@@ -2075,6 +2065,46 @@ export class Viewer {
 	/** Requests one gated-loop present (mode switch, resize, camera tick, demand texture). Immediate render() also clears it. */
 	invalidate(): void {
 		this._needsRender = true
+	}
+	/**
+	 * Run one engine step plus scene sync outside the rAF loop and present
+	 * it. Shared by live input (no wait for the next frame) and the test
+	 * API (`vpx.step()`). Returns whether a step ran.
+	 */
+	stepOnce(nowMs = performance.now()): boolean {
+		if (!this.wasmEngine?.ready) return false
+		if (this.isPaused || this.viewerMode !== 'play' || isLowQuality()) return false
+		if (!this._syncWasmTransforms(nowMs)) return true
+		this.renderApi?.flushMatrixUpdates?.(this.tableGroup)
+		if (this.renderPipeline) this.renderPipeline.render()
+		else this.renderer.render(this.scene, this.camera)
+		return true
+	}
+	/** Typed entry for the test API: enter or leave play mode (awaits the camera move). */
+	async setMode(mode): Promise<void> {
+		if (mode === 'play') await this._switchToPlay()
+		else await this._switchToViewer()
+	}
+	/**
+	 * Stop any in-flight camera animation, leaving the camera where it is.
+	 * Typed entry for the test API (`vpx.cancelCameraAnimation()`); the
+	 * mode-switch tween reuses the same path on every new animation.
+	 */
+	cancelCameraAnimation(): void {
+		this._cameraGen = (this._cameraGen ?? 0) + 1
+		if (this._cameraRaf) {
+			cancelAnimationFrame(this._cameraRaf)
+			this._cameraRaf = null
+		}
+		if (this._cameraTimeout) {
+			clearTimeout(this._cameraTimeout)
+			this._cameraTimeout = null
+		}
+		if (this._cameraTimeoutResolver) {
+			const resolver = this._cameraTimeoutResolver
+			this._cameraTimeoutResolver = null
+			resolver()
+		}
 	}
 
 	render() {

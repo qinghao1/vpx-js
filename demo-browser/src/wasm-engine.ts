@@ -1,4 +1,4 @@
-/* Copyright (C) 2026 The VPX-JS Authors. Released under GPL-3.0-or-later. */
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import type { BufferGeometry, Object3D, PointLight } from 'three/webgpu'
 import { isPlayfieldDecoyName } from '../../dist-esm/lib/render/threejs/scene-classify.js'
@@ -107,7 +107,7 @@ export class WasmEngine {
 	 * upstream's anti-hung skip (PhysicsEngine.cpp:535-539); the host cap
 	 * below only bounds per-tick bridge work.
 	 */
-	private gameMs = 0
+	private _gameMs = 0
 	private debtMs = 0
 	private lastStepWallMs = 0
 	/** Max game-time advance per rAF: bounds bridge work so a stall cannot spiral. */
@@ -122,7 +122,7 @@ export class WasmEngine {
 		// Fresh table, fresh game epoch (also covers instance reuse: drop the
 		// previous table's part names, cached DMD frame, and scene sync; the
 		// bridge's LoadTable replaces the previous table itself).
-		this.gameMs = 0
+		this._gameMs = 0
 		this.debtMs = 0
 		this.lastStepWallMs = 0
 		this.partNames.clear()
@@ -131,6 +131,17 @@ export class WasmEngine {
 		this.liveBalls.clear()
 		this.resetAudioFormat()
 		this.sync = undefined
+		// Without isolation the threaded engine aborts deep inside wasm: say why.
+		if (!crossOriginIsolated)
+			throw new WasmEngineStartError(
+				'The engine needs a cross-origin-isolated page: serve COOP/COEP headers, or build with VITE_COI_SW=1 for static hosts',
+			)
+		// Table load/teardown suspend on engine threads (JSPI): without it the
+		// factory fails at instantiate with a raw TypeError, so say why.
+		if (typeof (WebAssembly as unknown as { promising?: unknown }).promising !== 'function')
+			throw new WasmEngineStartError(
+				'This browser lacks WebAssembly JSPI (Chrome/Edge 137+, Firefox 153+, Safari 27+)',
+			)
 		// Page-relative so subpath deploys work: document.baseURI resolves
 		// against the page, unlike a module-relative URL under `/@fs/`. The
 		// module is shared page-wide; this instance owns its table from here.
@@ -215,6 +226,25 @@ export class WasmEngine {
 		return this.sync?.ballPoses() ?? []
 	}
 
+	/**
+	 * Harness read-only: live plunger pulls with part names, normalized
+	 * 0..1 downstream. Public so harnesses never read mover rows directly.
+	 */
+	public plungerPositions(): {
+		partIdx: number
+		name: string | undefined
+		pos: number
+		start: number
+		end: number
+	}[] {
+		return (this.sync?.plungerPositions() ?? []).map(p => ({ ...p, name: this.partNames.get(p.partIdx) }))
+	}
+
+	/** Harness read-only: host-owned game clock in ms (advances once per rAF tick while unpaused). */
+	public get gameMs(): number {
+		return this._gameMs
+	}
+
 	/** Harness read-only: cumulative applied light-row changes (boot/activity signal). */
 	public get lightActivity(): number {
 		return this.sync?.lightActivity ?? 0
@@ -222,6 +252,11 @@ export class WasmEngine {
 
 	get catalogSize(): number {
 		return this.partNames.size
+	}
+
+	/** Harness read-only: every part name in the engine catalog (trough-kicker detection, skip logic). */
+	public catalogNames(): string[] {
+		return [...this.partNames.values()]
 	}
 
 	partName(idx: number): string | undefined {
@@ -409,9 +444,9 @@ export class WasmEngine {
 			this.debtMs = Math.min(this.debtMs + Math.max(wallDelta, 0), WasmEngine.maxDebtMs)
 			const advance = Math.min(this.debtMs, WasmEngine.maxAdvanceMs)
 			if (advance > 0) {
-				this.gameMs += advance
+				this._gameMs += advance
 				this.debtMs -= advance
-				engine.stepFrame(this.gameMs)
+				engine.stepFrame(this._gameMs)
 			}
 		}
 		const read = (kind: WasmBufferKind): Float32Array => engine.getBuffer(kind)?.view ?? EMPTY_VIEW

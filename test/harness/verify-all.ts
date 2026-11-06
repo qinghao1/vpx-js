@@ -1,8 +1,9 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 // Unified E2E — runs all verify-* harnesses with TAP summary.
 // Exit codes: 0 all checks pass, 1 any failure (including optional checks that
 // ran and failed — only checks that never ran, e.g. missing native binary,
 // are reported as SKIP). Child convention: 0 pass, 77 skip, anything else fail.
-import { execSync, spawn } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import * as fs from 'node:fs'
 import { availableParallelism } from 'node:os'
 import path from 'node:path'
@@ -44,18 +45,52 @@ function resolveJobs(): number {
 	return Number.isFinite(n) && n > 0 ? n : cpuCount()
 }
 
-const killStale = () => {
+// Isolation: reap only child legs this process spawned (tracked PIDs), never
+// pattern-match host chrome. SIGTERM first so a leg's own utils.mjs cleanup
+// reaps its chrome/vite, then SIGKILL stragglers. Parallel runs must not kill
+// each other — or any unrelated user process.
+const _children = new Set<ReturnType<typeof spawn>>()
+function trackChild(child: ReturnType<typeof spawn>): ReturnType<typeof spawn> {
+	_children.add(child)
+	child.on('close', () => _children.delete(child))
+	return child
+}
+// Children spawn detached (own process group) so a kill takes the whole leg
+// subtree — leg chrome, leg vite, tsx wrapper — and nothing else. Signaling
+// the direct pid alone orphans grandchildren (verified with `npx vite`).
+function killTree(child: ReturnType<typeof spawn>, signal: NodeJS.Signals): void {
 	try {
-		execSync('pkill -9 -f "chrome.*headless.*puppeteer" 2>/dev/null || true', { timeout: 2000, stdio: 'ignore' })
+		if (child.pid) process.kill(-child.pid, signal)
+	} catch {}
+	try {
+		child.kill(signal)
+	} catch {}
+	try {
+		if (child.pid) process.kill(child.pid, signal)
 	} catch {}
 }
-process.once('exit', killStale)
-process.once('SIGINT', killStale)
-process.once('SIGTERM', killStale)
+async function killTracked(): Promise<void> {
+	for (const c of _children) killTree(c, 'SIGTERM')
+	const deadline = Date.now() + 5000
+	while (_children.size > 0 && Date.now() < deadline) await new Promise(r => setTimeout(r, 100))
+	for (const c of _children) killTree(c, 'SIGKILL')
+	_children.clear()
+}
+let _shuttingDown = false
+async function shutdown(code: number): Promise<void> {
+	if (_shuttingDown) return
+	_shuttingDown = true
+	await killTracked()
+	process.exit(code)
+}
+process.once('exit', () => {
+	for (const c of _children) killTree(c, 'SIGKILL')
+})
+process.once('SIGINT', () => void shutdown(1))
+process.once('SIGTERM', () => void shutdown(1))
 process.on('uncaughtException', err => {
 	console.error('[verify-all] uncaught', err)
-	killStale()
-	process.exit(1)
+	void shutdown(1)
 })
 
 async function puppeteerAvailable(): Promise<boolean> {
@@ -83,16 +118,13 @@ export async function verifyBrowser(): Promise<CheckStatus> {
 	}
 	try {
 		const code = await new Promise<number>(resolve => {
-			const child = spawn('node', [script], { stdio: 'inherit' })
+			const child = trackChild(spawn('node', [script], { stdio: 'inherit', detached: true }))
 			child.on('close', exitCode => resolve(exitCode ?? 1))
 			child.on('error', () => resolve(1))
-			child.on('close', killStale)
 		})
 		return exitCodeToStatus(code)
 	} catch {
 		return 'fail'
-	} finally {
-		killStale()
 	}
 }
 
@@ -124,6 +156,12 @@ const checks: E2ECheck[] = [
 		optional: true,
 		skipReason: 'Space Cadet VPX not provisioned (child exit 77)',
 	},
+	{
+		name: 'pages',
+		script: 'test/harness/verify-pages.mjs',
+		optional: true,
+		skipReason: 'engine artifact not built (child exit 77)',
+	},
 	{ name: 'browser', run: verifyBrowser, optional: true, skipReason: 'browser not runnable here' },
 ]
 
@@ -152,9 +190,12 @@ async function runCheck(check: E2ECheck, opts: { capture?: boolean } = {}): Prom
 	const scriptPath = path.resolve(check.script ?? '')
 	if (!fs.existsSync(scriptPath)) return { status: 'skip', output: '' }
 	return new Promise(resolve => {
-		const child = spawn('npx', ['tsx', scriptPath], {
-			stdio: opts.capture ? ['ignore', 'pipe', 'pipe'] : 'inherit',
-		})
+		const child = trackChild(
+			spawn('npx', ['tsx', scriptPath], {
+				stdio: opts.capture ? ['ignore', 'pipe', 'pipe'] : 'inherit',
+				detached: true,
+			}),
+		)
 		let out = ''
 		if (opts.capture) {
 			child.stdout?.on('data', d => {
@@ -247,7 +288,6 @@ async function main(): Promise<void> {
 	console.log('')
 	tapComment(`pass ${pass.n}/${checks.length}`)
 	tapComment(pass.n === checks.length ? 'Result: PASS' : 'Result: FAIL')
-	killStale()
 	process.exit(pass.n === checks.length ? 0 : 1)
 }
 

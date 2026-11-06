@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import { Texture } from 'three'
 import { describe, expect, it, vi } from 'vitest'
 import { TableBuilder } from '../../../test/table-builder.js'
@@ -231,7 +232,6 @@ describe('ThreeMapGenerator.loadTextures', () => {
 		const infos: Array<{ f: string; a: unknown[] }> = []
 		const prev = Logger.logger()
 		Logger.setLogger({
-			wtf: () => {},
 			error: () => {},
 			warn: () => {},
 			debug: () => {},
@@ -354,7 +354,6 @@ describe('ThreeMapGenerator.retainSources', () => {
 		const debugs: Array<{ f: string; a: unknown[] }> = []
 		const prev = Logger.logger()
 		Logger.setLogger({
-			wtf: () => {},
 			error: () => {},
 			warn: () => {},
 			info: () => {},

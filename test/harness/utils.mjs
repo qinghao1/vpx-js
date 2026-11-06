@@ -1,6 +1,7 @@
-import { execSync, spawn } from 'node:child_process'
-import { existsSync, readdirSync, rmSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+import { spawn } from 'node:child_process'
+import { existsSync, realpathSync, rmSync } from 'node:fs'
+import { createServer } from 'node:net'
 
 export async function loadPuppeteer() {
 	for (const specifier of ['puppeteer-core', 'puppeteer']) {
@@ -30,17 +31,11 @@ export async function waitFor(fn, { timeoutMs = 5000, intervalMs = 100 } = {}) {
 const _browsers = new Set()
 const _vites = new Set()
 const _profileDirs = new Map()
-// Host-wide reaping is opt-in (VPX_HARNESS_REAP=1): parallel harness runs must not
-// SIGKILL each other's chrome/vite. Default scope is tracked PIDs + own profile dirs.
-const HOST_REAP = process.env.VPX_HARNESS_REAP === '1'
+// Isolation: this module never kills by pattern (no pkill). Cleanup is scoped
+// to PIDs this process spawned (tracked in _browsers/_vites) plus the profile
+// dirs those browsers created, so parallel harness runs — and unrelated user
+// chrome/vite processes — are never touched.
 let _cleanupRegistered = false
-const CHROME_PKILL = 'pkill -9 -f "chrome.*headless.*puppeteer" 2>/dev/null || true'
-const VITE_PKILL = 'pkill -9 -f "vite.*--port" 2>/dev/null || true'
-function pkillSync(cmd) {
-	try {
-		execSync(cmd, { timeout: 2000, stdio: 'ignore' })
-	} catch {}
-}
 const CHROME_CANDIDATES = [
 	'/usr/bin/google-chrome',
 	'/usr/bin/chromium',
@@ -54,31 +49,6 @@ function resolveChromePath() {
 		if (existsSync(candidate)) return candidate
 	}
 	return undefined
-}
-function cleanChromeTmpDirs(onlyStale) {
-	try {
-		const tmp = '/tmp'
-		for (const name of readdirSync(tmp)) {
-			if (!name.startsWith('puppeteer_dev_chrome')) continue
-			const full = join(tmp, name)
-			try {
-				if (onlyStale) {
-					const st = statSync(full)
-					if (Date.now() - st.mtimeMs <= 60 * 1000) continue
-				}
-				rmSync(full, { recursive: true, force: true })
-			} catch {}
-		}
-	} catch {}
-}
-export function killStaleChromeSync() {
-	if (!HOST_REAP) return
-	pkillSync(CHROME_PKILL)
-	cleanChromeTmpDirs(true)
-}
-function killStaleViteSync() {
-	if (!HOST_REAP) return
-	pkillSync(VITE_PKILL)
 }
 function trackProfileDir(browser) {
 	try {
@@ -97,9 +67,8 @@ function removeOwnProfileDir(browser) {
 function registerCleanup() {
 	if (_cleanupRegistered) return
 	_cleanupRegistered = true
-	try {
-		killStaleChromeSync()
-	} catch {}
+	// Tracked PIDs only: reap browsers/vites this process spawned, then drop
+	// their own profile dirs. Never pattern-match host processes.
 	const _cleanup = () => {
 		for (const b of _browsers) {
 			try {
@@ -116,23 +85,8 @@ function registerCleanup() {
 			removeOwnProfileDir(b)
 		}
 		_browsers.clear()
-		for (const p of _vites) {
-			try {
-				process.kill(p.pid, 'SIGKILL')
-			} catch {}
-			try {
-				p.kill('SIGKILL')
-			} catch {}
-			try {
-				p.kill('SIGTERM')
-			} catch {}
-		}
+		for (const p of _vites) killGroup(p)
 		_vites.clear()
-		if (HOST_REAP) {
-			killStaleChromeSync()
-			killStaleViteSync()
-			cleanChromeTmpDirs(false)
-		}
 	}
 	process.once('exit', _cleanup)
 	process.once('beforeExit', _cleanup)
@@ -152,15 +106,6 @@ function registerCleanup() {
 			process.exit(1)
 		})
 	}
-	setInterval(() => {
-		if (!HOST_REAP) return
-		if (_browsers.size === 0) {
-			killStaleChromeSync()
-		}
-		if (_vites.size === 0) {
-			killStaleViteSync()
-		}
-	}, 30000).unref?.()
 }
 if (typeof process !== 'undefined') {
 	registerCleanup()
@@ -180,9 +125,8 @@ function resolveGpuArgs(gpu) {
 }
 export async function launchBrowser(puppeteer, opts = {}) {
 	registerCleanup()
-	try {
-		killStaleChromeSync()
-	} catch {}
+	// No proactive reaping: a second concurrent run must never SIGKILL the
+	// browser this run (or any other process) already has open.
 	const { gpu, ...rest } = opts
 	const gpuArgs = resolveGpuArgs(gpu)
 	const chromePath = resolveChromePath()
@@ -216,7 +160,6 @@ export async function launchBrowser(puppeteer, opts = {}) {
 		try {
 			browser.process()?.kill('SIGKILL')
 		} catch {}
-		if (HOST_REAP) pkillSync(CHROME_PKILL)
 	}, opts.autoKillMs ?? 300_000)
 	if (autoKill.unref) autoKill.unref()
 	const origClose = browser.close.bind(browser)
@@ -235,10 +178,6 @@ export async function launchBrowser(puppeteer, opts = {}) {
 				browser.process()?.kill?.('SIGKILL')
 			} catch {}
 			removeOwnProfileDir(browser)
-			if (HOST_REAP) {
-				pkillSync(CHROME_PKILL)
-				cleanChromeTmpDirs(false)
-			}
 		}
 	}
 	try {
@@ -297,81 +236,87 @@ async function fetchOk(url, method = 'HEAD') {
 	return false
 }
 
+// One vite per tree root per process, on an OS-assigned free port. A server
+// this process did not spawn is never reused: it may serve another checkout,
+// and a sibling run's server dies when that run exits.
+const _viteByRoot = new Map()
+
+function freePort() {
+	return new Promise((resolve, reject) => {
+		const server = createServer()
+		server.once('error', reject)
+		server.listen(0, () => {
+			const { port } = server.address()
+			server.close(() => resolve(port))
+		})
+	})
+}
+
+// `npx vite` forks sh + node: spawned detached, the tree is its own process
+// group, so signalling -pid reaps the server rather than orphaning it.
+function killGroup(proc, signal = 'SIGKILL') {
+	try {
+		process.kill(-proc.pid, signal)
+	} catch {}
+}
+
+async function startVite(root, protocol, label) {
+	for (let attempt = 1; ; attempt++) {
+		const port = await freePort()
+		console.log(`[${label}] starting vite in ${root} on :${port}…`)
+		const proc = spawn(
+			'npx',
+			['vite', '--host', '--port', String(port), '--strictPort', '--clearScreen', 'false'],
+			{
+				cwd: root,
+				stdio: ['ignore', 'pipe', 'pipe'],
+				detached: true,
+			},
+		)
+		_vites.add(proc)
+		proc.once('exit', () => _vites.delete(proc))
+		proc.stdout.on('data', d => process.stdout.write(`[${label}] ${d}`))
+		proc.stderr.on('data', d => process.stderr.write(`[${label}] ${d}`))
+		// 60 s: cold plugin + dep optimization on a loaded box exceeds 30 s.
+		for (let i = 0; i < 60 && proc.exitCode === null; i++) {
+			await sleep(1000)
+			if (await fetchOk(`${protocol}//localhost:${port}/`)) return { proc, port }
+		}
+		const exited = proc.exitCode !== null
+		killGroup(proc)
+		// --strictPort exits when something grabbed the port between freePort()
+		// and vite's bind: retry on a fresh port; a hang is a real failure.
+		if (!exited || attempt === 3) throw new Error(`[${label}] vite did not start on :${port}`)
+	}
+}
+
+/**
+ * Serve `cwd` (default: demo-browser) with this process's own vite and return
+ * `url` re-pointed at it. Navigate to the returned `url`, never the requested
+ * one: the port is chosen per run so parallel runs cannot collide.
+ */
 export async function ensureVite(
 	url,
 	{ cwd = new URL('../../demo-browser', import.meta.url).pathname, label = 'vite' } = {},
 ) {
-	registerCleanup()
-	// Port isolation: derive the wanted port from the requested URL so
-	// concurrent harness runs on distinct --port values probe AND spawn on
-	// their own port instead of all colliding on 3000.
-	const wantedPort = (() => {
-		try {
-			return new URL(url.replace(/\?.*$/, '')).port || '3000'
-		} catch {
-			return '3000'
-		}
-	})()
-	const candidates = [`https://localhost:${wantedPort}/`, `http://localhost:${wantedPort}/`]
-	for (let attempt = 0; attempt < 3; attempt++) {
-		for (const u of candidates) {
-			if (await fetchOk(u, 'HEAD')) return null
-			if (await fetchOk(u, 'GET')) return null
-		}
-		if (attempt < 2) {
-			console.log(`[${label}] vite not ready, retry ${attempt + 1}/3…`)
-			await sleep(800)
-		}
+	const requested = new URL(url)
+	const root = realpathSync(cwd)
+	let server = _viteByRoot.get(root)
+	if (!server) {
+		server = startVite(root, requested.protocol, label)
+		_viteByRoot.set(root, server)
+		server.catch(() => _viteByRoot.delete(root))
 	}
-	console.log(`[${label}] starting vite in ${cwd}…`)
-	const proc = spawn('npx', ['vite', '--host', '--port', wantedPort, '--clearScreen', 'false'], {
-		cwd,
-		stdio: ['ignore', 'pipe', 'pipe'],
-	})
-	_vites.add(proc)
-	proc.once('exit', () => _vites.delete(proc))
-	const killViteProc = () => {
-		try {
-			proc.kill('SIGTERM')
-		} catch {}
-		try {
-			proc.kill('SIGKILL')
-		} catch {}
-		try {
-			process.kill(proc.pid, 'SIGKILL')
-		} catch {}
-		_vites.delete(proc)
+	const { proc, port } = await server
+	requested.port = String(port)
+	return {
+		url: requested.href,
+		get killed() {
+			return proc.exitCode !== null
+		},
+		kill(signal = 'SIGKILL') {
+			_viteByRoot.delete(root)
+			killGroup(proc, signal)
+		},
 	}
-	// Spawned-vite watchdog: a harness-spawned server must outlive the longest
-	// leg (multi-minute SwiftShader phases), not the old 120 s budget, which
-	// murdered the server mid-run. Process-exit cleanup still reaps it.
-	const viteAutoKill = setTimeout(killViteProc, 3_600_000)
-	if (viteAutoKill.unref) viteAutoKill.unref()
-	const origKill = proc.kill.bind(proc)
-	proc.kill = (...args) => {
-		clearTimeout(viteAutoKill)
-		_vites.delete(proc)
-		return origKill(...args)
-	}
-	if (typeof process !== 'undefined') {
-		process.once('exit', killViteProc)
-		process.once('SIGINT', killViteProc)
-		process.once('SIGTERM', killViteProc)
-		process.once('SIGHUP', killViteProc)
-	}
-	proc.stdout.on('data', d => process.stdout.write(`[${label}] ${d}`))
-	proc.stderr.on('data', d => process.stderr.write(`[${label}] ${d}`))
-	for (let i = 0; i < 60; i++) {
-		await sleep(1000)
-		// Vite serves https (basicSsl) in this repo; probe both schemes with
-		// the same TLS-tolerant check as the pre-spawn candidates above.
-		// 60 s: cold plugin + dep optimization on a loaded box exceeds 30 s.
-		for (const u of candidates) {
-			if (await fetchOk(u, 'HEAD')) {
-				console.log(`[${label}] vite ready (${u})`)
-				return proc
-			}
-		}
-	}
-	throw new Error('vite not ready in 60s')
 }

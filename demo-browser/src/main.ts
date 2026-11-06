@@ -1,5 +1,8 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 // @ts-nocheck
 
+import { crossOriginIsolate } from './cross-origin-isolation.js'
+import { createTestApi } from './test-api.js'
 import { initHelp } from './ui/help-dialog.js'
 import { initTableBrowser } from './ui/table-browser.js'
 import { Viewer } from './viewer.js'
@@ -13,8 +16,13 @@ function parseViewerOptions(search) {
 		antialias: !params.has('noaa'),
 		batched: !params.has('nobatched'),
 		forceWebGL: params.has('webgl'),
+		// E2E drives play entry explicitly through the test API; the
+		// timed auto-switch to play would race it.
+		autoplay: params.get('autoplay') !== '0',
 	}
 }
+
+if (import.meta.env.VITE_COI_SW) await crossOriginIsolate()
 
 const options = parseViewerOptions(location.search)
 const viewer = new Viewer(options)
@@ -23,11 +31,16 @@ const _isDev = (() => {
 	const h = location.hostname
 	return h === 'localhost' || h === '127.0.0.1' || h === '' || h === '0.0.0.0'
 })()
-if (_isDev) window.viewer = viewer
+// Dev-only handles for humans and e2e: the viewer for scene inspection,
+// `vpx` for the typed test surface. Never present in production builds.
+if (_isDev) {
+	window.viewer = viewer
+	window.vpx = createTestApi(viewer)
+}
 initHelp(viewer)
 
 if (options.vpx) {
-	viewer.load().catch(e => console.error('[app] load failed', e))
+	viewer.load(options.vpx).catch(e => console.error('[app] load failed', e))
 	if (options.rom) viewer.preloadRom(options.rom).catch(e => console.error('[app] rom load failed', e))
 } else {
 	viewer.startLoop()

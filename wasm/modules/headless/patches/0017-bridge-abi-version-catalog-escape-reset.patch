@@ -12,24 +12,11 @@ Subject: [PATCH 17/17] bridge: ABI version, escaped part catalog, full session r
 - ResetBridgeFrameState also clears the FlexDMD publish latch and hash
   and the captured audio format, so a table loaded into a reused module
   publishes its first FlexDMD frame and relearns its own audio rate.
-- -sEXPORTED_FUNCTIONS lists every bridge export (GetFlasherImage,
-  GetAudio, GetAudioInfo, SetAudioLevel and GetAbiVersion were reachable
-  through EMSCRIPTEN_KEEPALIVE only).
+  (Every bridge export already carries EMSCRIPTEN_KEEPALIVE, so no
+  -sEXPORTED_FUNCTIONS change is needed.)
 
 Target: vpinball/vpinball@64a480a96d1b972711fbb8eea014654c779b1e23
 
-diff --git a/make/CMakeLists_app.txt b/make/CMakeLists_app.txt
---- a/make/CMakeLists_app.txt
-+++ b/make/CMakeLists_app.txt
-@@ -1120,7 +1120,7 @@ elseif(PLATFORM STREQUAL "wasm")
-       -sMODULARIZE=1
-       -sEXPORT_ES6=1
-       -sEXPORT_NAME=createVpinballHeadless
--      -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_VpxWasm_Init,_VpxWasm_MountRom,_VpxWasm_LoadTable,_VpxWasm_StepFrame,_VpxWasm_GetPartCatalogJson,_VpxWasm_GetBuffer,_VpxWasm_GetDmdFrame,_VpxWasm_PushKey,_VpxWasm_Nudge,_VpxWasm_DestroyTable,_VpxWasm_GetScriptErrorCount,_VpxWasm_GetScriptError
-+      -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_VpxWasm_GetAbiVersion,_VpxWasm_Init,_VpxWasm_MountRom,_VpxWasm_LoadTable,_VpxWasm_StepFrame,_VpxWasm_GetPartCatalogJson,_VpxWasm_GetBuffer,_VpxWasm_GetDmdFrame,_VpxWasm_PushKey,_VpxWasm_Nudge,_VpxWasm_DestroyTable,_VpxWasm_GetScriptErrorCount,_VpxWasm_GetScriptError,_VpxWasm_GetFlasherImage,_VpxWasm_GetAudio,_VpxWasm_GetAudioInfo,_VpxWasm_SetAudioLevel
-       -sEXPORTED_RUNTIME_METHODS=FS,UTF8ToString,HEAPU8,HEAPU32,HEAPF32
-       -Wl,--allow-multiple-definition
-       "--preload-file=${CMAKE_SOURCE_DIR}/src/assets@/assets"
 diff --git a/src/web/vpx_wasm_bridge.cpp b/src/web/vpx_wasm_bridge.cpp
 --- a/src/web/vpx_wasm_bridge.cpp
 +++ b/src/web/vpx_wasm_bridge.cpp

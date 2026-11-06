@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 // TWD browser E2E — runs demo-browser/e2e/integration.mjs against the real
 // Walking Dead table (plus the PinMAME ROM when present) so the pageerror
 // gate, backbox map-bound, live-DMD and DMD-visible legs exercise real

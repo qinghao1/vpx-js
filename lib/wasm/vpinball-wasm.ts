@@ -3,8 +3,8 @@
 
 /**
  * TypeScript side of the headless-engine bridge (`src/web/vpx_wasm_bridge.cpp`,
- * patches under `wasm/modules/headless/patches/`). Until the artifact exists,
- * every entry point here fails honestly instead of pretending the engine exists.
+ * patches under `wasm/modules/headless/patches/`). Without the built artifact
+ * every entry point here throws or rejects instead of using a fake engine.
  */
 
 /**
@@ -239,7 +239,7 @@ export interface DmdFrameDesc {
 /**
  * Raw emscripten module surface of `vpinball-headless` (see `vpx_wasm_bridge.cpp`): exported
  * `VpxWasm_*` functions plus the heap views. Use {@link wrapHeadlessEngine}
- * for the byte-array facade; the raw shape is exported for tests only (not from `lib/index`).
+ * for the byte-array facade; the raw shape is exported for tests only.
  */
 export interface RawHeadlessModule {
 	/** Absent on artifacts predating patch 0017; checked once by {@link wrapHeadlessEngine}. */
@@ -282,15 +282,17 @@ const suspendable = <A extends unknown[], R>(fn: (...args: A) => R, recv?: unkno
 		try {
 			const wrapped = (promising as (fn: (...args: A) => R) => (...args: A) => Promise<R>)(fn)
 			return (...args) => wrapped.apply(recv, args)
-		} catch {
-			/* Non-wasm fake: fall through to a resolved sync call. */
+		} catch (error) {
+			// `promising` rejects a non-wasm fake with a TypeError; anything
+			// else is a real failure, so only fakes fall back to a sync call.
+			if (!(error instanceof TypeError)) throw error
 		}
 	}
 	return (...args) => Promise.resolve(fn.apply(recv, args))
 }
 
 /** Facade operations that can fail with a {@link HeadlessEngineError}. */
-export type HeadlessEngineOp = 'abi' | 'malloc' | 'mountRom' | 'loadTable' | 'readDescriptor'
+export type HeadlessEngineOp = 'abi' | 'malloc' | 'mountRom' | 'loadTable' | 'readDescriptor' | 'environment' | 'load'
 
 /** A bridge call failed; `op` names the facade operation, `cause` the reason. */
 export class HeadlessEngineError extends Error {
@@ -522,13 +524,10 @@ export function wrapHeadlessEngine(raw: RawHeadlessModule, url: string): Headles
 	}
 }
 
-/** Thrown when the headless-engine artifact has not been built yet. */
+/** Thrown when the headless-engine artifact is missing (the glue URL 404s). */
 export class HeadlessEngineMissingError extends Error {
-	constructor(url: string) {
-		super(
-			`vpinball-headless not found at ${url}: build it with the Phase 2 bridge target ` +
-				`(vpx_wasm_bridge.cpp + VPX_HEADLESS_BRIDGE) — no engine runs until then.`,
-		)
+	constructor(url: string, options?: ErrorOptions) {
+		super(`vpinball-headless not found at ${url}: build it with \`npm run build:wasm:headless\`.`, options)
 		this.name = 'HeadlessEngineMissingError'
 	}
 }
@@ -554,8 +553,9 @@ const engines = new Map<string, Promise<HeadlessEngine>>()
  * per URL, wraps it in the byte-array facade and initializes the bridge.
  * Every caller shares that module (one heap and one pthread pool per page) and
  * loads its table into it in turn. Rejects with {@link HeadlessEngineMissingError}
- * when the artifact is absent and with {@link HeadlessEngineError} on an ABI
- * mismatch; a failed load is not cached.
+ * when the artifact 404s and with {@link HeadlessEngineError} (`op: 'environment'`
+ * without cross-origin isolation, `op: 'load'` when the module fails otherwise,
+ * `op: 'abi'` on a version mismatch); a failed load is not cached.
  */
 export function loadHeadlessEngine(url = 'wasm/vpinball-headless.js'): Promise<HeadlessEngine> {
 	let engine = engines.get(url)
@@ -567,15 +567,39 @@ export function loadHeadlessEngine(url = 'wasm/vpinball-headless.js'): Promise<H
 	return engine
 }
 
+/** Fail fast when the host page cannot run the threaded engine (every facade consumer needs this). */
+function checkHostEnvironment(url: string): void {
+	const isolated = (globalThis as { crossOriginIsolated?: unknown }).crossOriginIsolated
+	if (isolated === false)
+		throw new HeadlessEngineError(
+			'environment',
+			`${url} needs a cross-origin-isolated page (SharedArrayBuffer): serve COOP/COEP headers`,
+		)
+}
+
+/** Sort an engine-module import failure into missing (404) vs broken. */
+async function asEngineLoadError(url: string, cause: unknown): Promise<Error> {
+	let status: number | undefined
+	try {
+		status = (await fetch(url, { method: 'HEAD' })).status
+	} catch {
+		status = undefined
+	}
+	if (status === 404) return new HeadlessEngineMissingError(url, { cause })
+	const detail = cause instanceof Error ? cause.message : String(cause)
+	return new HeadlessEngineError('load', `${url} failed to load${status ? ` (HTTP ${status})` : ''}: ${detail}`)
+}
+
 async function instantiateHeadlessEngine(url: string): Promise<HeadlessEngine> {
+	checkHostEnvironment(url)
 	let factory: unknown
 	try {
 		const imported = (await import(/* @vite-ignore */ url)) as { default?: unknown }
 		factory = imported.default ?? imported
-	} catch {
-		throw new HeadlessEngineMissingError(url)
+	} catch (error) {
+		throw await asEngineLoadError(url, error)
 	}
-	if (typeof factory !== 'function') throw new HeadlessEngineMissingError(url)
+	if (typeof factory !== 'function') throw new HeadlessEngineError('load', `${url} did not export an engine factory`)
 	const locateFile = wasmLocateFile(url)
 	const raw = (await (factory as (module?: { locateFile?: (path: string) => string }) => Promise<RawHeadlessModule>)({
 		locateFile,

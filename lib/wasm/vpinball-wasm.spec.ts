@@ -7,6 +7,7 @@ import {
 	DmdFrameFormat,
 	HEADLESS_ABI_VERSION,
 	HeadlessEngineError,
+	HeadlessEngineMissingError,
 	loadHeadlessEngine,
 	type RawHeadlessModule,
 	resolveFlipperKey,
@@ -424,6 +425,31 @@ describe('suspendable receiver', () => {
 		expect(destroyReceiver).toBe(fake.raw)
 	})
 
+	it('falls back to a sync call only when promising rejects a non-wasm fake', async () => {
+		const prior = (WebAssembly as Record<string, unknown>).promising
+		;(WebAssembly as Record<string, unknown>).promising = () => {
+			throw new TypeError('not a wasm export')
+		}
+		try {
+			const fake = fakeRaw()
+			fake.raw._VpxWasm_LoadTable = () => 0
+			await expect(wrapHeadlessEngine(fake.raw, 'test').loadTable(new Uint8Array([1]))).resolves.toBeUndefined()
+		} finally {
+			;(WebAssembly as Record<string, unknown>).promising = prior
+		}
+	})
+	it('rethrows real failures from WebAssembly.promising instead of hiding them', () => {
+		const prior = (WebAssembly as Record<string, unknown>).promising
+		;(WebAssembly as Record<string, unknown>).promising = () => {
+			throw new RangeError('boom')
+		}
+		try {
+			expect(() => wrapHeadlessEngine(fakeRaw().raw, 'test')).toThrow(RangeError)
+		} finally {
+			;(WebAssembly as Record<string, unknown>).promising = prior
+		}
+	})
+
 	// `WebAssembly.promising` rejects closures over an export, so the wrapper
 	// must hand it the genuine export (identity-checked here), applied on the
 	// module receiver; otherwise table load traps with SuspendError whenever
@@ -484,6 +510,46 @@ describe('loadHeadlessEngine', () => {
 		await expect(loadHeadlessEngine(url)).rejects.toMatchObject({ op: 'abi' })
 		await expect(loadHeadlessEngine(url)).rejects.toBeInstanceOf(HeadlessEngineError)
 		expect(counts('__vpxStale')).toEqual({ factory: 2, init: 0 })
+	})
+	it('refuses to load without cross-origin isolation', async () => {
+		const globals = globalThis as { crossOriginIsolated?: unknown }
+		const prior = globals.crossOriginIsolated
+		globals.crossOriginIsolated = false
+		try {
+			await expect(
+				loadHeadlessEngine('https://localhost:3000/wasm/vpinball-headless.js?env=1'),
+			).rejects.toMatchObject({ op: 'environment' })
+		} finally {
+			globals.crossOriginIsolated = prior
+		}
+	})
+	it('reports a 404 as missing with the build command and the import cause', async () => {
+		const priorFetch = globalThis.fetch
+		globalThis.fetch = (async () => ({ status: 404 })) as typeof fetch
+		try {
+			const error = await loadHeadlessEngine('data:text/javascript,throw new Error("boom")?missing=1').catch(
+				e => e,
+			)
+			expect(error).toBeInstanceOf(HeadlessEngineMissingError)
+			expect(error.message).toMatch('npm run build:wasm:headless')
+			expect(error.cause).toBeInstanceOf(Error)
+		} finally {
+			globalThis.fetch = priorFetch
+		}
+	})
+	it('reports a present-but-broken module as a load error, not missing', async () => {
+		const priorFetch = globalThis.fetch
+		globalThis.fetch = (async () => ({ status: 200 })) as typeof fetch
+		try {
+			await expect(
+				loadHeadlessEngine('data:text/javascript,throw new Error("boom")?broken=1'),
+			).rejects.toMatchObject({ op: 'load' })
+			await expect(loadHeadlessEngine('data:text/javascript,export default 42?factory=1')).rejects.toMatchObject({
+				op: 'load',
+			})
+		} finally {
+			globalThis.fetch = priorFetch
+		}
 	})
 })
 

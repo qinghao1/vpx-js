@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -74,6 +75,7 @@ const vite = await ensureVite(url, {
 	cwd: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../demo-browser'),
 	label: 'bench',
 })
+url = vite.url
 const browser = await launchBrowser(puppeteer, {
 	...(headed ? { headless: false } : {}),
 	...(gpu ? { gpu } : {}),
@@ -914,12 +916,6 @@ const logPatterns = [
 		},
 	],
 	[
-		/Table script transpiled and executed in (\d+)ms/,
-		match => {
-			parsed.transpileMs = Number(match[1])
-		},
-	],
-	[
 		/\[stream\] Done .* in (\d+)ms/,
 		match => {
 			parsed.streamLogMs = Number(match[1])
@@ -1000,7 +996,6 @@ const payload = {
 		parseMs: parsed.parseMs ?? null,
 		sceneGenMs: parsed.sceneGenMs ?? null,
 		fetchMs: parsed.fetchMs ?? null,
-		transpileMs: parsed.transpileMs ?? null,
 		streamMs,
 		streamLogMs: parsed.streamLogMs ?? null,
 		streamDone,
@@ -1057,7 +1052,7 @@ console.log(`\n[bench] === ANALYSIS & SUGGESTIONS ===`)
 	if (breakdown && !pf.breakdown)
 		console.warn('[bench] breakdown requested but no phase data sampled (syncAll sink not installed?)')
 	console.log(
-		`Load: ready ${fmt(lj.readyMs)} (nav ${fmt(lj.navMs)} fetch ${fmt(lj.fetchMs)} parse ${fmt(lj.parseMs)} scene ${fmt(lj.sceneGenMs)} transpile ${fmt(lj.transpileMs)}) + stream ${fmt(lj.streamMs)} (log ${fmt(lj.streamLogMs)}) = total ${fmt(lj.totalLoadMs)} heapReady ${lj.readyHeap}MB streamDone=${lj.streamDone}`,
+		`Load: ready ${fmt(lj.readyMs)} (nav ${fmt(lj.navMs)} fetch ${fmt(lj.fetchMs)} parse ${fmt(lj.parseMs)} scene ${fmt(lj.sceneGenMs)}) + stream ${fmt(lj.streamMs)} (log ${fmt(lj.streamLogMs)}) = total ${fmt(lj.totalLoadMs)} heapReady ${lj.readyHeap}MB streamDone=${lj.streamDone}`,
 	)
 	console.log(
 		`GPU: ${payload.glInfo?.renderer ?? '?'} vendor ${payload.glInfo?.vendor ?? '?'} :: ${JSON.stringify(payload.glInfo?.params ?? {})}`,
@@ -1127,14 +1122,6 @@ console.log(`\n[bench] === ANALYSIS & SUGGESTIONS ===`)
 			`  Suggestion: generate meshes in workers (via Comlink), batchStaticOpaques only 1 BatchedMesh currently—extend to all opaques, instance rubbers/primitives, dispose hidden geometries earlier (postProcess hides lightmaps but keeps geometry).`,
 		)
 	}
-	if (lj.transpileMs && lj.transpileMs > 1500) {
-		console.log(
-			`- TRANSPILATION: ${lj.transpileMs}ms — VBScript -> JS via escodegen pipeline (8 transformers) on worker but still blocks ready -> play transition.`,
-		)
-		console.log(
-			`  Suggestion: cache transpiled JS in IDB via vbsCacheKey, pre-compile server-side, or reuse worker pool warm-up (currently creates new worker per load).`,
-		)
-	}
 	if (pf.fps && pf.fps < 50) {
 		console.log(
 			`- FPS: ${pf.fps} (target 60) — SwiftShader (${payload.glInfo?.renderer?.includes('SwiftShader') || payload.glInfo?.renderer?.includes('WebKit')}) + ${payload.metrics.tris} tris + ${lj.textures?.mb ?? '?'}MB textures + per-frame updateAnimations for all animatables + popStates diff + applyChangedStates matrix decomposes.`,
@@ -1161,7 +1148,7 @@ console.log(`\n[bench] === ANALYSIS & SUGGESTIONS ===`)
 		)
 	}
 	console.log(
-		`- BENCH COVERAGE: Load (fetch/parse/scene/transpile/stream) + Play (coin/start/plunge/flipper/nudge + physics/anim/render fps) measured. Re-run with --duration 5000 --warmup 2000 for stable FPS, compare --low vs --high quality, add --breakdown for the per-phase step split, and with --trace to capture chrome trace at ${tracePath ?? 'trace-*.json'}.`,
+		`- BENCH COVERAGE: Load (fetch/parse/scene/stream) + Play (coin/start/plunge/flipper/nudge + physics/anim/render fps) measured. Re-run with --duration 5000 --warmup 2000 for stable FPS, compare --low vs --high quality, add --breakdown for the per-phase step split, and with --trace to capture chrome trace at ${tracePath ?? 'trace-*.json'}.`,
 	)
 }
 if (tracePath) console.log(`[bench] trace at ${tracePath} — open in chrome://tracing or about://tracing`)

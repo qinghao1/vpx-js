@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 export const BAKED_EMISSIVE = 1.0 // baked is unlit
 export const BAKED_ROUGH = 0.75
 export const BAKED_METAL = 0.1

@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import { RE_BAKE_MAP } from './scene-classify.js'
 
 const LARGE_TEXTURE_PIXELS = 1_048_576

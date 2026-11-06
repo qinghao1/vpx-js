@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+import { existsSync } from 'node:fs'
+import { findWalkingDead, findWalkingDeadRom } from '../../test/harness/bench-shared.ts'
 import { attachLogging, ensureVite, launchBrowser, loadPuppeteer, newPage } from '../../test/harness/utils.mjs'
 import {
 	backboxChecks,
@@ -37,14 +40,14 @@ const url = upgradeLocalhost(
 		'',
 )
 const out = process.argv.find(a => a.startsWith('--out='))?.slice(6) || '/tmp'
-// GPU selection (same convention as bench.mjs): --gpu=vulkan|--gpu=gl|--gpu,
-// USE_GPU=..., or legacy USE_SWIFTSHADER=1 (default when no gpu is set).
+// GPU: --gpu=vulkan|gl|--gpu or USE_GPU=...; otherwise the host GPU when it
+// has one (the playable table kills SwiftShader tabs), else SwiftShader.
+// USE_SWIFTSHADER=1 forces software GL.
 const gpuArg =
 	process.argv.find(a => a.startsWith('--gpu='))?.slice(6) || (process.argv.includes('--gpu') ? 'vulkan' : null)
-const gpu = gpuArg || process.env.USE_GPU || process.env.GPU || null
-const useSwift = process.env.USE_SWIFTSHADER === '1'
-if (useSwift && !gpu) console.log('[integration] USE_SWIFTSHADER=1 (default SwiftShader flags)')
-if (gpu) console.log(`[integration] gpu=${gpu}`)
+const hostGpu = process.env.USE_SWIFTSHADER !== '1' && existsSync('/dev/dri/renderD128') ? 'vulkan' : null
+const gpu = gpuArg || process.env.USE_GPU || process.env.GPU || hostGpu
+console.log(`[integration] ${gpu ? `gpu=${gpu}` : 'SwiftShader (software GL)'}`)
 const readyTimeoutMs = Number(process.env.E2E_READY_TIMEOUT_MS) || 60000
 const autoKillMs = Number(process.env.E2E_AUTOKILL_MS) || undefined
 
@@ -65,9 +68,22 @@ const OPTIONAL_EMPTY_FIXTURE_LEGS = new Set([...OPTIONAL_GAMEPLAY_LEGS, 'playfie
 const isPlayableLabel = label => /walking_dead|twd/i.test(label)
 const optionalLegsFor = label => (isPlayableLabel(label) ? new Set(['backbox']) : OPTIONAL_EMPTY_FIXTURE_LEGS)
 // The headless-WASM engine is unconditional: the wasmEngine leg asserts on
-// every run, and the TS-player legs below skip honestly when it is active.
+// every run, and the gameplay legs below drive it through window.vpx.
 const legOkFor = (label, leg, v) =>
 	v === true || (v === 'skip' && (leg === 'wasmEngine' || optionalLegsFor(label).has(leg)))
+
+// E2E drives play entry explicitly through window.vpx: the timed
+// auto-switch to play would race ensurePlayMode, so force it off here
+// rather than clearing timers after load.
+function withAutoplayOff(u) {
+	try {
+		const uu = new URL(u)
+		if (!uu.searchParams.has('autoplay')) uu.searchParams.set('autoplay', '0')
+		return uu.toString()
+	} catch {
+		return u
+	}
+}
 
 function labelFromUrl(u) {
 	try {
@@ -90,10 +106,9 @@ function labelFromUrl(u) {
 	}
 }
 
-// Shared harness helpers (same as bench.mjs): ensureVite probes/starts the dev
-// server and registers process cleanup for vite + chrome, so no bespoke
-// ensureServer/_forceKillChrome/signal handlers are needed here.
-await ensureVite(url || DEFAULT_URL, { label: 'integration' })
+// ensureVite serves this tree on a per-run port (cleanup is registered by
+// utils.mjs), so navigate to the URL it returns.
+const serverUrl = (await ensureVite(url || DEFAULT_URL, { label: 'integration' })).url
 const puppeteer = await loadPuppeteer()
 const browser = await launchBrowser(puppeteer, {
 	...(gpu ? { gpu } : {}),
@@ -101,7 +116,7 @@ const browser = await launchBrowser(puppeteer, {
 })
 
 async function runOne(targetUrl, label) {
-	targetUrl = upgradeLocalhost(targetUrl)
+	targetUrl = withAutoplayOff(upgradeLocalhost(targetUrl))
 	const page = await newPage(browser)
 	const logs = attachLogging(page, {
 		filter: /Ready|Failed|Parsed|filter|Skipped|VLM|VR|cabinet|glass|mem|heap|THREE|Texture|DMD|emu|PinMAME/i,
@@ -151,19 +166,8 @@ async function runOne(targetUrl, label) {
 	}
 	await new Promise(r => setTimeout(r, 1200))
 	await hideOverlays(page)
-	await page.evaluate(() => {
-		try {
-			clearTimeout(window.viewer._autoPlayTimer)
-			window.viewer._autoPlayTimer = null
-		} catch {}
-		try {
-			window.viewer._scheduleAutoPlay = () => {}
-		} catch {}
-		try {
-			clearTimeout(window.viewer._fallbackBallTimer)
-			window.viewer._fallbackBallTimer = null
-		} catch {}
-	})
+	// No timer cleanup: ?autoplay=0 (appended above) disables the timed
+	// auto-switch, and legs drive play entry through window.vpx instead.
 	loadPhase = false
 	const results = {}
 	// Load+settle pageerror gate: any uncaught page exception during table
@@ -179,14 +183,11 @@ async function runOne(targetUrl, label) {
 	} else {
 		console.log(`[integration:${label}] pageerrors PASS (0 during load+settle)`)
 	}
-	// TS-player machinery legs (ball, physics) cannot run when the
-	// headless-WASM engine owns the table: no TS player exists. They skip
-	// honestly below; the wasmEngine leg asserts the WASM guarantees instead.
-	let wasmActive = false
-	try {
-		wasmActive = await page.evaluate(() => !!window.viewer?.wasmEngine?.ready && !window.viewer?.player)
-	} catch {}
-	if (wasmActive) console.log(`[integration:${label}] wasm engine active — TS-player legs skip`)
+	// Every gameplay leg runs against the headless-WASM engine through
+	// window.vpx (input via sendKey, positions from the movers/balls
+	// buffers). Static fixtures skip what they cannot support; the playable
+	// fixture must genuinely pass each leg.
+	console.log(`[integration:${label}] wasm engine legs active (window.vpx)`)
 	const diag = await diagnostics(page)
 	const isTableEmpty = targetUrl.includes('empty') || label.includes('empty')
 	const hasWarnings =
@@ -255,27 +256,16 @@ async function runOne(targetUrl, label) {
 	}
 	let ball = null
 	try {
-		ball = wasmActive
-			? {
-					pass: 'skip',
-					skipReason: 'wasm engine: ejection needs scripted trough kick (Stage 2)',
-					moved: false,
-					kickPos: null,
-					solFired: false,
-					isMock: false,
-					troughPos: null,
-					kickerNames: [],
-				}
-			: await ballChecks(page)
+		ball = await ballChecks(page)
 		console.log(`[ball:${label}]`, JSON.stringify(ball))
 		results.ball = ball.pass === 'skip' ? 'skip' : !!ball.pass
 		console.log(
-			`[integration:${label}] ball ${legStatus(results.ball)} moved=${ball.moved} kickPos=${JSON.stringify(ball.kickPos)} solFired=${ball.solFired} isMock=${ball.isMock} trough=${JSON.stringify(ball.troughPos)} kickers=${JSON.stringify(ball.kickerNames)}`,
+			`[integration:${label}] ball ${legStatus(results.ball)} moved=${ball.moved} kickPos=${JSON.stringify(ball.kickPos)} balls=${ball.balls} troughKickers=${ball.troughCount} kickers=${JSON.stringify(ball.kickerNames)}`,
 		)
 		if (results.ball === 'skip') console.log(`[integration:${label}] ball SKIP — ${ball.skipReason}`)
 		if (results.ball === false)
 			console.log(
-				`[integration:${label}] FAIL ball did not eject - trough kick failed (generic trough / Not Is / CBool)`,
+				`[integration:${label}] FAIL ball did not eject — ${ball.reason} (scripted trough kick needs ROM)`,
 			)
 	} catch (e) {
 		console.log(`[ball:${label}] error ${e.message}`)
@@ -293,30 +283,25 @@ async function runOne(targetUrl, label) {
 		console.log(`[plunger:${label}] error ${e.message}`)
 		results.plunger = false
 	}
-	const phys = wasmActive ? { wasmSkip: true } : await physicsChecks(page)
+	const phys = await physicsChecks(page)
 	console.log(`[physics:${label}]`, JSON.stringify(phys))
-	if (wasmActive) {
-		// No TS player clock on the WASM path: stepping is asserted by the
-		// wasmEngine leg; flipper/coin/start need script execution (Stage 2).
-		results.physics = 'skip'
-		console.log(`[integration:${label}] physics SKIP — wasm engine owns the clock (see wasmEngine leg)`)
-	} else {
-		// No ball-moved override: every sub-leg stands on its own verdict. Skipped
-		// sub-legs (no flipper, mock emu) are neutral, but at least one sub-leg must
-		// genuinely pass (the advancing physics clock) for the leg to pass.
-		const physParts = [phys.flipper?.pass, phys.coin?.pass, phys.start?.pass, phys.clock?.pass]
-		const physPass = physParts.every(p => p === true || p === 'skip') && physParts.some(p => p === true)
-		results.physics = physPass
-		console.log(`[integration:${label}] physics ${results.physics ? 'PASS' : 'FAIL'}`)
-	}
+	// No ball-moved override: every sub-leg stands on its own verdict. Skipped
+	// sub-legs (no flipper, no script output) are neutral, but at least one
+	// sub-leg must genuinely pass (flipper motion or the advancing game clock)
+	// for the leg to pass.
+	const physParts = [phys.flipper?.pass, phys.coin?.pass, phys.start?.pass, phys.clock?.pass]
+	const physPass = physParts.every(p => p === true || p === 'skip') && physParts.some(p => p === true)
+	results.physics = physPass
+	console.log(`[integration:${label}] physics ${results.physics ? 'PASS' : 'FAIL'}`)
 	try {
 		const nudge = await nudgeChecks(page)
 		console.log(`[nudge:${label}]`, JSON.stringify(nudge))
 		results.nudge = nudge.pass === 'skip' ? 'skip' : !!nudge.pass
 		console.log(
-			`[integration:${label}] nudge ${legStatus(results.nudge)} api=${nudge.viaApi} key=${nudge.viaKey} visual=${nudge.visual}`,
+			`[integration:${label}] nudge ${legStatus(results.nudge)} api=${nudge.viaApi} key=${nudge.viaKey} — ${nudge.reason}`,
 		)
-		if (results.nudge === false) console.log(`[nudge:${label}] WARN nudge not detected`)
+		if (results.nudge === 'skip') console.log(`[integration:${label}] nudge SKIP — ${nudge.reason}`)
+		if (results.nudge === false) console.log(`[nudge:${label}] WARN nudge not detected — ${nudge.reason}`)
 	} catch (e) {
 		console.log(`[nudge:${label}] error ${e.message}`)
 		results.nudge = false
@@ -369,7 +354,7 @@ async function runOne(targetUrl, label) {
 		console.log(`[wasmEngine:${label}]`, JSON.stringify(w))
 		results.wasmEngine = w.pass === 'skip' ? 'skip' : !!w.pass
 		console.log(
-			`[integration:${label}] wasmEngine ${legStatus(results.wasmEngine)} ready=${w.ready} catalog=${w.catalogSize} scriptErrors=${w.scriptErrors} balls=${w.ballCountAfter ?? w.ballCount} tick=${w.tickOk} input=${w.inputOk}${w.reason ? ` — ${w.reason}` : ''}`,
+			`[integration:${label}] wasmEngine ${legStatus(results.wasmEngine)} ready=${w.ready} catalog=${w.catalogSize} scriptErrors=${w.scriptErrors} balls=${w.ballCountAfter ?? w.ballCount} tick=${w.tickOk} advanced=${w.gameAdvanced} input=${w.inputOk}${w.reason ? ` — ${w.reason}` : ''}`,
 		)
 		if (results.wasmEngine === false) console.log(`[wasmEngine:${label}] FAIL ${JSON.stringify(w)}`)
 	} catch (e) {
@@ -477,7 +462,7 @@ if (url) {
 	const label = labelFromUrl(url)
 	let res
 	try {
-		res = await runOne(url, label)
+		res = await runOne(serverUrl, label)
 	} catch (e) {
 		console.error('[integration] runOne error', e)
 		res = { ok: false }
@@ -488,21 +473,22 @@ if (url) {
 	}
 	process.exit(res?.ok ? 0 : 1)
 } else {
-	const primaryUrl = DEFAULT_URL
-	const urls = [[primaryUrl, 'primary']]
-	const extraUrls = []
-	const singleExtra = process.env.EXTRA_URL || process.env.TEST_URL || process.env.URL
-	if (singleExtra) extraUrls.push(singleExtra)
-	const multiExtra = process.env.EXTRA_URLS || process.env.TEST_URLS
-	if (multiExtra)
-		extraUrls.push(
-			...multiExtra
-				.split(',')
-				.map(s => s.trim())
-				.filter(Boolean),
-		)
-	for (const eu of extraUrls) {
-		if (!urls.some(([u]) => u === eu)) urls.push([eu, labelFromUrl(eu)])
+	// Default run: the empty fixture, plus the playable table with its ROM when
+	// both exist locally. Only that run boots PinMAME, so it is what catches
+	// engine aborts on real tables. EXTRA_URLS (comma list) adds more pages,
+	// moved onto this run's server.
+	const { origin } = new URL(serverUrl)
+	const urls = [[serverUrl, 'primary']]
+	const twd = findWalkingDead()
+	const rom = findWalkingDeadRom()
+	if (twd && rom) {
+		const query = new URLSearchParams({ vpx: `/@fs${twd}`, rom: `/@fs${rom}`, mode: 'play' })
+		urls.push([`${origin}/?${query}`, 'twd'])
+	} else console.log('[integration] no Walking Dead table + ROM found: playable-table run skipped')
+	for (const extra of (process.env.EXTRA_URLS ?? '').split(',').filter(s => s.trim())) {
+		const page = new URL(extra.trim(), origin)
+		const onServer = `${origin}${page.pathname}${page.search}`
+		if (!urls.some(([u]) => u === onServer)) urls.push([onServer, labelFromUrl(onServer)])
 	}
 	let overallOk = true
 	for (const [u, l] of urls) {

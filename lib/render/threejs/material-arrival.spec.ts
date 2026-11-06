@@ -1,3 +1,4 @@
+// Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import { BoxGeometry, DataTexture, Group, Mesh, MeshStandardMaterial } from 'three'
 import { describe, expect, it } from 'vitest'
 import { cloneMaterialForWrite } from './material-shared.js'
