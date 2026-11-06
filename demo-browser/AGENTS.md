@@ -5,46 +5,54 @@ Local Vite demo on `https://localhost:3000` (Vite 8, self-signed TLS via `basicS
 ## Run
 
 ```bash
-npm run build:esm                  # from repo root (required before dev/build)
-npm run dev --prefix demo-browser   # vite :3000
+npm ci --prefix demo-browser         # once
+npm run build:esm                    # from repo root (required before dev/build)
+npm run dev --prefix demo-browser    # vite :3000
 ```
 
-- `?vpx=/test/fixtures/table-empty.vpx&mode=play`
-- `?vpx=/@fs/path/to/table.vpx&rom=/@fs/path/to/rom.zip&mode=play` (any table/ROM via drag & drop, file picker, or `?vpx`/`?rom` query)
-- `&webgl` forces three's WebGL2 backend (default: WebGPU, falling back to WebGL2 when unavailable)
+URL options (all optional):
 
-Requires `dist-esm` built. `server.fs.allow` covers the repo root, `~/Downloads`, `~/.pinmame/roms` (`strict:false`, COOP/COEP/CORP, `assetsInclude` `*.vpx/*.wasm/*.zip`). The engine artifact is served from `public/wasm/`.
+- `vpx=<name|path|url>` (alias `table`) — table to load, e.g. `?vpx=/test/fixtures/table-empty.vpx` or `?vpx=/@fs/path/to/table.vpx`
+- `rom=<path|url>` — PinMAME ROM zip for that table, e.g. `&rom=/@fs/path/to/rom.zip`
+- `mode=play|viewer` — start mode (default `viewer`)
+- `noaa` — no antialiasing; `nobatched` — skip static-mesh batching; `webgl` — force three's WebGL2 backend (default: WebGPU, falling back to WebGL2 when unavailable)
+
+Tables and ROMs also load by drag & drop, the file pickers, or the table browser. A ROM belongs to the table on screen (or the one dropped with it): it reboots that table's engine, and a new table without one clears it. Only server-fetchable sources are mirrored into `?vpx`/`?rom`; local files clear them.
+
+Requires `dist-esm` built. `server.fs.allow` covers the repo root, `~/Downloads`, `~/.pinmame/roms` (`strict:false`, COOP/COEP/CORP, `assetsInclude` `*.vpx/*.wasm/*.zip`). The engine artifact is served from `public/wasm/`. `public/test/fixtures/table-empty.vpx` is a tracked copy of `test/fixtures/table-empty.vpx` so static builds ship the default table; keep the two identical.
 
 ## Structure
 
-- `index.html` — semantic HTML5 shell, loads `src/styles/app.css` + `src/main.ts` (no global `log-capture.js` script)
-- `src/main.ts` — bootstrapper: parses URL options once, creates `Viewer`, wires file pickers, drag & drop, log buttons, and the dev-only `window.viewer`/`window.vpx`
+- `index.html` — semantic HTML5 shell, loads `src/styles/app.css` + `src/main.ts`
+- `src/main.ts` — bootstrapper: parses URL options once, creates `Viewer`, wires file pickers, drag & drop, URL sync, log buttons, and the dev-only `window.viewer`/`window.vpx`
 - `src/cross-origin-isolation.ts` + `coi-sw.js` — static hosts without COOP/COEP (GitHub Pages): `VITE_COI_SW=1` builds ship a header-adding service worker and register it (one reload); other builds contain neither
-- `src/test-api.ts` — typed e2e surface (`window.vpx`: state, `whenReady`, `setMode`, `sendKey`, `nudge`, `step`, `dmd`)
-- `src/viewer.ts` — Viewer coordinator (~2200 LOC, delegates to subsystems)
-- `src/config.js` — controls, camera presets & constants (~120 LOC)
-- `src/styles/app.css` — consolidated CSS tokens (~1150 LOC)
-- `src/input/input-manager.ts` — keys, touch zones & cabinet button raycasting (~560 LOC)
-- `src/input/nudge-controller.ts` — nudge physics, swipe, gamepad & motion (~170 LOC)
-- `src/dmd/dmd-renderer.ts` — on-table DMD mesh updater (~385 LOC)
-- `src/ui/stats-overlay.ts`, `help-dialog.ts`, `log-viewer.ts` — stats HUD, controls dialog, log panel (no `console`/`fetch`/`XHR` monkey-patch)
+- `src/test-api.ts` — typed e2e surface (`window.vpx`): `state`, `three` (scene, camera, controls, renderer, tableGroup, renderApi, table), `whenReady`, `setMode`, `cancelCameraAnimation`, `sendKey`, `nudge`, `step`, `dmd`
+- `src/viewer.ts` — Viewer coordinator: renderer lifecycle (incl. device-loss recovery), load pipeline, engine boot, mode switches, frame loop
+- `src/wasm-engine.ts` — adapter over the headless vpinball WASM engine (script, physics, audio, DMD)
+- `src/config.js` — controls, camera presets & constants
+- `src/styles/app.css` — consolidated CSS tokens
+- `src/input.js` — `attachInput`: attaches keyboard, pointer/touch and nudge input once through one host and one `AbortController`
+- `src/input/input-manager.ts` — keys, touch flipper zones, swipe nudges & cabinet button raycasting
+- `src/input/nudge-controller.ts` — device-motion shake nudges and gamepad nudges (polled on the viewer's frame loop)
+- `src/dmd/dmd-renderer.ts`, `src/backglass/backglass-renderer.ts` — on-table DMD mesh updater and desktop backglass overlay
+- `src/ui/stats-overlay.ts`, `help-dialog.ts`, `log-viewer.ts` — stats HUD, controls dialog, page log (no `console`/`fetch`/`XHR` monkey-patch)
 - `src/ui/table-browser.ts` — Virtual Pinball Spreadsheet table/ROM browser (`lib/emu/vps-catalog.ts`)
-- `src/utils/candidate-resolver.ts`, `texture-filter.ts` — VPX/ROM resolution & glass-texture filtering
+- `src/utils/candidate-resolver.ts`, `texture-filter.ts` — VPX resolution, downloads & glass-texture filtering
 - `src/env.js`, `src/utils.js` — env caps/quality flags + `$`/`fmtBytes` helpers and `utils/*` re-exports
-- `src/input.js` — `attachInput` composer over `input/` + `nudge-controller` (defines logic, not a shim); `config.js`, `utils.js`, `env.js` are real sources (viewer imports them directly from `./ui/*` and `./input/*`)
+- `tsconfig.json` — `npm run typecheck:demo` (root); `viewer.ts` stays `@ts-nocheck`
 - `vite.config.ts` — `basicSsl`, cross-origin isolation headers, dedupes `three`/`three-mesh-bvh`, aliases `refs.node`→`refs.browser` etc., fixture + ROM middleware
 - `e2e/integration.mjs` + `e2e/helpers.mjs` — unified E2E over `window.vpx` (waitReady → diagnostics → physics → DMD → shots), single generic harness
 
 ## Conventions
 
-- ESM only, Biome tabs/120, minimal code, no `window.*` pollution or `console` patching; UI events are `CustomEvent`s on `window`
-- Keep logging and E2E deduped — single `integration.mjs` + `helpers.mjs`, no per-scenario harnesses
+- ESM only, Biome tabs/120, minimal code, no `window.*` pollution or `console` patching (only `main.ts` exposes the dev handles); UI events are `CustomEvent`s on `window`
+- Keep logging and E2E deduped — one `viewer.log`, single `integration.mjs` + `helpers.mjs`, no per-scenario harnesses
 - Keep demo-browser table-agnostic: no hard-coded table/ROM names (use `?vpx`/`?rom` or drag & drop, generic `DEFAULT_URL` `table-empty.vpx`)
 
 ## Test
 
 ```bash
-npx tsx demo-browser/e2e/integration.mjs --url=https://localhost:3000/?vpx=/test/fixtures/table-empty.vpx&mode=play --out=/tmp
+npx tsx demo-browser/e2e/integration.mjs '--url=https://localhost:3000/?vpx=/test/fixtures/table-empty.vpx&mode=play' --out=/tmp
 ```
 
 Without `--url` it runs `table-empty.vpx` and, when `findWalkingDead()`/`findWalkingDeadRom()` find them, The Walking Dead with its ROM (`twd` label: every gameplay leg required). That run boots PinMAME, so it catches engine aborts on real tables; it uses the host GPU when one exists (`USE_SWIFTSHADER=1` forces software GL). It tests whatever engine `public/wasm/` holds. Also via `test/harness/verify-browser.ts` and `verify-all.ts`. On bug fixes, add regression test — `lib/**/*.spec.ts` for unit, `demo-browser/e2e/integration.mjs` for E2E.
