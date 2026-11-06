@@ -1,6 +1,7 @@
 // @ts-nocheck
 
 import { initHelp } from './ui/help-dialog.js'
+import { initTableBrowser } from './ui/table-browser.js'
 import { Viewer } from './viewer.js'
 
 const params = new URLSearchParams(location.search)
@@ -31,6 +32,7 @@ const syncParam = (key, value) => {
 	u.searchParams.set(key, value)
 	history.replaceState(null, '', u.pathname + u.search)
 }
+initTableBrowser(viewer, syncParam)
 
 function handleFile(f) {
 	if (!f) return
