@@ -19,7 +19,16 @@ export const pollLog = async (page, needle, timeout = 60000, label = needle) => 
 	return page.evaluate(() => document.getElementById('log')?.innerText || '').catch(() => '')
 }
 
-export const waitReady = (page, timeout = 60000) => pollLog(page, 'Ready', timeout, 'Ready')
+export const waitReady = async (page, timeout = 60000) => {
+	// Load state lives on body.dataset (window.vpx.whenReady); the log poll
+	// below is only a fallback for builds without the dev test API.
+	try {
+		await page.evaluate(t => window.vpx.whenReady(t), timeout)
+	} catch {
+		await pollLog(page, 'Ready', timeout, 'Ready')
+	}
+	return page.evaluate(() => document.getElementById('log')?.innerText || '')
+}
 
 export const hideOverlays = page =>
 	page.evaluate(() => {
@@ -533,422 +542,150 @@ export const dmdChecks = page =>
 
 export const ensurePlayMode = async page => {
 	return page.evaluate(async () => {
-		const v = window.viewer
-		if (!v) return { ok: false, reason: 'no viewer' }
-		if (v.viewerMode !== 'play') {
+		const api = window.vpx
+		if (!api) return { ok: false, reason: 'no test api (window.vpx)' }
+		try {
+			await api.whenReady()
+		} catch (e) {
+			return { ok: false, reason: `not ready: ${e?.message ?? e}` }
+		}
+		if (api.state.mode !== 'play') {
 			try {
-				await v._switchToPlay()
+				await api.setMode('play')
 			} catch (e) {
-				return { ok: false, reason: String(e) }
+				return { ok: false, reason: String(e?.message ?? e) }
 			}
-			await new Promise(r => setTimeout(r, 700))
 		}
 		let tries = 0
 		while (tries < 25) {
-			if (v.player && v.table) break
+			if (api.state.wasmReady) break
 			await new Promise(r => setTimeout(r, 400))
 			tries++
 		}
-		return { ok: !!v.player, mode: v.viewerMode, hasPlayer: !!v.player, tries }
+		const s = api.state
+		return { ok: s.wasmReady, mode: s.mode, wasmReady: s.wasmReady, balls: s.ballCount, tries }
 	})
 }
 
 export const ballChecks = async (page, timeout = 60000) => {
 	await ensurePlayMode(page)
-	await page.evaluate(() => {
-		try {
-			clearTimeout(window.viewer._autoPlayTimer)
-			window.viewer._autoPlayTimer = null
-		} catch {}
-		try {
-			window.viewer._scheduleAutoPlay = () => {}
-		} catch {}
-		try {
-			clearTimeout(window.viewer._fallbackBallTimer)
-			window.viewer._fallbackBallTimer = null
-		} catch {}
-	})
-	const isMock = await page.evaluate(() => {
-		const emu = window.viewer?.player?.getPhysics?.()?.emu
-		return !emu || !!emu.isMock
-	})
-	if (!isMock) {
-		const start = Date.now()
-		while (Date.now() - start < 26000) {
-			try {
-				const r = await page.evaluate(() => {
-					const v = window.viewer
-					const emu = v?.player?.getPhysics?.()?.emu
-					let running = false
-					try {
-						running = !!(emu?.isInitialized?.() && emu.api?.isRunning?.() === 1)
-					} catch {}
-					if (!running) return { running: false, sum: 0 }
-					let frame = null
-					try {
-						frame = v.player.getDmdFrame?.()
-					} catch {}
-					let sum = 0
-					if (frame?.length) for (let i = 0; i < frame.length; i++) sum += frame[i] ?? 0
-					return { running: true, sum }
-				})
-				if (r.running && r.sum > 50000) break
-			} catch {}
-			await new Promise(r => setTimeout(r, 500))
-		}
-	} else {
-		await new Promise(r => setTimeout(r, 600))
-	}
 	await new Promise(r => setTimeout(r, 1500))
-	const before = await page.evaluate(() => {
-		const p = window.viewer.player
-		return p.balls.map(b => ({
-			name: b.getName(),
-			x: Math.round(b.state.pos.x),
-			y: Math.round(b.state.pos.y),
-			z: Math.round(b.state.pos.z),
-			frozen: b.state.isFrozen,
-		}))
-	})
-	const troughInfo = await page.evaluate(() => {
-		try {
-			const kickers = Object.values(window.viewer.table.kickers || {})
-			const isTrough = k => {
-				try {
-					const n = (k.getName?.() || k.data?.name || '').toLowerCase()
-					return /trough|drain|ballrelease|outhole|release/i.test(n)
-				} catch {
-					return false
-				}
-			}
-			let troughKickers = kickers.filter(k => {
-				try {
-					return (k.getApi?.().BallCntOver || 0) > 0
-				} catch {
-					return false
-				}
-			})
-			if (!troughKickers.length) troughKickers = kickers.filter(isTrough)
-			if (!troughKickers.length) troughKickers = kickers
-			let troughBefore = 0
-			for (const k of troughKickers) {
-				try {
-					troughBefore += k.getApi?.().BallCntOver || 0
-				} catch {}
-			}
-			let troughPos = null
-			if (troughKickers.length) {
-				const k = troughKickers[0]
-				try {
-					troughPos = { x: Math.round(k.data.center.x), y: Math.round(k.data.center.y) }
-				} catch {}
-			}
-			const kickerNames = kickers
-				.map(k => {
-					try {
-						return k.getName?.() || k.data?.name || ''
-					} catch {
-						return ''
-					}
-				})
-				.slice(0, 12)
-			return {
-				troughBefore,
-				troughPos,
-				kickerNames,
-				kickerCount: kickers.length,
-				troughCount: troughKickers.length,
-			}
-		} catch {
-			return { troughBefore: 0, troughPos: null, kickerNames: [], kickerCount: 0, troughCount: 0 }
-		}
-	})
-	const troughBefore = troughInfo.troughBefore
-	const troughPos = troughInfo.troughPos
-	await page.evaluate(() => {
-		window.__kickCount = 0
-		window.__kickTrace = []
-		window.__solTrace = []
-		try {
-			const kickers = Object.values(window.viewer.table.kickers || {})
-			for (const k of kickers) {
-				if (k && k.hit && k.hit.kickXyz) {
-					const orig = k.hit.kickXyz.bind(k.hit)
-					const name = (() => {
-						try {
-							return k.getName?.() || k.data?.name || 'kicker'
-						} catch {
-							return 'kicker'
-						}
-					})()
-					k.hit.kickXyz = (...args) => {
-						window.__kickCount++
-						window.__kickTrace.push(name + ':hit:' + args.join(','))
-						try {
-							return orig(...args)
-						} catch (e) {
-							window.__kickTrace.push('err:' + e.message)
-							throw e
-						}
-					}
-				}
-				if (k && k.getApi) {
-					const api = k.getApi()
-					if (api.Kick) {
-						const orig2 = api.Kick.bind(api)
-						const name = (() => {
-							try {
-								return k.getName?.() || k.data?.name || 'kicker'
-							} catch {
-								return 'kicker'
-							}
-						})()
-						api.Kick = (a, s) => {
-							window.__kickCount++
-							window.__kickTrace.push(name + ':apiKick:' + a + ',' + s)
-							return orig2(a, s)
-						}
-					}
-				}
-			}
-		} catch {}
-	})
-	let moved = false,
-		kickPos = null,
-		after = null,
-		solFired = false,
-		coinOk = false,
-		startOk = false,
-		isRunning = null
-	const attempts = isMock ? 0 : 3
-	for (let attempt = 0; attempt < attempts; attempt++) {
-		try {
-			await page.evaluate(() => window.viewer.player.onKeyDown({ code: 'Digit5', key: '5', ts: Date.now() }))
-			await new Promise(r => setTimeout(r, 500))
+	// Wait briefly for script output (DMD/lit playfield): it tells a
+	// no-ejection FAIL (engine runs script) apart from an honest SKIP
+	// (fixture cannot eject — no script output at all).
+	const settled = await page.evaluate(async () => {
+		const api = window.vpx
+		const sleep = ms => new Promise(r => setTimeout(r, ms))
+		const litSum = () => {
 			try {
-				const v = await page.evaluate(() => {
-					const emu = window.viewer.player.getPhysics().emu
-					try {
-						return { a: emu.getSwitchInput?.(65), b: emu.getSwitchInput?.(67), c: emu.getSwitchInput?.(1) }
-					} catch {
-						return { a: 0, b: 0, c: 0 }
-					}
-				})
-				if (v.a || v.b || v.c) coinOk = true
-			} catch {}
-			await page.evaluate(() => window.viewer.player.onKeyUp({ code: 'Digit5', key: '5', ts: Date.now() }))
-			await new Promise(r => setTimeout(r, 1000))
-			await page.evaluate(() => window.viewer.player.onKeyDown({ code: 'Digit5', key: '5', ts: Date.now() }))
-			await new Promise(r => setTimeout(r, 500))
-			await page.evaluate(() => window.viewer.player.onKeyUp({ code: 'Digit5', key: '5', ts: Date.now() }))
-			await new Promise(r => setTimeout(r, 800))
-			await page.evaluate(() => window.viewer.player.onKeyDown({ code: 'Digit1', key: '1', ts: Date.now() }))
-			await new Promise(r => setTimeout(r, 500))
-			try {
-				const v = await page.evaluate(() => {
-					try {
-						return !!window.viewer.player.getPhysics().emu.getSwitchInput?.(16)
-					} catch {
-						return false
-					}
-				})
-				if (v) startOk = true
-			} catch {}
-			await page.evaluate(() => window.viewer.player.onKeyUp({ code: 'Digit1', key: '1', ts: Date.now() }))
-			await new Promise(r => setTimeout(r, 800))
-		} catch {}
-		const t0 = Date.now()
-		while (Date.now() - t0 < 10000) {
-			await new Promise(r => setTimeout(r, 150))
-			try {
-				const s = await page.evaluate(() => {
-					try {
-						return window.viewer.player.getPhysics().emu.getSolenoidState?.(1)
-					} catch {
-						return 0
-					}
-				})
-				if (s) {
-					solFired = true
-					await page.evaluate(val => {
-						window.__solTrace.push(val)
-					}, s)
-				}
-			} catch {}
-			const state = await page.evaluate(() => {
-				const balls = window.viewer.player.balls
-				const moving = balls.find(b => !b.state.isFrozen)
-				return {
-					moving: !!moving,
-					kickPos: moving
-						? {
-								x: Math.round(moving.state.pos.x),
-								y: Math.round(moving.state.pos.y),
-								z: Math.round(moving.state.pos.z),
-							}
-						: null,
-					after: balls.map(b => ({
-						name: b.getName(),
-						x: Math.round(b.state.pos.x),
-						y: Math.round(b.state.pos.y),
-						frozen: b.state.isFrozen,
-					})),
-					cnt: balls.length,
-				}
-			})
-			if (state.moving) {
-				moved = true
-				kickPos = state.kickPos
-				after = state.after
-				break
-			}
-			try {
-				const kc = await page.evaluate(() => window.__kickCount || 0)
-				if (kc > 0) {
-					const st = await page.evaluate(() => ({
-						kc: window.__kickCount,
-						trace: window.__kickTrace.slice(0, 5),
-					}))
-					if (!moved) {
-						const balls = await page.evaluate(() =>
-							window.viewer.player.balls.map(b => ({
-								name: b.getName(),
-								x: Math.round(b.state.pos.x),
-								y: Math.round(b.state.pos.y),
-								frozen: b.state.isFrozen,
-							})),
-						)
-						after = balls
-						moved = true
-						kickPos = st.trace[0] ? troughPos : kickPos
-					}
-				}
-			} catch {}
-		}
-		if (moved) break
-		await new Promise(r => setTimeout(r, 600))
-	}
-	if (!moved) {
-		const t0 = Date.now()
-		while (Date.now() - t0 < 6000) {
-			await new Promise(r => setTimeout(r, 200))
-			try {
-				const s = await page.evaluate(() => {
-					try {
-						return window.viewer.player.getPhysics().emu.getSolenoidState?.(1)
-					} catch {
-						return 0
-					}
-				})
-				if (s) solFired = true
-			} catch {}
-			const state = await page.evaluate(() => {
-				const balls = window.viewer.player.balls
-				const moving = balls.find(b => !b.state.isFrozen)
-				return {
-					moving: !!moving,
-					kickPos: moving
-						? {
-								x: Math.round(moving.state.pos.x),
-								y: Math.round(moving.state.pos.y),
-								z: Math.round(moving.state.pos.z),
-							}
-						: null,
-					after: balls.map(b => ({
-						name: b.getName(),
-						x: Math.round(b.state.pos.x),
-						y: Math.round(b.state.pos.y),
-						frozen: b.state.isFrozen,
-					})),
-				}
-			})
-			if (state.moving) {
-				moved = true
-				kickPos = state.kickPos
-				after = state.after
-				break
-			}
-		}
-	}
-	if (!after)
-		after = await page.evaluate(() =>
-			window.viewer.player.balls.map(b => ({
-				name: b.getName(),
-				x: Math.round(b.state.pos.x),
-				y: Math.round(b.state.pos.y),
-				frozen: b.state.isFrozen,
-			})),
-		)
-	const troughAfter =
-		(await page.evaluate(() => {
-			try {
-				const kickers = Object.values(window.viewer.table.kickers || {})
-				const isTrough = k => {
-					try {
-						const n = (k.getName?.() || k.data?.name || '').toLowerCase()
-						return /trough|drain|ballrelease|outhole|release/i.test(n)
-					} catch {
-						return false
-					}
-				}
-				let troughKickers = kickers.filter(isTrough)
-				if (!troughKickers.length) troughKickers = kickers
-				let s = 0
-				for (const k of troughKickers) {
-					try {
-						s += k.getApi?.().BallCntOver || 0
-					} catch {}
-				}
-				return s
+				const d = api.dmd()
+				if (!d || !d.frame?.length) return 0
+				let sum = 0
+				for (let i = 0; i < d.frame.length; i++) sum += d.frame[i]
+				return sum
 			} catch {
 				return 0
 			}
-		})) || 0
-	const kickCount = await page.evaluate(() => window.__kickCount || 0)
-	const kickTrace = await page
-		.evaluate(() => window.__kickTrace || [])
-		.then(a => a.slice(0, 5))
-		.catch(() => [])
-	const solTrace = await page
-		.evaluate(() => window.__solTrace || [])
-		.then(a => a.slice(0, 5))
-		.catch(() => [])
-	isRunning = await page.evaluate(() => {
-		try {
-			return window.viewer.player.getPhysics().emu.api?.isRunning?.()
-		} catch {
-			return null
 		}
+		const t0 = Date.now()
+		let sum = 0
+		while (Date.now() - t0 < 20000) {
+			sum = litSum()
+			if (sum > 50000) break
+			if (api.state.lightActivity > 0 && Date.now() - t0 > 5000) break
+			await sleep(500)
+		}
+		return { dmdSum: sum, lightActivity: api.state.lightActivity }
 	})
-	// Mock emu cannot eject: ball movement needs a ROM-driven scripted trough
-	// kick. Report an honest skip (with the observed inventory) instead of a
-	// presence-pseudo-pass.
-	const pass = isMock ? 'skip' : !!moved && !!kickPos
-	const skipReason = isMock ? 'mock emu (no ROM): ejection requires scripted trough kick' : null
-	return {
-		before,
-		after,
-		troughBefore,
-		troughAfter,
-		troughPos,
-		kickerNames: troughInfo.kickerNames,
-		kickerCount: troughInfo.kickerCount,
-		troughCount: troughInfo.troughCount,
-		moved,
-		kickPos,
-		solFired,
-		solTrace,
-		coinOk,
-		startOk,
-		kickCount,
-		kickTrace,
-		isMock,
-		pass,
-		skipReason,
-		balls: after.length,
-		isRunning,
-		changed: null,
-	}
+	return page.evaluate(async settled => {
+		const api = window.vpx
+		const out = { settled }
+		if (!api) {
+			out.pass = 'skip'
+			out.skipReason = 'no test api (window.vpx)'
+			return out
+		}
+		const sleep = ms => new Promise(r => setTimeout(r, ms))
+		const dmdSum = () => {
+			try {
+				const d = api.dmd()
+				if (!d || !d.frame?.length) return 0
+				let sum = 0
+				for (let i = 0; i < d.frame.length; i++) sum += d.frame[i]
+				return sum
+			} catch {
+				return 0
+			}
+		}
+		// Trough/drain kickers by engine catalog name (script kicks one of
+		// these to eject); kicker inventory is logging context only.
+		const names = api.state.partNames
+		out.kickerNames = names.filter(n => /kicker/i.test(n || '')).slice(0, 12)
+		out.kickerCount = out.kickerNames.length
+		out.troughCount = names.filter(n => /trough|drain|ballrelease|outhole|release/i.test(n || '')).length
+		const snap = () => api.state.balls.map(b => ({ id: b.id, x: b.x, y: b.y, z: b.z }))
+		const before = snap()
+		out.before = before
+		out.balls = before.length
+		let moved = false
+		let kickPos = null
+		let after = before
+		const key = async (code, holdMs) => {
+			api.sendKey(code, true)
+			await sleep(holdMs)
+			api.sendKey(code, false)
+		}
+		// Coin up, then start: the scripted trough kick ejects on game start.
+		for (let attempt = 0; attempt < 3 && !moved; attempt++) {
+			await key('Digit5', 500)
+			await sleep(1000)
+			await key('Digit5', 500)
+			await sleep(800)
+			await key('Digit1', 500)
+			await sleep(800)
+			const base = new Map(before.map(b => [b.id, b]))
+			const t0 = Date.now()
+			while (Date.now() - t0 < 10000 && !moved) {
+				await sleep(150)
+				const balls = snap()
+				after = balls
+				for (const b of balls) {
+					const prev = base.get(b.id)
+					if (!prev) {
+						moved = true
+						kickPos = { x: Math.round(b.x), y: Math.round(b.y), z: Math.round(b.z) }
+						break
+					}
+					if (Math.hypot(b.x - prev.x, b.y - prev.y, b.z - prev.z) > 5) {
+						moved = true
+						kickPos = { x: Math.round(b.x), y: Math.round(b.y), z: Math.round(b.z) }
+						break
+					}
+				}
+			}
+			if (!moved) await sleep(600)
+		}
+		out.after = after
+		out.balls = after.length
+		out.moved = moved
+		out.kickPos = kickPos
+		out.dmdSum = dmdSum()
+		out.lightActivity = api.state.lightActivity
+		if (moved) {
+			out.pass = true
+			return out
+		}
+		// No motion and no script output ever: the fixture cannot eject
+		// (empty table, or no ROM driving the script) — honest skip.
+		if (settled.dmdSum === 0 && settled.lightActivity === 0 && out.dmdSum === 0 && out.lightActivity === 0) {
+			out.pass = 'skip'
+			out.skipReason = 'no script output observed (no DMD/lamp activity): ejection unobservable'
+			return out
+		}
+		out.pass = false
+		out.reason = 'script output observed but no ball ejected (ROM trough kick required)'
+		return out
+	}, settled)
 }
 
 export const shot = async (page, name, camPos, target, outDir) => {
