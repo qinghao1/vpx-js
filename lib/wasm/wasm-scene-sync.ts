@@ -91,6 +91,7 @@ export interface SyncCounts {
  * `syncAll` result: change counts plus the light parts whose col-1
  * intensity changed this frame. The viewer maps those to names for the
  * lightmap fan-out, so the engine no longer re-walks the lights buffer.
+ * `changedLightParts` is reused scratch, valid until the next `syncAll`.
  */
 export interface SyncResult extends SyncCounts {
 	readonly changedLightParts: readonly number[]
@@ -191,7 +192,7 @@ export class WasmSceneSync<NODE, GEOMETRY, POINT_LIGHT> {
 	 * the host drops names it cannot resolve).
 	 */
 	private readonly lastLightValues = new Map<number, number>()
-	/** Scratch for the current frame's col-1 changes; copied out on return. */
+	/** Scratch for the current frame's col-1 changes; returned as-is, valid until the next `syncAll`. */
 	private readonly lightChanges: number[] = []
 	/** Scratch for the current frame's live ball ids; cleared, never reallocated. */
 	private readonly seenIds = new Set<number>()
@@ -254,7 +255,7 @@ export class WasmSceneSync<NODE, GEOMETRY, POINT_LIGHT> {
 			lights,
 			prims,
 			flashers,
-			changedLightParts: [...this.lightChanges],
+			changedLightParts: this.lightChanges,
 		}
 	}
 
@@ -312,11 +313,7 @@ export class WasmSceneSync<NODE, GEOMETRY, POINT_LIGHT> {
 
 	private applyBallRow(slot: BallSlot<NODE>, row: Float32Array): void {
 		slot.state.pos.set(row[1]!, row[2]!, row[3]!)
-		slot.state.orientation.matrix = [
-			[row[5]!, row[6]!, row[7]!],
-			[row[8]!, row[9]!, row[10]!],
-			[row[11]!, row[12]!, row[13]!],
-		]
+		slot.state.orientation.set(row[5]!, row[6]!, row[7]!, row[8]!, row[9]!, row[10]!, row[11]!, row[12]!, row[13]!)
 		slot.state.isVisible = row[15]! !== 0
 		slot.updater.applyState(slot.obj, slot.state, this.renderApi, this.table)
 	}
