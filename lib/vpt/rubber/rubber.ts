@@ -8,7 +8,7 @@ import type { Meshes } from '../../render/irender-api.js'
 import { handleBiffTag } from '../biff-helper.js'
 import { type DragPoint, dragPointNestedTag } from '../dragpoint.js'
 import { Item } from '../item.js'
-import { type IPhysicalData, ItemData } from '../item-data.js'
+import { ItemData } from '../item-data.js'
 import { ItemState } from '../item-state.js'
 import type { Table } from '../table/table.js'
 import { RubberMeshGenerator, RubberUpdater } from './rubber-view.js'
@@ -37,7 +37,7 @@ const BOOL_MAP: Record<string, string> = {
 const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', IMAG: 'szImage', MAPH: 'szPhysicsMaterial' }
 
 /** @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp */
-export class RubberData extends ItemData implements IPhysicalData {
+export class RubberData extends ItemData {
 	public height = 25
 	public hitHeight = 25
 	public thickness = 8
@@ -154,10 +154,6 @@ export class Rubber extends Item<RubberData> {
 		)
 		this.meshGenerator = new RubberMeshGenerator(data)
 		this.updater = new RubberUpdater(this.data, this.state, this.meshGenerator.middlePoint)
-	}
-
-	public isCollidable(): boolean {
-		return this.data.isCollidable
 	}
 
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {

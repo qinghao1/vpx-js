@@ -5,7 +5,7 @@ import type { Storage } from '../../io/ole-doc.js'
 import { Matrix3D } from '../../math/matrix.js'
 import type { Meshes } from '../../render/irender-api.js'
 import { Item } from '../item.js'
-import { Mesh } from '../mesh.js'
+import type { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
 import { forceHidePlayfieldMesh, PrimitiveData } from './primitive-data.js'
 import { PrimitiveMeshGenerator } from './primitive-mesh-generator.js'
@@ -54,10 +54,6 @@ export class Primitive extends Item<PrimitiveData> {
 		return !material || (material.isOpacityActive && material.opacity < 0.999)
 	}
 
-	public isCollidable(): boolean {
-		return this.data.isCollidable
-	}
-
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {
 		const isTransparent = this.isTransparent(table)
 		return {
@@ -74,10 +70,6 @@ export class Primitive extends Item<PrimitiveData> {
 				backfacesEnabled: this.data.backfacesEnabled,
 			},
 		}
-	}
-
-	public clearMesh(): void {
-		this.data.mesh = new Mesh()
 	}
 
 	private getMesh(table: Table): Mesh {

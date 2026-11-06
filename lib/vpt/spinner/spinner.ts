@@ -43,10 +43,6 @@ export class Spinner extends Item<SpinnerData> {
 		this.updater = new SpinnerUpdater(this.state, this.data, this.meshGenerator)
 	}
 
-	public isCollidable(): boolean {
-		return true
-	}
-
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {
 		const spinner = this.meshGenerator.generateMeshes(table)
 

@@ -191,10 +191,6 @@ export class Bumper extends Item<BumperData> {
 		this.updater = new BumperUpdater(this.state, this.data)
 	}
 
-	public isCollidable(): boolean {
-		return this.data.isCollidable
-	}
-
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {
 		const m = this.meshGenerator.getMeshes(table)
 		const mat = (name?: string) => table.getMaterial(name)

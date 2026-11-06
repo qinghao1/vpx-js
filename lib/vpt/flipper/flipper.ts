@@ -39,9 +39,6 @@ export class Flipper extends Item<FlipperData> {
 		this.updater = new FlipperUpdater(this.data, this.state)
 	}
 
-	public isCollidable(): boolean {
-		return true
-	}
 	public getState(): FlipperState {
 		return this.state
 	}
@@ -64,10 +61,6 @@ export class Flipper extends Item<FlipperData> {
 			}
 		}
 		return meshes
-	}
-
-	public getFlipperData(): FlipperData {
-		return this.data
 	}
 
 	private getMatrix(rotation: number = this.data.startAngle): Matrix3D {

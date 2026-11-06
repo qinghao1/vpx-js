@@ -37,10 +37,6 @@ export class Ball {
 	public getUpdater(): BallUpdater {
 		return this.updater
 	}
-	public isCollidable(): boolean {
-		return true
-	}
-
 	public async addToScene<NODE, GEOMETRY, POINT_LIGHT>(
 		scene: NODE,
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,

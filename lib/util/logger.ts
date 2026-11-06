@@ -54,16 +54,13 @@ export class Logger implements ILogger {
 }
 
 export class Progress implements IProgress {
-	private static _instance: IProgress = new Progress()
+	private static readonly _instance: IProgress = new Progress()
 	private title?: string
 	private action?: string
 	private lastPrint = 0
 	private startTime = 0
 	static progress(): IProgress {
 		return Progress._instance
-	}
-	static setProgress(p: IProgress): void {
-		Progress._instance = p
 	}
 	start(_id: string, title: string): void {
 		this.title = title

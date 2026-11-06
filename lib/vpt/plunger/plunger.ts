@@ -55,10 +55,6 @@ export class Plunger extends Item<PlungerData> {
 		return meshes
 	}
 
-	public isCollidable(): boolean {
-		return true
-	}
-
 	public getUpdater(): PlungerUpdater {
 		return this.updater
 	}

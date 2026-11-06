@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Storage } from '../io/ole-doc.js'
 import { ItemType } from './enums.js'
-import { getItemKey, ITEM_KEYS, ITEM_REGISTRY, loadItemByType } from './item-registry.js'
+import { ITEM_KEYS, ITEM_REGISTRY, loadItemByType } from './item-registry.js'
 
 // Renderable table items only: Timer/Textbox/LightSeq/DispReel left with the script surface.
 const EXPECTED_KEYS: Array<[number, string]> = [
@@ -26,7 +26,7 @@ describe('The VPinball item registry', () => {
 	it('should map every loadable game-item type to its LoadedTable key', () => {
 		expect(Object.keys(ITEM_REGISTRY)).toHaveLength(EXPECTED_KEYS.length)
 		for (const [type, key] of EXPECTED_KEYS) {
-			expect(getItemKey(type)).toBe(key)
+			expect(ITEM_REGISTRY[type]?.key).toBe(key)
 		}
 	})
 
@@ -41,15 +41,15 @@ describe('The VPinball item registry', () => {
 	it('should not register non-game-item types', () => {
 		// Table/LightCenter/DragPoint never appear as GameItems; Timer/Textbox/
 		// LightSeq/DispReel/Collection load separately or not at all.
-		expect(getItemKey(ItemType.Table)).toBeUndefined()
-		expect(getItemKey(ItemType.LightCenter)).toBeUndefined()
-		expect(getItemKey(ItemType.DragPoint)).toBeUndefined()
-		expect(getItemKey(ItemType.Collection)).toBeUndefined()
-		expect(getItemKey(ItemType.Timer)).toBeUndefined()
-		expect(getItemKey(ItemType.Textbox)).toBeUndefined()
-		expect(getItemKey(ItemType.LightSeq)).toBeUndefined()
-		expect(getItemKey(ItemType.DispReel)).toBeUndefined()
-		expect(getItemKey(99)).toBeUndefined()
+		expect(ITEM_REGISTRY[ItemType.Table]?.key).toBeUndefined()
+		expect(ITEM_REGISTRY[ItemType.LightCenter]?.key).toBeUndefined()
+		expect(ITEM_REGISTRY[ItemType.DragPoint]?.key).toBeUndefined()
+		expect(ITEM_REGISTRY[ItemType.Collection]?.key).toBeUndefined()
+		expect(ITEM_REGISTRY[ItemType.Timer]?.key).toBeUndefined()
+		expect(ITEM_REGISTRY[ItemType.Textbox]?.key).toBeUndefined()
+		expect(ITEM_REGISTRY[ItemType.LightSeq]?.key).toBeUndefined()
+		expect(ITEM_REGISTRY[ItemType.DispReel]?.key).toBeUndefined()
+		expect(ITEM_REGISTRY[99]?.key).toBeUndefined()
 	})
 
 	it('should return null for unknown types without touching storage', async () => {

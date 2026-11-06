@@ -9,7 +9,7 @@ import { handleBiffTag } from '../biff-helper.js'
 import { type DragPoint, dragPointNestedTag } from '../dragpoint.js'
 import { Enums } from '../enums.js'
 import { Item } from '../item.js'
-import { type IPhysicalData, ItemData } from '../item-data.js'
+import { ItemData } from '../item-data.js'
 import { ItemState } from '../item-state.js'
 import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
@@ -45,7 +45,7 @@ const BOOL_MAP: Record<string, string> = {
 const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', IMAG: 'szImage', MAPH: 'szPhysicsMaterial' }
 
 /** @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
-export class RampData extends ItemData implements IPhysicalData {
+export class RampData extends ItemData {
 	public depthBias = 0
 	public dragPoints: DragPoint[] = []
 	public elasticity = 0.3
@@ -200,10 +200,6 @@ export class Ramp extends Item<RampData> {
 		)
 		this.meshGenerator = new RampMeshGenerator(data, this.state)
 		this.updater = new RampUpdater(this.state, this.meshGenerator)
-	}
-
-	public isCollidable(): boolean {
-		return this.data.isCollidable
 	}
 
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {

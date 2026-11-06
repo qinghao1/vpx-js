@@ -3,42 +3,9 @@
 
 import { BiffParser } from '../io/biff-parser.js'
 import type { Storage } from '../io/ole-doc.js'
-import { ItemType } from './enums.js'
-
-const TYPE_NAMES: Record<number, string> = {
-	[ItemType.Surface]: 'Surface',
-	[ItemType.Flipper]: 'Flipper',
-	[ItemType.Timer]: 'Timer',
-	[ItemType.Plunger]: 'Plunger',
-	[ItemType.Textbox]: 'Textbox',
-	[ItemType.Bumper]: 'Bumper',
-	[ItemType.Trigger]: 'Trigger',
-	[ItemType.Light]: 'Light',
-	[ItemType.Kicker]: 'Kicker',
-	[ItemType.Decal]: 'Decal',
-	[ItemType.Gate]: 'Gate',
-	[ItemType.Spinner]: 'Spinner',
-	[ItemType.Ramp]: 'Ramp',
-	[ItemType.Table]: 'Table',
-	[ItemType.LightCenter]: 'Light Center',
-	[ItemType.DragPoint]: 'Drag Point',
-	[ItemType.Collection]: 'Collection',
-	[ItemType.DispReel]: 'Reel',
-	[ItemType.LightSeq]: 'Light Sequence',
-	[ItemType.Primitive]: 'Primitive',
-	[ItemType.Flasher]: 'Flasher',
-	[ItemType.Rubber]: 'Rubber',
-	[ItemType.HitTarget]: 'Hit Target',
-	[ItemType.Count]: 'Count',
-	[ItemType.Invalid]: 'Invalid',
-}
 
 /** Base for VPX item data parsed from OLE storage. */
 export abstract class ItemData extends BiffParser {
-	public static getType(type: number): string {
-		return TYPE_NAMES[type] ?? `Unknown type "${type}"`
-	}
-
 	public timer = new TimerDataRoot()
 	public name!: string
 	public pdata?: number
@@ -81,16 +48,6 @@ export abstract class ItemData extends BiffParser {
 				break
 		}
 	}
-}
-
-export interface IPhysicalData {
-	elasticity: number
-	elasticityFalloff?: number
-	friction: number
-	scatter: number
-	overwritePhysics: boolean
-	isCollidable: boolean
-	szPhysicsMaterial?: string
 }
 
 export class TimerDataRoot {

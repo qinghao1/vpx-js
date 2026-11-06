@@ -121,10 +121,6 @@ export class Kicker extends Item<KickerData> {
 		this.updater = new KickerUpdater(this.state)
 	}
 
-	public isCollidable(): boolean {
-		return true
-	}
-
 	public getMeshes(table: Table): Record<string, KickerMeshEntry> {
 		return {
 			kicker: {
