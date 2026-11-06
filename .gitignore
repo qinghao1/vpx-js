@@ -15,6 +15,7 @@ demo-browser/.vite/
 # built engine artifact (npm run build:wasm:headless) and local test tables
 demo-browser/public/wasm/
 demo-browser/public/ab-tmp/
+scratch/
 .claude/
 # native VPinballX provisioned by scripts/setup-vpinball.sh
 .cache/vpinball/
