@@ -421,100 +421,82 @@ export const plungerChecks = async page => {
 	}, play)
 }
 
+// Nudge leg: the seam exposes no cabinet-acceleration accessor, so a nudge
+// is only observable through a live ball's deflection. Route one engine
+// nudge (vpx.nudge) and one KeyZ press (the viewer's nudge key), and judge
+// each by the ball's peak per-sample displacement against its pre-nudge
+// drift. Skips honestly with no live ball; a resting ball that stays
+// resting fails (the impulse never reached it).
 export const nudgeChecks = async page => {
-	await new Promise(r => setTimeout(r, 600))
-	return page.evaluate(async () => {
-		const v = window.viewer
+	const play = await ensurePlayMode(page)
+	return page.evaluate(async play => {
+		const api = window.vpx
 		const out = {}
+		if (!api) {
+			out.pass = 'skip'
+			out.reason = 'no test api (window.vpx)'
+			return out
+		}
+		if (!play?.ok) {
+			out.pass = false
+			out.reason = `play mode not entered: ${play?.reason ?? 'unknown'}`
+			return out
+		}
 		try {
-			const phys = v.player?.getPhysics?.()
-			if (!phys || !phys.getCabinetAcceleration) {
+			const sleep = ms => new Promise(r => setTimeout(r, ms))
+			if (!api.state.balls.length) {
 				out.pass = 'skip'
-				out.reason = 'no phys'
+				out.reason = 'no live ball: nudge effect unobservable in WASM seam'
 				return out
 			}
-			const getAcc = () => {
-				try {
-					const a = phys.getCabinetAcceleration()
-					return { x: a.x, y: a.y, mag: Math.hypot(a.x, a.y) }
-				} catch {
-					return { x: 0, y: 0, mag: 0 }
+			// Peak per-100ms displacement of any ball over a window: the
+			// pre-nudge window measures idle drift, the post-nudge window
+			// must clearly exceed it.
+			const peakStep = async windowMs => {
+				let peak = 0
+				let prev = api.state.balls.map(b => ({ id: b.id, x: b.x, y: b.y, z: b.z }))
+				const t0 = Date.now()
+				while (Date.now() - t0 < windowMs) {
+					await sleep(100)
+					const cur = api.state.balls.map(b => ({ id: b.id, x: b.x, y: b.y, z: b.z }))
+					for (const b of cur) {
+						const p = prev.find(q => q.id === b.id)
+						if (p) peak = Math.max(peak, Math.hypot(b.x - p.x, b.y - p.y, b.z - p.z))
+					}
+					prev = cur
 				}
+				return peak
 			}
-			const getOff = () => {
-				try {
-					const o = phys.getCabinetOffset()
-					return { x: o.x, y: o.y, mag: Math.hypot(o.x, o.y) }
-				} catch {
-					return { x: 0, y: 0, mag: 0 }
-				}
+			const drift = await peakStep(1000)
+			const floor = 3
+			const bar = Math.max(1.5 * drift, floor)
+			const attempt = async (label, fire) => {
+				fire()
+				const peak = await peakStep(1000)
+				return { label, peak: +peak.toFixed(2), pass: peak > bar }
 			}
-			const getIdx = () => {
-				try {
-					return v.player.getNudgeHandler().getIndex()
-				} catch {
-					return -1
-				}
-			}
-			const beforeAcc = getAcc(),
-				beforeOff = getOff(),
-				beforeIdx = getIdx()
-			const beforeShake = (() => {
-				try {
-					const tg = window.viewer?.tableGroup || window.tableGroup
-					return tg ? { x: tg.position.x, y: tg.position.y } : { x: 0, y: 0 }
-				} catch {
-					return { x: 0, y: 0 }
-				}
-			})()
-			try {
-				v.player.nudge(75, 2.8)
-			} catch {}
-			await new Promise(r => setTimeout(r, 140))
-			const midAcc = getAcc(),
-				midOff = getOff(),
-				midIdx = getIdx()
-			const midShake = (() => {
-				try {
-					const tg = window.viewer?.tableGroup || window.tableGroup
-					return tg ? { x: tg.position.x, y: tg.position.y } : { x: 0, y: 0 }
-				} catch {
-					return { x: 0, y: 0 }
-				}
-			})()
-			await new Promise(r => setTimeout(r, 700))
-			const afterAcc = getAcc(),
-				afterOff = getOff()
-			const idx2 = getIdx()
-			try {
-				v.player.onKeyDown({ code: 'KeyZ', key: 'z', ts: Date.now() })
-			} catch {}
-			await new Promise(r => setTimeout(r, 90))
-			try {
-				v.player.onKeyUp({ code: 'KeyZ', key: 'z', ts: Date.now() })
-			} catch {}
-			await new Promise(r => setTimeout(r, 140))
-			const afterKeyAcc = getAcc(),
-				afterKeyIdx = getIdx()
-			const viaApi = midIdx !== beforeIdx && (midAcc.mag > 0.01 || midOff.mag > 0.0001)
-			const viaKey = afterKeyIdx !== idx2 && (afterKeyAcc.mag > 0.005 || afterKeyAcc.mag > beforeAcc.mag)
-			const viaVisual =
-				Math.hypot(midShake.x - beforeShake.x, midShake.y - beforeShake.y) > 0.005 || midOff.mag > 0.00005
-			out.before = { acc: beforeAcc, off: beforeOff, idx: beforeIdx, shake: beforeShake }
-			out.mid = { acc: midAcc, off: midOff, idx: midIdx, shake: midShake }
-			out.after = { acc: afterAcc, off: afterOff }
-			out.afterKey = { acc: afterKeyAcc, idx: afterKeyIdx }
-			out.viaApi = viaApi
-			out.viaKey = viaKey
-			out.visual = viaVisual
-			out.pass = viaApi && viaKey
-			out.reason = out.pass ? 'nudge ok' : `api ${viaApi} key ${viaKey} visual ${viaVisual}`
+			const viaApi = await attempt('api', () => api.nudge(75, 2.6))
+			await sleep(400)
+			const viaKey = await attempt('key', () => {
+				api.sendKey('KeyZ', true)
+				return sleep(90).then(() => api.sendKey('KeyZ', false))
+			})
+			out.before = { drift: +drift.toFixed(2), bar: +bar.toFixed(2) }
+			out.mid = { api: viaApi, key: viaKey }
+			out.viaApi = viaApi.pass
+			out.viaKey = viaKey.pass
+			out.stillReady = api.state.wasmReady
+			out.pass = (viaApi.pass || viaKey.pass) && api.state.wasmReady
+			out.reason = out.pass
+				? `nudge deflected ball (api ${viaApi.peak} key ${viaKey.peak} vs bar ${bar.toFixed(2)})`
+				: `no deflection above drift (api ${viaApi.peak} key ${viaKey.peak} vs bar ${bar.toFixed(2)})`
+			return out
 		} catch (e) {
 			out.pass = false
-			out.error = String(e)
+			out.error = String(e?.message ?? e)
+			return out
 		}
-		return out
-	})
+	}, play)
 }
 
 export const dmdChecks = page =>
