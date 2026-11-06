@@ -1,0 +1,30 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
+Date: Tue, 3 Nov 2026 00:00:00 -0400
+Subject: [PATCH 11/11] bridge: silence refresh-rate probe error in headless
+
+The headless WASM build has no display by design (Noop renderer, input
+via VpxWasm_PushKey, host-driven via VpxWasm_StepFrame), so the SDL
+refresh-rate probe in Window::Window always yields 0Hz and the ERROR
+log is spurious. The 60Hz fallback value is still assigned as the
+fixed step rate; only the log is suppressed, and only under
+VPX_HEADLESS_BRIDGE. Desktop behavior is unchanged.
+
+diff --git a/src/renderer/Window.cpp b/src/renderer/Window.cpp
+index 95da8d0f..f5198b9b 100644
+--- a/src/renderer/Window.cpp
++++ b/src/renderer/Window.cpp
+@@ -172,7 +172,13 @@ Window::Window(const string& title, const Settings& settings, VPXWindowId window
+ 
+    if (m_refreshrate <= 0)
+    {
++#ifdef VPX_HEADLESS_BRIDGE
++      // Headless WASM has no display by design (Noop renderer, host-driven via
++      // VpxWasm_StepFrame), so a 0Hz SDL probe is expected: silently keep the
++      // fixed 60Hz step rate instead of logging a spurious ERROR.
++#else
+       PLOGE << "Failed to get display refresh rate. VPX will use a 60Hz default which may be wrong and cause bad video synchronization.";
++#endif
+       m_refreshrate = 60;
+    }
+ 

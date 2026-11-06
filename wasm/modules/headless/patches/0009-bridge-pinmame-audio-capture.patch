@@ -1,0 +1,145 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
+Date: Sun, 2 Nov 2026 00:00:00 -0400
+Subject: [PATCH 9/9] bridge: capture PinMAME ROM audio to PCM ring
+
+diff --git a/plugins/pinmame/PinMAMEPlugin.cpp b/plugins/pinmame/PinMAMEPlugin.cpp
+index 8311f38..878eda7 100644
+--- a/plugins/pinmame/PinMAMEPlugin.cpp
++++ b/plugins/pinmame/PinMAMEPlugin.cpp
+@@ -24,6 +24,9 @@
+ 
+ #include "plugins/PluginStrings.h"
+ 
++// Headless WASM bridge: PCM ring owned by vpx_wasm_bridge.cpp (C linkage, like the other VpxWasm_* entry points).
++extern "C" void VpxWasm_PushAudio(const uint8_t* pcm, unsigned byteCount, int channels, double sampleRate);
++
+ namespace PinMAME
+ {
+ 
+@@ -330,6 +333,7 @@ static void OnControllerDestroyed(Controller* destroyed)
+ 
+ static unsigned int runCmdMsgId = 0;
+ static unsigned int runStopMsgId = 0;
++static unsigned int pinmameAudioUpdateMsgId = 0;
+ 
+ static void ReleaseRunCmdController()
+ {
+@@ -338,6 +342,19 @@ static void ReleaseRunCmdController()
+       runCmdController->Release();
+ }
+ 
++// Headless WASM bridge: forward PinMAME audio updates into the bridge PCM ring
++// (see VpxWasm_GetAudio). Deferred to the main thread by libpinmame (RunOnMainThread), so no locking.
++static void MSGPIAPI OnPinMAMEAudioUpdate(unsigned int /*msgId*/, void* /*context*/, void* msgData)
++{
++   const AudioUpdateMsg* const msg = static_cast<const AudioUpdateMsg*>(msgData);
++   if (msg == nullptr || msg->buffer == nullptr || msg->bufferSize == 0)
++      return;
++   if (msg->sampleFormat != CTLPI_AUDIO_FORMAT_SAMPLE_INT16)
++      return; // bridge ring is int16-only; PinMAME is configured for int16
++   const int channels = (msg->channelFormat == CTLPI_AUDIO_FORMAT_CHANNEL_STEREO) ? 2 : 1;
++   ::VpxWasm_PushAudio(msg->buffer, msg->bufferSize, channels, msg->sampleRate);
++}
++
+ static void MSGPIAPI OnControllerRunCmd(unsigned int msgId, void* context, void* msgData)
+ {
+    RunCmdMsg* const msg = static_cast<RunCmdMsg*>(msgData);
+@@ -550,6 +567,9 @@ MSGPI_EXPORT void MSGPIAPI PinMAMEPluginLoad(const uint32_t sessionId, const Msg
+    msgApi->SubscribeMsg(endpointId, runCmdMsgId, OnControllerRunCmd, nullptr);
+    msgApi->SubscribeMsg(endpointId, runStopMsgId, OnControllerRunStop, nullptr);
+ 
++   pinmameAudioUpdateMsgId = msgApi->GetMsgID(CTLPI_NAMESPACE, CTLPI_AUDIO_ON_UPDATE_MSG);
++   msgApi->SubscribeMsg(endpointId, pinmameAudioUpdateMsgId, OnPinMAMEAudioUpdate, nullptr);
++
+    PinmameSetMsgAPI(const_cast<MsgPluginAPI*>(msgApi), endpointId);
+ }
+ 
+@@ -584,6 +604,8 @@ MSGPI_EXPORT void MSGPIAPI PinMAMEPluginUnload()
+ 
+    msgApi->UnsubscribeMsg(runCmdMsgId, OnControllerRunCmd, nullptr);
+    msgApi->UnsubscribeMsg(runStopMsgId, OnControllerRunStop, nullptr);
++   msgApi->UnsubscribeMsg(pinmameAudioUpdateMsgId, OnPinMAMEAudioUpdate, nullptr);
++   msgApi->ReleaseMsgID(pinmameAudioUpdateMsgId);
+    msgApi->ReleaseMsgID(runCmdMsgId);
+    msgApi->ReleaseMsgID(runStopMsgId);
+    msgApi->ReleaseMsgID(getVpxApiMsgId);
+diff --git a/src/web/vpx_wasm_bridge.cpp b/src/web/vpx_wasm_bridge.cpp
+index 31d7287..e5884ac 100644
+--- a/src/web/vpx_wasm_bridge.cpp
++++ b/src/web/vpx_wasm_bridge.cpp
+@@ -438,6 +438,74 @@ EMSCRIPTEN_KEEPALIVE const BridgeBufferView *VpxWasm_GetBuffer(int kind)
+    return &g_view;
+ }
+ 
++// ---- PinMAME ROM audio capture (int16 PCM ring) ----
++// Producer: OnPinMAMEAudioUpdate in the PinMAME plugin (libpinmame posts audio
++// updates on the main thread, same thread that runs StepFrame and this getter).
++// Consumer: VpxWasm_GetAudio below, which drains. Oldest samples are dropped on overflow.
++namespace {
++constexpr size_t kAudioCapSamples = 44100u * 2u * 4u; // 4 s of stereo
++struct AudioRing {
++   int sampleRate = 0;
++   int channels = 0;
++   std::vector<int16_t> buf;
++   size_t head = 0;
++   size_t count = 0;
++};
++AudioRing g_audio;
++int16_t g_audioOut[16384];
++}
++
++void VpxWasm_PushAudio(const uint8_t* pcm, unsigned byteCount, int channels, double sampleRate)
++{
++   if (pcm == nullptr || byteCount == 0 || (channels != 1 && channels != 2) || sampleRate <= 0.0)
++      return;
++   if (g_audio.buf.empty())
++      g_audio.buf.resize(kAudioCapSamples);
++   g_audio.sampleRate = (int)sampleRate;
++   g_audio.channels = channels;
++   const size_t n = byteCount / 2;
++   const int16_t* s = reinterpret_cast<const int16_t*>(pcm);
++   for (size_t i = 0; i < n; i++)
++   {
++      g_audio.buf[g_audio.head] = s[i];
++      g_audio.head = (g_audio.head + 1) % g_audio.buf.size();
++      if (g_audio.count < g_audio.buf.size())
++         g_audio.count++;
++   }
++}
++
++EMSCRIPTEN_KEEPALIVE const int32_t* VpxWasm_GetAudioInfo()
++{
++   static int32_t info[2];
++   info[0] = g_audio.sampleRate;
++   info[1] = g_audio.channels;
++   return info;
++}
++
++EMSCRIPTEN_KEEPALIVE const BridgeBufferView* VpxWasm_GetAudio()
++{
++   if (g_audio.buf.empty() || g_audio.count == 0)
++   {
++      g_view.ptr = 0;
++      g_view.count = 0;
++      g_view.stride = g_audio.channels;
++      return &g_view;
++   }
++   const size_t cap = sizeof(g_audioOut) / sizeof(g_audioOut[0]);
++   const size_t n = (g_audio.count < cap) ? g_audio.count : cap;
++   size_t idx = (g_audio.head + g_audio.buf.size() - g_audio.count) % g_audio.buf.size();
++   for (size_t i = 0; i < n; i++)
++   {
++      g_audioOut[i] = g_audio.buf[idx];
++      idx = (idx + 1) % g_audio.buf.size();
++   }
++   g_audio.count -= n;
++   g_view.ptr = (n == 0) ? 0 : (int)(intptr_t)g_audioOut;
++   g_view.count = (int)n;
++   g_view.stride = g_audio.channels;
++   return &g_view;
++}
++
+ static unsigned DmdHash(const uint8_t* px, int n)
+ {
+    unsigned h = 2166136261u;

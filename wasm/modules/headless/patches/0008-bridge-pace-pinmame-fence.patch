@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
+Date: Sun, 2 Nov 2026 00:00:00 -0400
+Subject: [PATCH 8/9] bridge: pace PinMAME with the host game clock
+
+Pace the VPM emulation with the host-driven game clock each frame. The
+time fence is otherwise set once at table init (core.vbs) and the libpinmame
+game thread parks after ~10ms of emulated time: DMD freezes, switches never
+process, solenoids never fire. Advancing the fence per step is exactly the
+external synchronization the fence mechanism exists for (see time_fence
+handling in cpuexec.c); the host owns the clock headless.
+
+Target: vpinball/vpinball@64a480a96d1b972711fbb8eea014654c779b1e23
+
+diff --git a/src/web/vpx_wasm_bridge.cpp b/src/web/vpx_wasm_bridge.cpp
+--- a/src/web/vpx_wasm_bridge.cpp
++++ b/src/web/vpx_wasm_bridge.cpp
+@@ -24,2 +24,3 @@ includes
+ #include "utils/color.h"
++#include "pinmame/libpinmame.h"
+ #include "parts/ball.h"
+@@ -401,3 +401,6 @@ step
+    if (!g_player)
+       return;
++   // Pace PinMAME with the host-driven game clock: the VPM time fence is
++   // otherwise set once at table init and the emulation parks after ~10ms.
++   PinmameSetTimeFence(nowMs > 0.0 ? nowMs / 1000.0 : 0.001);
+    g_player->StepHeadlessFrame(nowMs);

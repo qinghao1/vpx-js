@@ -1,0 +1,127 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 -0400
+From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
+Date: Wed, 4 Nov 2026 00:00:00 -0400
+Subject: [PATCH 12/12] bridge: mirror live FlexDMD display into m_dmdFrame
+
+FlexDMD-driven tables (no PinMAME ROM, e.g. JP's Space Cadet) render score
+and mission state through the script's FlexDMD stage, so GetDmdFrame stayed
+empty even with the script running. Pull the live FlexDMD luminance frame
+(0..255 bytes per dot, converted to the linear float lane the PinMAME
+mirror serves) lazily on read, publishing only on change so m_dmdFrameId
+stays a real change counter. Runs only when no frame is mirrored yet, so
+VPM tables keep their existing frames. The first publish requires
+non-blank content: an idle instance only ever serves its blank surface,
+which must not reveal the overlay. Adds one narrow plugin accessor; no new
+ABI surface, no script or table changes.
+
+Target: vpinball/vpinball@64a480a96d1b972711fbb8eea014654c779b1e23
+
+diff --git a/plugins/flexdmd/FlexDMDPlugin.cpp b/plugins/flexdmd/FlexDMDPlugin.cpp
+--- a/plugins/flexdmd/FlexDMDPlugin.cpp
++++ b/plugins/flexdmd/FlexDMDPlugin.cpp
+@@ -457,4 +457,34 @@ MSGPI_EXPORT void MSGPIAPI FlexDMDPluginUnload()
+    scriptApi = nullptr;
+    msgApi = nullptr;
+    vpxApi = nullptr;
+ }
++
++// Headless WASM bridge: snapshot the live FlexDMD dot-matrix display for
++// the WASM ABI. Pixels are bytes per dot in 0..255 sRGB luminance (same
++// layout FlexDMD::GetDmdPixels serves). False when no FlexDMD instance is
++// running: an idle instance only ever serves its blank surface.
++bool FlexDMD_GetDmdPixels(std::vector<uint8_t>& pixels, int& width, int& height)
++{
++   pixels.clear();
++   width = 0;
++   height = 0;
++   for (FlexDMD* pFlex : flexDmds)
++   {
++      if (pFlex == nullptr || !pFlex->GetRun())
++         continue;
++      width = pFlex->GetWidth();
++      height = pFlex->GetHeight();
++      if (width <= 0 || height <= 0)
++         continue;
++      pixels = pFlex->GetDmdPixels();
++      if ((int)pixels.size() < width * height)
++      {
++         pixels.clear();
++         width = 0;
++         height = 0;
++         continue;
++      }
++      return true;
++   }
++   return false;
++}
+diff --git a/src/web/vpx_wasm_bridge.cpp b/src/web/vpx_wasm_bridge.cpp
+--- a/src/web/vpx_wasm_bridge.cpp
++++ b/src/web/vpx_wasm_bridge.cpp
+@@ -73,6 +73,11 @@ enum class MoverType : int
+ // controller/DMD is active.
+ bool PinMAME_GetDmdPixels(std::vector<uint8_t>& pixels, int& width, int& height);
+ 
++// Provided by the FlexDMD plugin (FlexDMDPlugin.cpp): snapshot of the live
++// FlexDMD dot-matrix display, bytes per dot in 0..255 sRGB luminance. False
++// when no FlexDMD instance is running.
++bool FlexDMD_GetDmdPixels(std::vector<uint8_t>& pixels, int& width, int& height);
++
+ namespace
+ {
+ 
+@@ -551,12 +551,54 @@ static void PullPinMameDmd()
+    g_dmdHash = hash;
+    g_dmdHashInit = true;
+ }
+ 
++static unsigned g_dmdFlexHash = 0;
++static bool g_dmdFlexInit = false;
++
++// FlexDMD-driven tables (no PinMAME ROM) render score and mission state
++// through the script's FlexDMD stage. Mirror it into m_dmdFrame with the
++// same publish-on-change counter as the PinMAME lane. Runs only when no
++// frame is mirrored yet, so VPM tables keep their existing frames. The
++// first publish requires non-blank content: an idle instance only ever
++// serves its blank surface, which must not reveal the overlay.
++static void PullFlexDmd()
++{
++   if (!g_player)
++      return;
++   std::vector<uint8_t> px;
++   int w = 0, h = 0;
++   if (!FlexDMD_GetDmdPixels(px, w, h) || w <= 0 || h <= 0 || (int)px.size() < w * h)
++      return;
++   const int n = w * h;
++   const unsigned hash = DmdHash(px.data(), n);
++   if (g_dmdFlexInit && hash == g_dmdFlexHash)
++      return;
++   if (!g_dmdFlexInit)
++   {
++      bool blank = true;
++      for (int i = 0; i < n; i++)
++         if (px[i] != 0) { blank = false; break; }
++      if (blank)
++         return;
++   }
++   g_player->m_dmdSize = int2(w, h);
++   BaseTexture::Update(g_player->m_dmdFrame, (unsigned)w, (unsigned)h, BaseTexture::BW_FP32, nullptr);
++   float* const __restrict data = static_cast<float*>(g_player->m_dmdFrame->data());
++   for (int i = 0; i < n; i++)
++      data[i] = InvsRGBPercent((uint8_t)((int)px[i] * 100 / 255));
++   g_player->m_dmdFrameId++;
++   g_player->m_pluginAPI.OnDMDUpdated(nullptr, g_player->m_dmdFrame);
++   g_dmdFlexHash = hash;
++   g_dmdFlexInit = true;
++}
++
+ EMSCRIPTEN_KEEPALIVE const BridgeDmdFrame *VpxWasm_GetDmdFrame()
+ {
+    if (!g_player)
+       return nullptr;
+    PullPinMameDmd();
+    if (!g_player->m_dmdFrame)
+-      return nullptr;
++      PullFlexDmd();
++   if (!g_player->m_dmdFrame)
++      return nullptr;
+    const std::shared_ptr<BaseTexture> &frame = g_player->m_dmdFrame;
