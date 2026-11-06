@@ -40,7 +40,7 @@ if (options.vpx) {
 
 /**
  * Mirror the open table/ROM in the URL so a reload refetches it. Local files
- * cannot be refetched, so they clear their key; a new table also drops the ROM.
+ * sync by file name (page-relative on reload); a new table also drops the ROM.
  */
 const syncParam = (key: 'vpx' | 'rom', value?: string) => {
 	const url = new URL(location.href)
@@ -56,11 +56,11 @@ function openFiles(files: Iterable<File>) {
 	const list = [...files]
 	const named = (ext: string) => list.filter(f => f.name.toLowerCase().endsWith(ext))
 	for (const f of named('.vpx')) {
-		syncParam('vpx')
+		syncParam('vpx', f.name)
 		viewer.loadFromFile(f).catch(reportFailure('load'))
 	}
 	for (const f of named('.zip')) {
-		syncParam('rom')
+		syncParam('rom', f.name)
 		viewer.loadRomFile(f).catch(reportFailure('rom load'))
 	}
 }

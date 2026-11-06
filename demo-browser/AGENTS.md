@@ -17,7 +17,7 @@ URL options (all optional):
 - `mode=play|viewer` — start mode (default `viewer`)
 - `noaa` — no antialiasing; `nobatched` — skip static-mesh batching; `webgl` — force three's WebGL2 backend (default: WebGPU, falling back to WebGL2 when unavailable)
 
-Tables and ROMs also load by drag & drop, the file pickers, or the table browser. A ROM belongs to the table on screen (or the one dropped with it): it reboots that table's engine, and a new table without one clears it. Only server-fetchable sources are mirrored into `?vpx`/`?rom`; local files clear them.
+Tables and ROMs also load by drag & drop, the file pickers, or the table browser. A ROM belongs to the table on screen (or the one dropped with it): it reboots that table's engine, and a new table without one clears it. Opened files mirror their file name into `?vpx`/`?rom` (page-relative on reload).
 
 Requires `dist-esm` built. `server.fs.allow` covers the repo root, `~/Downloads`, `~/.pinmame/roms` (`strict:false`, COOP/COEP/CORP, `assetsInclude` `*.vpx/*.wasm/*.zip`); the ROM middleware also resolves `~/pinmame/roms` (non-dot) and `public/pinmame/roms/`. The engine artifact is served from `public/wasm/`. `public/test/fixtures/table-empty.vpx` is a tracked copy of `test/fixtures/table-empty.vpx` so static builds ship the default table; keep the two identical.
 
