@@ -26,7 +26,7 @@
 		"useDefineForClassFields": false,
 		"ignoreDeprecations": "6.0"
 	},
-	"include": ["lib/**/*", "build/**/*"],
+	"include": ["lib/**/*"],
 	"exclude": [
 		".nyc_output",
 		"node_modules",

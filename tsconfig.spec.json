@@ -1,6 +1,6 @@
 {
 	"extends": "./tsconfig.json",
 	"compilerOptions": { "noEmit": true, "types": ["node", "vitest/globals"] },
-	"include": ["lib/**/*", "build/**/*", "test/**/*"],
+	"include": ["lib/**/*", "test/**/*"],
 	"exclude": [".nyc_output", "node_modules", "dist", "dist-esm", "coverage", "res", "test/fixtures", "demo-browser"]
 }

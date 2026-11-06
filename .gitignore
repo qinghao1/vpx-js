@@ -1,27 +1,19 @@
 .idea
-.nyc_output
+.claude/
+.agents/
 coverage
 dist
 dist-esm
 node_modules
-# local bench profiling artifacts
-lib/**/bench*.spec.ts
-lib/*.bench*.ts
-bench*.spec.ts
-/*.vpx
-!test/fixtures/*.vpx
 *.bak
+# local bench profiling specs
+bench*.spec.ts
+# local tables (fixtures live in test/fixtures/)
+/*.vpx
 
-.agents/
-demo-browser/dist/
-demo-browser/node_modules/
 demo-browser/.vite/
-profile_harness*.mjs
-external/vpinball/build/
-external/vpinball/bin/
-external/vpinball/external/
-external/vpinball/third-party/
-.cache/vpinball/
-scratch/
+# built engine artifact (npm run build:wasm:headless) and local test tables
 demo-browser/public/wasm/
 demo-browser/public/ab-tmp/
+# native VPinballX provisioned by scripts/setup-vpinball.sh
+.cache/vpinball/
