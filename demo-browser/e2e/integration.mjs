@@ -1,4 +1,6 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
+import { existsSync } from 'node:fs'
+import { findWalkingDead, findWalkingDeadRom } from '../../test/harness/bench-shared.ts'
 import { attachLogging, ensureVite, launchBrowser, loadPuppeteer, newPage } from '../../test/harness/utils.mjs'
 import {
 	backboxChecks,
@@ -38,14 +40,14 @@ const url = upgradeLocalhost(
 		'',
 )
 const out = process.argv.find(a => a.startsWith('--out='))?.slice(6) || '/tmp'
-// GPU selection (same convention as bench.mjs): --gpu=vulkan|--gpu=gl|--gpu,
-// USE_GPU=..., or legacy USE_SWIFTSHADER=1 (default when no gpu is set).
+// GPU: --gpu=vulkan|gl|--gpu or USE_GPU=...; otherwise the host GPU when it
+// has one (the playable table kills SwiftShader tabs), else SwiftShader.
+// USE_SWIFTSHADER=1 forces software GL.
 const gpuArg =
 	process.argv.find(a => a.startsWith('--gpu='))?.slice(6) || (process.argv.includes('--gpu') ? 'vulkan' : null)
-const gpu = gpuArg || process.env.USE_GPU || process.env.GPU || null
-const useSwift = process.env.USE_SWIFTSHADER === '1'
-if (useSwift && !gpu) console.log('[integration] USE_SWIFTSHADER=1 (default SwiftShader flags)')
-if (gpu) console.log(`[integration] gpu=${gpu}`)
+const hostGpu = process.env.USE_SWIFTSHADER !== '1' && existsSync('/dev/dri/renderD128') ? 'vulkan' : null
+const gpu = gpuArg || process.env.USE_GPU || process.env.GPU || hostGpu
+console.log(`[integration] ${gpu ? `gpu=${gpu}` : 'SwiftShader (software GL)'}`)
 const readyTimeoutMs = Number(process.env.E2E_READY_TIMEOUT_MS) || 60000
 const autoKillMs = Number(process.env.E2E_AUTOKILL_MS) || undefined
 
@@ -471,21 +473,22 @@ if (url) {
 	}
 	process.exit(res?.ok ? 0 : 1)
 } else {
-	const primaryUrl = serverUrl
-	const urls = [[primaryUrl, 'primary']]
-	const extraUrls = []
-	const singleExtra = process.env.EXTRA_URL || process.env.TEST_URL || process.env.URL
-	if (singleExtra) extraUrls.push(singleExtra)
-	const multiExtra = process.env.EXTRA_URLS || process.env.TEST_URLS
-	if (multiExtra)
-		extraUrls.push(
-			...multiExtra
-				.split(',')
-				.map(s => s.trim())
-				.filter(Boolean),
-		)
-	for (const eu of extraUrls) {
-		if (!urls.some(([u]) => u === eu)) urls.push([eu, labelFromUrl(eu)])
+	// Default run: the empty fixture, plus the playable table with its ROM when
+	// both exist locally. Only that run boots PinMAME, so it is what catches
+	// engine aborts on real tables. EXTRA_URLS (comma list) adds more pages,
+	// moved onto this run's server.
+	const { origin } = new URL(serverUrl)
+	const urls = [[serverUrl, 'primary']]
+	const twd = findWalkingDead()
+	const rom = findWalkingDeadRom()
+	if (twd && rom) {
+		const query = new URLSearchParams({ vpx: `/@fs${twd}`, rom: `/@fs${rom}`, mode: 'play' })
+		urls.push([`${origin}/?${query}`, 'twd'])
+	} else console.log('[integration] no Walking Dead table + ROM found: playable-table run skipped')
+	for (const extra of (process.env.EXTRA_URLS ?? '').split(',').filter(s => s.trim())) {
+		const page = new URL(extra.trim(), origin)
+		const onServer = `${origin}${page.pathname}${page.search}`
+		if (!urls.some(([u]) => u === onServer)) urls.push([onServer, labelFromUrl(onServer)])
 	}
 	let overallOk = true
 	for (const [u, l] of urls) {

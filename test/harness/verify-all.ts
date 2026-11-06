@@ -156,6 +156,12 @@ const checks: E2ECheck[] = [
 		optional: true,
 		skipReason: 'Space Cadet VPX not provisioned (child exit 77)',
 	},
+	{
+		name: 'pages',
+		script: 'test/harness/verify-pages.mjs',
+		optional: true,
+		skipReason: 'engine artifact not built (child exit 77)',
+	},
 	{ name: 'browser', run: verifyBrowser, optional: true, skipReason: 'browser not runnable here' },
 ]
 

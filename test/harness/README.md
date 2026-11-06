@@ -3,7 +3,7 @@
 E2E harnesses, benches, and repros. Single entry point:
 
 ```bash
-npx tsx test/harness/verify-all.ts   # TAP 1..5: table → twd-render → ab → cadet → browser
+npx tsx test/harness/verify-all.ts   # TAP 1..6: table → twd-render → ab → cadet → pages → browser
 ```
 
 ## Runner rule (.ts vs .mjs)
@@ -21,7 +21,7 @@ npx tsx test/harness/verify-all.ts   # TAP 1..5: table → twd-render → ab →
 
 | File                          | What                                                                                                                                                                                           | Needs                                                            |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `verify-all.ts`               | Aggregator, TAP 1..5 (table, twd-render, ab, cadet, browser), exit 0/1                                                                                                                         | varies per step                                                  |
+| `verify-all.ts`               | Aggregator, TAP 1..6 (table, twd-render, ab, cadet, pages, browser), exit 0/1                                                                                                                  | varies per step                                                  |
 | `verify-table.ts`             | VPX parse + script extract over fixtures + `example-table.vpx`                                                                                                                                 | —                                                                |
 | `verify-browser.ts`           | Thin wrapper → `verify-all.verifyBrowser` → `demo-browser/e2e/integration.mjs`                                                                                                                 | Chrome + vite + `dist-esm`                                       |
 | `verify-play-room.ts`         | Play-room scene checks (TAP `Tap` class)                                                                                                                                                       | —                                                                |
@@ -30,6 +30,7 @@ npx tsx test/harness/verify-all.ts   # TAP 1..5: table → twd-render → ab →
 | `verify-ab.mjs`               | A/B parity: same table+ROM, same scripted match, NEW (WASM) vs OLD (`/tmp/vpx-js-old` at HEAD) — render, gameplay, physics, DMD, audio gates + JSON report                                     | VPX + ROM + Chrome + vite + OLD worktree, else SKIP              |
 | `verify-cadet.mjs`            | Space Cadet live checks: decoy stays hidden, DMD overlay hidden until first frame (FlexDMD content when bridged), lamps go live after coin+start, digit-flasher score images live (patch 0013) | `space_cadet.vpx` + Chrome + vite + rebuilt wasm, else SKIP/fail |
 | `verify-headless.mjs`         | Headless engine checks (15 gates: load, boot, DMD, coins, audio, lifecycle)                                                                                                                    | —                                                                |
+| `verify-pages.mjs`            | Static-host E2E: `VITE_COI_SW=1` bundle on a header-less server under `/vpx-js/` — service worker isolates, threaded engine boots                                                              | engine artifact (`public/wasm/`)                                 |
 | `compare-side-by-side.ts`     | MANUAL dual-window launcher (browser left, native right) — eyeball only, no asserts                                                                                                            | Chrome + vite + native                                           |
 | `bench.mjs`                   | Browser bench: load + FPS + profile (`--vpx/--rom/--balls/--duration/--warmup/--out/--headed/--gpu/--trace`)                                                                                   | Chrome + vite                                                    |
 | `bench-fps-gpu.mjs`           | GPU FPS bench                                                                                                                                                                                  | Chrome + vite + GPU                                              |

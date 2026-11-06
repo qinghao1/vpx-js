@@ -53,6 +53,16 @@ export const WALKING_DEAD_CANDIDATES: string[] = [
 	path.join(HOME, '.cache/vpinball/tables/The Walking Dead (Stern 2014).vpx'),
 ].filter((candidate): candidate is string => !!candidate)
 
+// The TWD ROM (PinMAME set twd_160h) next to wherever the table usually lives.
+export const WALKING_DEAD_ROM_CANDIDATES: string[] = [
+	process.env.WALKING_DEAD_ROM,
+	path.join(HOME, '.pinmame/roms/twd_160h.zip'),
+	path.join(HOME, 'Downloads/twd_160h.zip'),
+	path.join(HOME, 'Downloads/walking_dead/twd_160h.zip'),
+	path.join(HOME, '.cache/vpinball/pinmame/roms/twd_160h.zip'),
+	path.resolve('demo-browser/public/ab-tmp/twd.zip'),
+].filter((candidate): candidate is string => !!candidate)
+
 export const VPX_CANDIDATES: string[] = [...WALKING_DEAD_CANDIDATES, path.resolve('test/fixtures/table-empty.vpx')]
 
 export function findVpx(): string | null {
@@ -61,6 +71,10 @@ export function findVpx(): string | null {
 
 export function findWalkingDead(): string | null {
 	return WALKING_DEAD_CANDIDATES.find(candidate => exists(candidate, 1024 * 1024)) ?? null
+}
+
+export function findWalkingDeadRom(): string | null {
+	return WALKING_DEAD_ROM_CANDIDATES.find(candidate => exists(candidate)) ?? null
 }
 
 export function defaultGenOpts(overrides: Record<string, boolean> = {}): Record<string, boolean> {

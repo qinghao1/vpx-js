@@ -14,19 +14,12 @@
  * Run: node test/harness/verify-headless.mjs [--rom=<zip>]
  * Exit: 0 pass, 77 skip (artifact absent), 1 fail.
  */
-import { existsSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { findWalkingDead } from './bench-shared.ts'
+import { findWalkingDead, findWalkingDeadRom } from './bench-shared.ts'
 import { attachLogging, ensureVite, launchBrowser, loadPuppeteer, newPage } from './utils.mjs'
 
 const ROM_ZIP = process.argv.find(a => a.startsWith('--rom='))?.slice(6) || ''
 
-const romCandidates = [
-	`${homedir()}/.cache/vpinball/pinmame/roms/twd_160h.zip`,
-	`${homedir()}/Downloads/walking_dead/twd_160h.zip`,
-	`${homedir()}/Downloads/twd_160h.zip`,
-]
-const romPath = ROM_ZIP || romCandidates.find(p => existsSync(p)) || ''
+const romPath = ROM_ZIP || findWalkingDeadRom() || ''
 const twdPath = findWalkingDead() ?? ''
 
 const BASE = new URL((await ensureVite('https://localhost/', { label: 'verify-headless' })).url).origin
