@@ -223,7 +223,7 @@ export const physicsChecks = async page => {
 			const sd = Math.sqrt(sums.reduce((a, b) => a + (b - mean) ** 2, 0) / sums.length)
 			return { mean, sd, lights: api.state.lightActivity }
 		}
-		const pressForResponse = async code => {
+		const pressForResponse = async (code, windowMs) => {
 			const pre = await baseline()
 			const d0 = dmdSum()
 			api.sendKey(code, true)
@@ -232,7 +232,7 @@ export const physicsChecks = async page => {
 			const t0 = Date.now()
 			let responded = false,
 				post = { sum: d0.sum, lights: pre.lights }
-			while (Date.now() - t0 < 4000 && !responded) {
+			while (Date.now() - t0 < windowMs && !responded) {
 				await sleep(100)
 				const d = dmdSum()
 				const lights = api.state.lightActivity
@@ -243,12 +243,26 @@ export const physicsChecks = async page => {
 			}
 			return { pre, post, responded, dmdPresent: d0.present || dmdSum().present }
 		}
+		// Whether any script output exists at all: without it a press cannot
+		// be judged, and the second press would wait on nothing.
+		let outputEver = dmdSum().present || api.state.lightActivity > 0
 		for (const [key, code] of [
 			['coin', 'Digit5'],
 			['start', 'Digit1'],
 		]) {
 			try {
-				const r = await pressForResponse(code)
+				if (key === 'start' && !outputEver) {
+					out[key] = {
+						before: 0,
+						mid: 0,
+						after: 0,
+						pass: 'skip',
+						reason: 'no DMD/lamp output: switch response unobservable',
+					}
+					continue
+				}
+				const r = await pressForResponse(code, outputEver ? 4000 : 1500)
+				outputEver = outputEver || r.dmdPresent || r.post.lights > 0 || r.responded
 				if (!r.dmdPresent && r.pre.lights === 0 && r.post.lights === 0) {
 					out[key] = {
 						before: 0,
@@ -569,7 +583,14 @@ export const ensurePlayMode = async page => {
 			tries++
 		}
 		const s = api.state
-		return { ok: s.wasmReady, mode: s.mode, wasmReady: s.wasmReady, balls: s.ballCount, tries }
+		return {
+			ok: s.wasmReady,
+			mode: s.mode,
+			wasmReady: s.wasmReady,
+			balls: s.ballCount,
+			tries,
+			reason: s.wasmReady ? undefined : 'engine not ready after 10s',
+		}
 	})
 }
 
@@ -593,15 +614,32 @@ export const ballChecks = async (page, timeout = 60000) => {
 				return 0
 			}
 		}
+		// Structural capability: no plungers/kickers/balls in the catalog
+		// means the fixture can never eject — don't burn the script-output
+		// wait (PinMAME boot on a real table takes most of it).
+		const s0 = api.state
+		const structural =
+			s0.plungers.length > 0 ||
+			s0.balls.length > 0 ||
+			s0.partNames.some(n => /kicker|plunger|trough|drain|ballrelease|outhole|release/i.test(n || ''))
 		const t0 = Date.now()
 		let sum = 0
-		while (Date.now() - t0 < 20000) {
+		while (Date.now() - t0 < (structural ? 26000 : 5000)) {
 			sum = litSum()
 			if (sum > 50000) break
-			if (api.state.lightActivity > 0 && Date.now() - t0 > 5000) break
+			if (Date.now() - t0 > 5000) {
+				if (api.state.lightActivity > 0 || api.state.balls.length > 0) break
+				if (!structural) break
+			}
 			await sleep(500)
 		}
-		return { dmdSum: sum, lightActivity: api.state.lightActivity }
+		const s1 = api.state
+		return {
+			dmdSum: sum,
+			lightActivity: s1.lightActivity,
+			structural,
+			balls: s1.balls.length,
+		}
 	})
 	return page.evaluate(async settled => {
 		const api = window.vpx
@@ -642,7 +680,11 @@ export const ballChecks = async (page, timeout = 60000) => {
 			api.sendKey(code, false)
 		}
 		// Coin up, then start: the scripted trough kick ejects on game start.
-		for (let attempt = 0; attempt < 3 && !moved; attempt++) {
+		// One attempt is enough when the fixture shows no ball source and no
+		// script output — repeats only help a live script.
+		const attempts =
+			settled.structural || settled.dmdSum > 0 || settled.lightActivity > 0 || settled.balls > 0 ? 3 : 1
+		for (let attempt = 0; attempt < attempts && !moved; attempt++) {
 			await key('Digit5', 500)
 			await sleep(1000)
 			await key('Digit5', 500)
@@ -682,7 +724,8 @@ export const ballChecks = async (page, timeout = 60000) => {
 			return out
 		}
 		// No motion and no script output ever: the fixture cannot eject
-		// (empty table, or no ROM driving the script) — honest skip.
+		// (empty table, or no ROM driving the script) — honest skip. The
+		// structural flag only shortened the settle wait above.
 		if (settled.dmdSum === 0 && settled.lightActivity === 0 && out.dmdSum === 0 && out.lightActivity === 0) {
 			out.pass = 'skip'
 			out.skipReason = 'no script output observed (no DMD/lamp activity): ejection unobservable'
