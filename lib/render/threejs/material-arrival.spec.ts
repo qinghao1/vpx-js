@@ -371,4 +371,55 @@ describe('material arrival: BDL uniforms survive streaming', () => {
 		expect(mat.alphaTest, 'cutout follows the arriving image').toBeCloseTo(0.5, 10)
 		expect(mat.version, 'cutout change must revalidate the program').toBeGreaterThan(v0)
 	})
+
+	describe('F9: classic slot invalidation skips uniform-only swaps', () => {
+		it('invalidates on first attach but not on a texture -> texture swap', () => {
+			const texA = makeTex()
+			const texB = makeTex()
+			const textures = new Map<string, DataTexture>([
+				['imagea', texA],
+				['imageb', texB],
+			])
+			const generator = makeGenerator(textures)
+			const mat = new MeshStandardMaterial({ color: 0x000000 }) as any
+			const v0 = mat.version
+			generator.applyMap(mat, 'imagea')
+			expect(mat.map, 'map attached').toBe(texA)
+			expect(mat.version, 'attach changes the program').toBeGreaterThan(v0)
+			const v1 = mat.version
+			generator.applyMap(mat, 'imageb')
+			expect(mat.map, 'swapped map bound').toBe(texB)
+			expect(mat.version, 'swap only rebinds a uniform').toBe(v1)
+		})
+
+		it('still invalidates a classic-slot swap that changes the alpha cutout', () => {
+			const texA = makeTex()
+			;(texA as any).userData = { alphaTestValue: 1 / 255 }
+			const texB = makeTex()
+			;(texB as any).userData = { alphaTestValue: 0.5 }
+			const textures = new Map<string, DataTexture>([
+				['imagea', texA],
+				['imageb', texB],
+			])
+			const generator = makeGenerator(textures)
+			const mat = new MeshStandardMaterial({ color: 0x000000 }) as any
+			generator.applyMap(mat, 'imagea')
+			const v1 = mat.version
+			generator.applyMap(mat, 'imageb')
+			expect(mat.map, 'swapped map bound').toBe(texB)
+			expect(mat.alphaTest, 'cutout follows the arriving image').toBeCloseTo(0.5, 10)
+			expect(mat.version, 'cutout change must revalidate the program').toBeGreaterThan(v1)
+		})
+
+		it('leaves the program alone when the slot already holds the texture', () => {
+			const texA = makeTex()
+			const textures = new Map<string, DataTexture>([['imagea', texA]])
+			const generator = makeGenerator(textures)
+			const mat = new MeshStandardMaterial({ color: 0x000000 }) as any
+			generator.applyMap(mat, 'imagea')
+			const v1 = mat.version
+			generator.applyMap(mat, 'imagea')
+			expect(mat.version, 'no-op rebind invalidates nothing').toBe(v1)
+		})
+	})
 })

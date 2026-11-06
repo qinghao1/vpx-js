@@ -14,7 +14,6 @@ import {
 	type Mesh as ThreeMesh,
 	Vector3,
 } from 'three'
-import type { IRenderable, RenderInfo } from '../../game/interfaces.js'
 import type { Matrix3D } from '../../math/matrix.js'
 import { type AnimationGate, animationGate } from '../../util/animation-gate.js'
 import { progress } from '../../util/logger.js'
@@ -24,7 +23,7 @@ import type { Material } from '../../vpt/material.js'
 import type { Mesh } from '../../vpt/mesh.js'
 import type { Table, TableGenerateOptions } from '../../vpt/table/table.js'
 import type { Texture } from '../../vpt/texture.js'
-import type { IRenderApi, MeshConvertOptions } from '../irender-api.js'
+import type { IRenderApi, IRenderable, MeshConvertOptions, RenderInfo } from '../irender-api.js'
 import { applyBatchedVisibility, unbatchInstances } from './batched-visibility.js'
 import type { IMaterialGenerator } from './imaterial-generator.js'
 import { cloneMaterialForWrite } from './material-shared.js'

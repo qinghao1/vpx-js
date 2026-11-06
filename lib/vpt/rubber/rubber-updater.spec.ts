@@ -8,7 +8,6 @@ import sinonChai from 'sinon-chai'
 import { Matrix4, Vector3 } from 'three'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { TestRenderApi } from '../../../test/test-render-api.js'
-import { Player } from '../../game/player.js'
 import { Matrix3D } from '../../math/matrix.js'
 import type { Table } from '../table/table.js'
 import type { RubberState } from './rubber.js'
@@ -25,7 +24,6 @@ class CapturingRenderApi extends TestRenderApi {
 
 describe('The VPinball rubber updater', () => {
 	let table: Table
-	let player: Player
 
 	beforeEach(() => {
 		table = new TableBuilder()
@@ -33,23 +31,6 @@ describe('The VPinball rubber updater', () => {
 			.addRubber('r1', { staticRendering: false })
 			.addRubber('r2', { staticRendering: true })
 			.build()
-
-		// init player
-		player = new Player(table).init()
-	})
-
-	it('should update visibility even when rendering is static', async () => {
-		table.rubbers.r2.getApi().Visible = false
-		const states = player.popStates()
-		expect(states.getState<RubberState>('r2').isVisible).to.equal(false)
-		states.getState<RubberState>('r2').release()
-	})
-
-	it('should update visibility when rendering is dynamic', async () => {
-		table.rubbers.r1.getApi().Visible = false
-		const states = player.popStates()
-		expect(states.getState<RubberState>('r1').isVisible).to.equal(false)
-		states.getState<RubberState>('r1').release()
 	})
 
 	it('should apply visibility', async () => {
@@ -92,14 +73,10 @@ describe('The VPinball rubber updater', () => {
 		expect(Array.from(matrix.elements)).to.deep.equal(Array.from(new Matrix3D().elements))
 	})
 
-	it('should move the mesh when transforming via the API', async () => {
+	it('should move the mesh when transforming via the state', async () => {
 		const rubber = table.rubbers.r1
-		rubber.getApi().RotX = 30
-		const states = player.popStates()
-		const diff = states.getState<RubberState>('r1')
 		const renderApi = new CapturingRenderApi()
-		rubber.getUpdater().applyState(null, diff as RubberState, renderApi as any, table)
-		diff.release()
+		rubber.getUpdater().applyState(null, { rotX: 30 } as RubberState, renderApi as any, table)
 		expect(renderApi.matrices).to.have.lengthOf(1)
 		expect(Array.from(renderApi.matrices[0].elements)).not.to.deep.equal(Array.from(new Matrix3D().elements))
 	})
@@ -117,8 +94,10 @@ describe('The VPinball rubber updater', () => {
 	it('should map baked vertices exactly onto a freshly baked transform', async () => {
 		const baked = new TableBuilder().addRubber('r', {}).build()
 		const fresh = new TableBuilder().addRubber('r', { rotX: 10, rotY: 15, rotZ: 25, height: 40 }).build()
-		new Player(baked).init()
 		const rubber = baked.rubbers.r
+		// Bake first: the updater rotates around the mesh center, which scene
+		// generation computes (former physics-init hit-gen side effect).
+		rubber.getMeshes(baked)
 		const renderApi = new CapturingRenderApi()
 		rubber
 			.getUpdater()

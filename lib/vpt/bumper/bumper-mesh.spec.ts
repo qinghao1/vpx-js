@@ -13,9 +13,7 @@ describe('The VPinball bumper generator', () => {
 	let node: Object3D
 
 	before(async () => {
-		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-bumper.vpx')), {
-			loadInvisibleItems: false,
-		})
+		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-bumper.vpx')))
 		node = await table.generateTableNode(new ThreeRenderApi(), {})
 	})
 

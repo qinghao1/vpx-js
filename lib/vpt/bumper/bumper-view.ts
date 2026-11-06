@@ -1,7 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { MathUtils } from 'three'
+import { degToRad } from '../../math/angle.js'
 import { Matrix3D } from '../../math/matrix.js'
 import { Vertex3D } from '../../math/vector.js'
 import type { IRenderApi } from '../../render/irender-api.js'
@@ -29,7 +29,7 @@ export class BumperMeshGenerator {
 
 	public getMeshes(table: Table): BumperMesh {
 		if (!this.data.center) throw new Error(`Cannot export bumper ${this.data.getName()} without center.`)
-		const m = new Matrix3D().rotateZMatrix(MathUtils.degToRad(this.data.orientation))
+		const m = new Matrix3D().rotateZMatrix(degToRad(this.data.orientation))
 		const height =
 			table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) * table.getScaleZ()
 		const z = (v: number) => v * table.getScaleZ() + height
@@ -159,8 +159,8 @@ export class BumperUpdater extends ItemUpdater<BumperState> {
 			const height =
 				table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y) * table.getScaleZ()
 			const m1 = Matrix3D.claim().setTranslation(-this.data.center.x, -this.data.center.y, -height - 5)
-			const mRotY = Matrix3D.claim().rotateYMatrix(MathUtils.degToRad(state.skirtRotY))
-			const mRotX = Matrix3D.claim().rotateXMatrix(MathUtils.degToRad(state.skirtRotX))
+			const mRotY = Matrix3D.claim().rotateYMatrix(degToRad(state.skirtRotY))
+			const mRotX = Matrix3D.claim().rotateXMatrix(degToRad(state.skirtRotX))
 			const m2 = Matrix3D.claim().setTranslation(this.data.center.x, this.data.center.y, height + 5)
 			const matrix = Matrix3D.claim().multiplyMatrices(m1, mRotY).multiply(mRotX).multiply(m2)
 			renderApi.applyMatrixToNode(matrix, skirtObj)

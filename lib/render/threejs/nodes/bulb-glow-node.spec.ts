@@ -1,20 +1,13 @@
-import { AdditiveBlending, DataTexture } from 'three'
+import { CustomBlending, OneMinusSrcColorFactor, ReverseSubtractEquation, SrcAlphaFactor } from 'three'
 import { afterEach, describe, expect, it } from 'vitest'
+import { createBulbGlowNodeMaterial, isBulbGlowMaterial, setBulbGlowState } from './bulb-glow-node.js'
 import {
-	createBulbGlowNodeMaterial,
-	createMergedBulbGlowMaterial,
-	isBulbGlowMaterial,
-	setBulbGlowState,
-} from './bulb-glow-node.js'
-import {
-	backdropStubTexture,
-	setAdditiveBackdrop,
 	setPrimitiveTransmissionArea,
 	uBulbGlowFootprintClip,
 	uPlayfieldSurfaceY,
 	uTransArea,
 } from './primitive-bdl-node.js'
-import { collectNodes, graphReferences, materialize } from './tsl-test-harness.js'
+import { graphReferences, materialize } from './tsl-test-harness.js'
 
 // setPrimitiveTransmissionArea mutates shared playfield-area module state;
 // restore it so this file stays order-independent.
@@ -42,16 +35,18 @@ describe('bulb glow node material', () => {
 		expect(isBulbGlowMaterial(mat)).toBe(true)
 		expect(mat.transparent).toBe(true)
 		expect(mat.depthWrite).toBe(false)
-		expect(mat.colorNode).toBeDefined()
-		// Positive additive light: the native negatively-encoded
-		// REVSUBTRACT form draws nothing on the WebGPU backend, so the
-		// dst-modulation nuance is approximated by the additive lift.
-		// Runs in the pipeline scene pass's transparent phase, so no
-		// extra pass is needed.
-		expect(mat.blending, 'bulb halo composites additively').toBe(AdditiveBlending)
+		expect(mat.outputNode).toBeTruthy()
+		// Full fs_light.sc composite via the blend unit: REVSUBTRACT with
+		// SRC_ALPHA/INV_SRC_COLOR over the post-opaque scene color, fed the
+		// negatively-encoded shader output. Runs in the pipeline scene
+		// pass's transparent phase, so no extra pass is needed.
+		expect(mat.blending, 'bulb halo composites with the native blend state').toBe(CustomBlending)
+		expect(mat.blendSrc).toBe(SrcAlphaFactor)
+		expect(mat.blendDst).toBe(OneMinusSrcColorFactor)
+		expect(mat.blendEquation).toBe(ReverseSubtractEquation)
 	})
 
-	it('should store the clamped modulateVsAdd', () => {
+	it('should store the clamped modulateVsAdd for the negative encoding', () => {
 		const additive = createBulbGlowNodeMaterial({
 			color: 0xffffff,
 			color2: 0xffffff,
@@ -132,9 +127,9 @@ describe('bulb glow node material', () => {
 			falloffPower: 2,
 			intensity: 10,
 		})
-		const colorNode = materialize(mat.colorNode)
-		expect(graphReferences(colorNode, uTransArea), 'halo must sample the playfield area').toBe(true)
-		expect(graphReferences(colorNode, uBulbGlowFootprintClip), 'halo must gate on the footprint clip').toBe(true)
+		const outputNode = materialize(mat.outputNode)
+		expect(graphReferences(outputNode, uTransArea), 'halo must sample the playfield area').toBe(true)
+		expect(graphReferences(outputNode, uBulbGlowFootprintClip), 'halo must gate on the footprint clip').toBe(true)
 	})
 
 	it('leaves the halo unmasked until the playfield area is configured', () => {
@@ -146,69 +141,5 @@ describe('bulb glow node material', () => {
 	it('enables the halo footprint mask with the playfield area', () => {
 		setPrimitiveTransmissionArea(952, 2247, 0.05)
 		expect(uBulbGlowFootprintClip.value).toBe(1)
-	})
-
-	it('emits positive additive light for both factories', () => {
-		// Regression: the negatively-encoded REVSUBTRACT output drew nothing
-		// on the WebGPU backend (program runs, fragments stay dst), so halos
-		// must composite additively with a positive rgb and alpha 1.
-		const perQuad = createBulbGlowNodeMaterial({
-			color: 0xff6020,
-			color2: 0xffffff,
-			centerX: 0,
-			centerY: 0,
-			falloff: 100,
-			falloffPower: 2,
-			intensity: 10,
-		})
-		const merged = createMergedBulbGlowMaterial()
-		for (const mat of [perQuad, merged]) {
-			expect(mat.blending).toBe(AdditiveBlending)
-			const dag = collectNodes(materialize(mat.colorNode))
-			// -1 = removed negative-encoding factor of the REVSUBTRACT form.
-			expect(
-				dag.some(n => n.value === -1),
-				'halo must not negatively encode its output',
-			).toBe(false)
-		}
-	})
-
-	it('carries a backdrop tap holding the reference constant pre-stream', () => {
-		// The tap samples the playfield albedo as the native dst once the
-		// drain binds it; until then it must behave exactly like the old
-		// constant weight so pre-stream frames are unchanged.
-		const perQuad = createBulbGlowNodeMaterial({
-			color: 0xffffff,
-			color2: 0xffffff,
-			centerX: 0,
-			centerY: 0,
-			falloff: 100,
-			falloffPower: 2,
-			intensity: 10,
-		})
-		for (const mat of [perQuad, createMergedBulbGlowMaterial()]) {
-			const ud = mat.userData as Record<string, unknown>
-			expect(ud.__backdropArm).toBe(true)
-			const nodes = ud.__backdropNodes as { value: unknown }[]
-			expect(nodes).toHaveLength(1)
-			expect(nodes[0].value).toBe(backdropStubTexture())
-			expect(ud.__backdropMap ?? null).toBe(null)
-			expect(graphReferences(materialize(mat.colorNode), nodes[0])).toBe(true)
-		}
-	})
-
-	it('rebinds the backdrop tap to streamed playfield art in place', () => {
-		const mat = createMergedBulbGlowMaterial()
-		const ud = mat.userData as Record<string, unknown>
-		const nodes = ud.__backdropNodes as { value: unknown }[]
-		const art = new DataTexture(new Uint8Array([200, 100, 50, 255]), 1, 1)
-		expect(setAdditiveBackdrop(mat, art, 'pf')).toBe(true)
-		expect(nodes[0].value).toBe(art)
-		expect(ud.__backdropMap).toBe(art)
-		expect(ud.__backdropName).toBe('pf')
-	})
-
-	it('refuses the backdrop bind on materials without the tap', () => {
-		expect(setAdditiveBackdrop({}, backdropStubTexture())).toBe(false)
 	})
 })

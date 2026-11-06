@@ -3,8 +3,7 @@
 
 import { type Object3D, PointLight, type Mesh as ThreeMesh } from 'three'
 import type { MeshBasicNodeMaterial } from 'three/webgpu'
-import type { LightData, LightState } from '../../vpt/light/light.js'
-import { bakedIntensity } from '../../vpt/light/light-physics.js'
+import { bakedIntensity, type LightData, type LightState } from '../../vpt/light/light.js'
 import type { Table } from '../../vpt/table/table.js'
 import { getAuthoredVisible } from './authored-visible.js'
 import {

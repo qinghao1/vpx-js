@@ -23,9 +23,9 @@ describe('Table name lookups', () => {
 
 	it('resolves textures case-insensitively by key and by texture name', () => {
 		const table = new TableBuilder().build()
-		table.textures = {
+		;(table as any).textures = {
 			Playfield: { getName: () => 'pfTex' },
-		} as never
+		}
 		expect(table.getTexture('playfield')).toBe(table.textures.Playfield)
 		expect(table.getTexture('PFTEX')).toBe(table.textures.Playfield)
 		expect(table.getTexture('missing')).toBeUndefined()
@@ -33,9 +33,9 @@ describe('Table name lookups', () => {
 
 	it('sees textures added after the first lookup', () => {
 		const table = new TableBuilder().build()
-		table.textures = {} as never
+		;(table as any).textures = {}
 		expect(table.getTexture('late')).toBeUndefined()
-		table.textures = { Late: { getName: () => 'late' } } as never
+		;(table as any).textures = { Late: { getName: () => 'late' } }
 		expect(table.getTexture('LATE')).toBe(table.textures.Late)
 	})
 })

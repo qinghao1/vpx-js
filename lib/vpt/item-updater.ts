@@ -1,6 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-import { MathUtils } from 'three'
+import { degToRad } from '../math/angle.js'
 import { Matrix3D } from '../math/matrix.js'
 import type { Vertex2D } from '../math/vector.js'
 import type { IRenderApi } from '../render/irender-api.js'
@@ -82,9 +82,9 @@ export abstract class ItemUpdater<STATE extends ItemState> {
 		// @see https://github.com/vpinball/vpinball/blob/master/src/parts/spinner.cpp (Spinner::Render vertMatrix)
 		// @see https://github.com/vpinball/vpinball/blob/master/src/parts/gate.cpp (Gate::Render fullMatrix)
 		const matTransToOrigin = Matrix3D.claim().setTranslation(-center.x, -center.y, posZ)
-		const matRotateToOrigin = Matrix3D.claim().rotateZMatrix(MathUtils.degToRad(-rotationZ))
+		const matRotateToOrigin = Matrix3D.claim().rotateZMatrix(degToRad(-rotationZ))
 		const matTransFromOrigin = Matrix3D.claim().setTranslation(center.x, center.y, -posZ)
-		const matRotateFromOrigin = Matrix3D.claim().rotateZMatrix(MathUtils.degToRad(rotationZ))
+		const matRotateFromOrigin = Matrix3D.claim().rotateZMatrix(degToRad(rotationZ))
 		const matRotateX = Matrix3D.claim().rotateXMatrix(angle)
 
 		const matrix = matTransToOrigin

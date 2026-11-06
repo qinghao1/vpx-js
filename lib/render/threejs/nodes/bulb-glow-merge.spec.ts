@@ -1,10 +1,10 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import {
-	AdditiveBlending,
 	type BufferAttribute,
 	type BufferGeometry,
 	Color,
+	CustomBlending,
 	Group,
 	Mesh,
 	PlaneGeometry,
@@ -75,14 +75,14 @@ function twoLampRoot(): { root: Group; quadA: Mesh; quadB: Mesh } {
 }
 
 describe('merged bulb-glow composite', () => {
-	it('creates a flagged additive-composite material', () => {
+	it('creates a flagged native-composite material', () => {
 		const mat = createMergedBulbGlowMaterial()
 		expect(isMergedBulbGlowMaterial(mat)).to.equal(true)
 		expect(isBulbGlowMaterial(mat)).to.equal(false)
 		expect(mat.transparent).to.equal(true)
 		expect(mat.depthWrite).to.equal(false)
 		expect(mat.depthTest).to.equal(true)
-		expect(mat.blending).to.equal(AdditiveBlending)
+		expect(mat.blending).to.equal(CustomBlending)
 	})
 
 	it('folds two quads into one draw with per-lamp parameter attributes', () => {
@@ -205,29 +205,6 @@ describe('merged bulb-glow composite', () => {
 		for (const name of ['position', 'aGlowCenter', 'aGlowParams', 'aGlowDyn', 'aGlowColor', 'aGlowColor2']) {
 			expect((geo.getAttribute(name) as BufferAttribute).usage, `${name} stays static`).to.equal(StaticDrawUsage)
 		}
-	})
-
-	it('carries the pending playfield name onto the merged tap', () => {
-		// Post-merge the quads are gone; the merged material inherits their
-		// pending backdrop so the streaming drain binds its tap too.
-		const { root, quadA, quadB } = twoLampRoot()
-		for (const quad of [quadA, quadB]) {
-			;((quad as Mesh).material as { userData: Record<string, unknown> }).userData.__backdropName = 'pf'
-		}
-		expect(mergeBulbGlowQuads(root, tableStub())).to.equal(2)
-		const merged = root.getObjectByName('merged:bulb.glow') as Mesh
-		expect((merged.material as { userData: Record<string, unknown> }).userData.__backdropName).toBe('pf')
-	})
-
-	it('leaves mixed pending names off the merged tap', () => {
-		// Heterogeneous runs must not silently pick one lamp's name; the
-		// merged tap keeps the stub until the stamp pass names it.
-		const { root, quadA, quadB } = twoLampRoot()
-		;((quadA as Mesh).material as { userData: Record<string, unknown> }).userData.__backdropName = 'pf-a'
-		;((quadB as Mesh).material as { userData: Record<string, unknown> }).userData.__backdropName = 'pf-b'
-		expect(mergeBulbGlowQuads(root, tableStub())).to.equal(2)
-		const merged = root.getObjectByName('merged:bulb.glow') as Mesh
-		expect((merged.material as { userData: Record<string, unknown> }).userData.__backdropName ?? null).toBe(null)
 	})
 
 	it('skips identical restamps', () => {

@@ -1,37 +1,25 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { EventProxy } from '../../game/event-proxy.js'
-import type { IAnimatable, IAnimation, IHittable, IRenderable, IScriptable, Meshes } from '../../game/interfaces.js'
-import type { Player } from '../../game/player.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { Matrix3D } from '../../math/matrix.js'
-import type { HitObject } from '../../physics/hit-object.js'
-import type { Ball } from '../ball/ball.js'
+import type { Meshes, RenderInfo } from '../../render/irender-api.js'
 import { Item } from '../item.js'
+import type { Material } from '../material.js'
 import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
-import { PrimitiveAnimation } from './primitive-animation.js'
-import { PrimitiveApi } from './primitive-api.js'
+import type { Texture } from '../texture.js'
 import { forceHidePlayfieldMesh, PrimitiveData } from './primitive-data.js'
-import { PrimitiveHitGenerator } from './primitive-hit-generator.js'
 import { PrimitiveMeshGenerator } from './primitive-mesh-generator.js'
 import { PrimitiveState } from './primitive-state.js'
 import { PrimitiveUpdater } from './primitive-updater.js'
 
 /** @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
-export class Primitive
-	extends Item<PrimitiveData>
-	implements IRenderable<PrimitiveState>, IHittable, IScriptable<PrimitiveApi>, IAnimatable
-{
+export class Primitive extends Item<PrimitiveData> {
 	private readonly state: PrimitiveState
 	private readonly meshGenerator: PrimitiveMeshGenerator
-	private readonly hitGenerator: PrimitiveHitGenerator
 	private readonly updater: PrimitiveUpdater
 	private mesh?: Mesh
-	private api?: PrimitiveApi
-	private hits?: HitObject[]
-	private animation?: PrimitiveAnimation
 
 	public static async fromStorage(storage: Storage, itemName: string, loadMeshes: boolean): Promise<Primitive> {
 		const data = await PrimitiveData.fromStorage(storage, itemName, loadMeshes)
@@ -61,7 +49,6 @@ export class Primitive
 		)
 		this.updater = new PrimitiveUpdater(data, this.state)
 		this.meshGenerator = new PrimitiveMeshGenerator(data)
-		this.hitGenerator = new PrimitiveHitGenerator(data)
 	}
 
 	public isTransparent(table: Table): boolean {
@@ -99,25 +86,6 @@ export class Primitive
 		return (this.mesh ??= this.meshGenerator.getMesh(table))
 	}
 
-	public setupPlayer(player: Player, table: Table): void {
-		this.events = new EventProxy(this)
-		this.events.onCollision = (obj: HitObject, ball: Ball, dot: number) => {
-			this.events!.currentHitThreshold = dot
-			obj.fireHitEvent(ball)
-		}
-		const base = this.getMesh(table)
-		this.hits = this.hitGenerator.generateHitObjects(base, this.events, table)
-		const display = base.clone().transform(Matrix3D.RIGHT_HANDED)
-		this.updater.setMesh(display)
-		this.updater.setEmuProvider(() => player.getPhysics().emu)
-		this.animation = new PrimitiveAnimation(this.data, this.state, display.clone())
-		this.api = new PrimitiveApi(this, this.state, this.data, this.hits!, this.events, player, table, this.animation)
-	}
-
-	public getApi(): PrimitiveApi {
-		return this.api!
-	}
-
 	public getState(): PrimitiveState {
 		return this.state
 	}
@@ -126,29 +94,7 @@ export class Primitive
 		return this.updater
 	}
 
-	public getAnimation(): IAnimation {
-		return this.animation!
-	}
-
-	public getHitShapes(): HitObject[] {
-		return this.hits!
-	}
-
 	public setSides(num: number): void {
 		this.data.sides = num
-	}
-
-	public setCollidable(isCollidable: boolean): void {
-		this.data.isCollidable = isCollidable
-		if (this.hits?.length > 0 && this.hits?.[0].isEnabled !== isCollidable) {
-			for (const hit of this.hits!) {
-				// !! costly
-				hit.isEnabled = isCollidable //copy to hit-testing on entities composing the object
-			}
-		}
-	}
-
-	public getEventNames(): string[] {
-		return ['Hit', 'Init']
 	}
 }

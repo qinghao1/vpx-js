@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { NodeBinaryReader } from '../../io/binary-reader.node.js'
 import { Table } from '../table/table.js'
+import { bakedIntensity } from './light.js'
 
 describe('regression: light initial intensity not dark', () => {
 	it.skipIf(!existsSync('walking_dead.vpx'))(
@@ -13,7 +14,7 @@ describe('regression: light initial intensity not dark', () => {
 			expect(gi.data.intensity).toBe(1000)
 			expect(gi.data.state).toBe(2)
 			expect(gi.data.isOn()).toBe(true)
-			expect(gi.getState().intensity).toBe(1000)
+			expect(bakedIntensity(gi.data)).toBe(1000)
 		},
 	)
 })

@@ -8,7 +8,6 @@ import sinonChai from 'sinon-chai'
 import * as THREE from 'three'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { TestRenderApi } from '../../../test/test-render-api.js'
-import { Player } from '../../game/player.js'
 import { Vertex3D } from '../../math/vector.js'
 import {
 	createPrimitiveAdditiveMaterial,
@@ -24,7 +23,6 @@ chai.use((sinonChai as any).default ?? sinonChai)
 
 describe('The VPinball primitive updater', () => {
 	let table: Table
-	let player: Player
 
 	beforeEach(() => {
 		table = new TableBuilder()
@@ -32,23 +30,6 @@ describe('The VPinball primitive updater', () => {
 			.addPrimitive('pStatic', { staticRendering: true })
 			.addPrimitive('pDynamic', { staticRendering: false })
 			.build()
-
-		// init player
-		player = new Player(table).init()
-	})
-
-	it('should update visibility even when static rendering is enabled', () => {
-		table.primitives.pStatic.getApi().Visible = false
-		const states = player.popStates()
-		expect(states.getState<PrimitiveState>('pStatic').isVisible).to.equal(false)
-		states.getState<PrimitiveState>('pStatic').release()
-	})
-
-	it('should update visibility when static rendering is disabled', () => {
-		table.primitives.pDynamic.getApi().Visible = false
-		const states = player.popStates()
-		expect(states.getState<PrimitiveState>('pDynamic').isVisible).to.equal(false)
-		states.getState<PrimitiveState>('pDynamic').release()
 	})
 
 	it('should hide a sequencer-locked primitive with inPlayState off and reveal it on unlock', () => {
@@ -488,19 +469,17 @@ describe('The VPinball primitive updater', () => {
 	})
 
 	it('script Visible=1 re-shows a forced-hidden playfield_mesh end to end', () => {
-		// An explicit script show must still reach the scene node: the api
-		// setter writes both state and data, and the updater routes the live
-		// flag to visibility (Space Cadet decoy stays hidden until shown).
+		// An explicit script show must still reach the scene node: the state
+		// flag routes the live visibility to the node (Space Cadet decoy
+		// stays hidden until shown).
 		const t2 = new TableBuilder().addPrimitive('playfield_mesh', { isVisible: true }).build()
-		new Player(t2).init()
 		const prim = (t2.items as any).playfield_mesh
 		expect(prim.getState().isVisible, 'forced hidden at claim').to.equal(false)
-		prim.getApi().Visible = 1
 		const renderApi = new ThreeRenderApi({ applyMaterials: true } as any)
 		const group = new THREE.Group()
 		group.name = 'primitive-playfield_mesh'
 		group.visible = false
-		prim.getUpdater().applyState(group, prim.getState(), renderApi, t2)
+		prim.getUpdater().applyState(group, { isVisible: true } as PrimitiveState, renderApi, t2)
 		expect(group.visible, 'script show must reveal the forced-hidden decoy').to.equal(true)
 	})
 

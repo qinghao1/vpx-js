@@ -1,13 +1,15 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-import { Color } from 'three'
-import { tryGetFloatState } from '../../emu/res-uri.js'
-import type { IEmulator } from '../../game/iemulator.js'
+// `Color` is pure linear-space colorimetry (no renderer); the hex it yields
+// is backend-neutral, so this stays while the sRGB↔linear round-trip must
+// match the renderer exactly.
+import { AdditiveBlending, Color, NormalBlending } from 'three'
 import { Matrix3D } from '../../math/matrix.js'
 import type { IRenderApi } from '../../render/irender-api.js'
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
 import { ItemUpdater } from '../item-updater.js'
 import { Mesh } from '../mesh.js'
+import { type EmuFloatState, lightmapAlphaFactor, tryGetLinkedFloatState } from '../state-link.js'
 import type { Table } from '../table/table.js'
 import type { PrimitiveData } from './primitive-data.js'
 import {
@@ -52,10 +54,10 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		super(state)
 	}
 
-	private emuProvider?: () => IEmulator | undefined
+	private emuProvider?: () => EmuFloatState | undefined
 
-	/** Controller-state source for SLNK modulation, wired in setupPlayer like the light/flasher animations. */
-	public setEmuProvider(provider: () => IEmulator | undefined): void {
+	/** Controller-state source for SLNK modulation. */
+	public setEmuProvider(provider: () => EmuFloatState | undefined): void {
 		this.emuProvider = provider
 	}
 
@@ -278,7 +280,7 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		// (primitive.cpp:932-940): a resolved SLNK link scales the alpha and
 		// suppresses the lamp modulation; otherwise the lightmap ratio applies.
 		const slnk = this.slnkLinkState()
-		const lightFactor = slnk === undefined ? this.lightmapAlphaFactor(table) : 1
+		const lightFactor = slnk === undefined ? lightmapAlphaFactor(table, this.data.szLightmap) : 1
 		const effectiveAlpha = Math.max(0, rawAlpha) * (slnk ?? 1) * lightFactor
 		const bdl = Math.max(0, dlTop)
 		for (const mesh of this.meshes(obj)) {
@@ -298,7 +300,10 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 				mat.polygonOffsetFactor = -2
 				mat.polygonOffsetUnits = -4
 				;(mesh as any).renderOrder = 2
-				mat.blending = 2
+				// Named three.js blend id: primitives never set absorb (no
+				// addBlendMode flows into their factory call), so the plain
+				// additive re-assert below is a no-op, never a mode clobber.
+				mat.blending = AdditiveBlending
 				mat.toneMapped = true
 				// Native (primitive.cpp:1037,1088): visible=false skips the draw, and
 				// additive is also skipped when there is nothing to add.
@@ -358,33 +363,8 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 	private slnkLinkState(): number | undefined {
 		const link = this.data.stateSrcLink
 		if (!link || !this.emuProvider) return undefined
-		const linked = tryGetFloatState(this.emuProvider(), link)
+		const linked = tryGetLinkedFloatState(this.emuProvider(), link)
 		return linked.ok ? linked.value : undefined
-	}
-
-	private lightmapAlphaFactor(table: Table): number {
-		// Native convolutes lightmap primitives with the lamp shadow (primitive.cpp:1080);
-		// the lamp scales the primitive alpha, never its color.
-		const lightName = this.data.szLightmap
-		if (!lightName) return 1
-		try {
-			const light = (table as any).lights?.[lightName] ?? (table as any).getLight?.(lightName)
-			const lightState = (light as any)?.getState?.() ?? (light as any)?.state
-			const dataInt = (light as any)?.data?.intensity ?? (light as any)?.intensity ?? 1
-			const scale = (light as any)?.data?.intensityScale ?? (light as any)?.animation?.intensityScale ?? 1
-			const currentIntensity = lightState?.intensity ?? dataInt
-			const denom = dataInt * scale
-			// Upstream divides unconditionally (primitive.cpp:932-940): the live
-			// intensity is full-scale (base x scale x state), so a mid-fade lamp
-			// scales by current/denom, never by the raw current value.
-			let rawFactor: number
-			if (denom !== 0) {
-				rawFactor = currentIntensity / denom
-			} else rawFactor = 0
-			return Math.max(0, Math.min(1, Number.isFinite(rawFactor) ? rawFactor : 0))
-		} catch {
-			return 1
-		}
 	}
 
 	private applyAlpha<NODE>(obj: NODE): void {
@@ -402,7 +382,7 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 			mat.transparent = transparent
 			mat.depthWrite = !mat.transparent
 			mat.depthTest = true
-			if (mat.blending !== 1 && !mat.userData?.__addBlend) mat.blending = 1
+			if (mat.blending !== NormalBlending && !mat.userData?.__addBlend) mat.blending = NormalBlending
 		}
 	}
 
@@ -465,3 +445,6 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		Matrix3D.release(oldFull, newFull, rh, oldRH, newRH, invOldRH, delta)
 	}
 }
+
+/** Kept for import compatibility; the contract lives in `../state-link.js`. */
+export type { EmuFloatState as PrimitiveEmuState } from '../state-link.js'

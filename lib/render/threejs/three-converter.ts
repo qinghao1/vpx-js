@@ -2,10 +2,9 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { type BufferGeometry, Group, type Object3D, type PointLight, Mesh as ThreeMesh } from 'three'
-import type { IRenderable, RenderInfo } from '../../game/interfaces.js'
 import type { ItemState } from '../../vpt/item-state.js'
 import type { Table, TableGenerateOptions } from '../../vpt/table/table.js'
-import type { IRenderApi, MeshConvertOptions } from '../irender-api.js'
+import type { IRenderApi, IRenderable, MeshConvertOptions, RenderInfo } from '../irender-api.js'
 import { setAuthoredVisible } from './authored-visible.js'
 import type { IMaterialGenerator } from './imaterial-generator.js'
 import type { ThreeMeshGenerator } from './three-mesh-generator.js'

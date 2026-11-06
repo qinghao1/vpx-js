@@ -1,21 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { TestRenderApi } from '../../../test/test-render-api.js'
-import type { IEmulator } from '../../game/iemulator.js'
 import type { ReadResult, Storage } from '../../io/ole-doc.js'
 import type { IRenderApi } from '../../render/irender-api.js'
 import type { Primitive } from './primitive.js'
 import { PrimitiveData } from './primitive-data.js'
 import { PRIMITIVE_ADDITIVE_KIND } from './primitive-material-protocol.js'
+import type { PrimitiveEmuState } from './primitive-updater.js'
 
-function stubEmulator(lamps: Record<number, number>): IEmulator {
+function stubEmulator(lamps: Record<number, number>): PrimitiveEmuState {
 	return {
-		emuSimulateCycle: () => 0,
-		setSwitchInput: () => true,
 		getLampState: (n: number) => lamps[n] ?? 0,
 		getSolenoidState: () => 0,
 		getGIState: () => 0,
-	} as unknown as IEmulator
+	}
 }
 
 function stringRecord(tag: string, value: string): Uint8Array {

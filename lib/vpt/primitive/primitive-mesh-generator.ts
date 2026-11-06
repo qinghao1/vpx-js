@@ -1,7 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { MathUtils } from 'three'
+import { degToRad } from '../../math/angle.js'
 import { Matrix3D } from '../../math/matrix.js'
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
 import { Mesh } from '../mesh.js'
@@ -28,12 +28,12 @@ export function buildPrimitiveMatrix(
 	scaleZ: number,
 ): Matrix3D {
 	const rotTrans = new Matrix3D().setTranslation(translation.x, translation.y, translation.z)
-	rotTrans.multiply(new Matrix3D().rotateZMatrix(MathUtils.degToRad(rotation.z)))
-	rotTrans.multiply(new Matrix3D().rotateYMatrix(MathUtils.degToRad(rotation.y)))
-	rotTrans.multiply(new Matrix3D().rotateXMatrix(MathUtils.degToRad(rotation.x)))
-	rotTrans.multiply(new Matrix3D().rotateZMatrix(MathUtils.degToRad(objectRotation.z)))
-	rotTrans.multiply(new Matrix3D().rotateYMatrix(MathUtils.degToRad(objectRotation.y)))
-	rotTrans.multiply(new Matrix3D().rotateXMatrix(MathUtils.degToRad(objectRotation.x)))
+	rotTrans.multiply(new Matrix3D().rotateZMatrix(degToRad(rotation.z)))
+	rotTrans.multiply(new Matrix3D().rotateYMatrix(degToRad(rotation.y)))
+	rotTrans.multiply(new Matrix3D().rotateXMatrix(degToRad(rotation.x)))
+	rotTrans.multiply(new Matrix3D().rotateZMatrix(degToRad(objectRotation.z)))
+	rotTrans.multiply(new Matrix3D().rotateYMatrix(degToRad(objectRotation.y)))
+	rotTrans.multiply(new Matrix3D().rotateXMatrix(degToRad(objectRotation.x)))
 	const scale = new Matrix3D().setScaling(size.x, size.y, size.z)
 	const positionMatrix = new Matrix3D().setTranslation(position.x, position.y, position.z)
 	const full = scale.multiply(rotTrans).multiply(positionMatrix)

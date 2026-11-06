@@ -62,6 +62,7 @@ export class BallUpdater extends ItemUpdater<BallState> {
 		} finally {
 			Matrix3D.release(orient, trans, scale, mat)
 		}
+		this.applyVisibility(obj, this.state, api)
 		// World-matrix refresh is the backend's job: the node is flagged here,
 		// flushed once per frame by the host.
 	}

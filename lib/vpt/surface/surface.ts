@@ -1,23 +1,17 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { EventProxy } from '../../game/event-proxy.js'
-import type { IHittable, IRenderable, IScriptable, Meshes } from '../../game/interfaces.js'
-import type { Player } from '../../game/player.js'
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { Matrix3D } from '../../math/matrix.js'
-import type { HitObject } from '../../physics/hit-object.js'
+import type { Meshes } from '../../render/irender-api.js'
 import { handleBiffTag } from '../biff-helper.js'
 import { type DragPoint, dragPointNestedTag } from '../dragpoint.js'
-import { Enums } from '../enums.js'
 import { Item } from '../item.js'
-import { ItemApi } from '../item-api.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 import { ItemState } from '../item-state.js'
 import type { Material } from '../material.js'
 import type { Table } from '../table/table.js'
-import { SurfaceHitGenerator } from './surface-physics.js'
 import { SurfaceMeshGenerator, SurfaceUpdater } from './surface-view.js'
 
 const BOOL_MAP: Record<string, string> = {
@@ -176,260 +170,11 @@ export class SurfaceState extends ItemState {
 	}
 }
 
-/** Surface API — VBS surface for `Surface`/`Wall`. @see https://github.com/vpinball/vpinball/blob/master/src/parts/surface.cpp */
-export class SurfaceApi extends ItemApi<SurfaceData> {
-	private isDynamic = false
-
-	constructor(
-		private readonly _state: SurfaceState,
-		data: SurfaceData,
-		private readonly hits: HitObject[],
-		private readonly hitGenerator: SurfaceHitGenerator,
-		events: EventProxy,
-		player: Player,
-		table: Table,
-	) {
-		super(data, events, player, table)
-		this.isDynamic = this.data.isDroppable
-		if (!this.isDynamic && this.data.isSideVisible) {
-			const material = table.getMaterial(this.data.szSideMaterial)
-			if (material?.isOpacityActive) this.isDynamic = true
-		}
-		if (!this.isDynamic && this.data.isTopBottomVisible) {
-			const material = table.getMaterial(this.data.szTopMaterial)
-			if (material?.isOpacityActive) this.isDynamic = true
-		}
-	}
-
-	get HasHitEvent() {
-		return this.data.hitEvent
-	}
-	set HasHitEvent(v) {
-		this.data.hitEvent = v
-	}
-	get Threshold() {
-		return this.data.threshold
-	}
-	set Threshold(v) {
-		this.data.threshold = v
-	}
-	get Image() {
-		return this.data.szImage
-	}
-	set Image(v) {
-		this._assertNonHdrImage(v)
-		if (this.isDynamic) this._state.topTexture = v
-		this.data.szImage = v
-	}
-	get SideMaterial() {
-		return this.data.szSideMaterial
-	}
-	set SideMaterial(v) {
-		if (this.isDynamic) this._state.sideMaterial = v
-		this.data.szSideMaterial = v
-	}
-	get SlingshotMaterial() {
-		return this.data.szSlingShotMaterial
-	}
-	set SlingshotMaterial(v) {
-		this.data.szSlingShotMaterial = v
-	}
-	/** @deprecated Not used upstream; always returns ImageAlignCenter and ignores writes. */
-	get ImageAlignment() {
-		return Enums.ImageAlignment.ImageAlignCenter
-	}
-	set ImageAlignment(_v) {
-		/* not used (anymore?) */
-	}
-	get HeightBottom() {
-		return this.data.heightBottom
-	}
-	set HeightBottom(v) {
-		this.data.heightBottom = v
-	}
-	get HeightTop() {
-		return this.data.heightTop
-	}
-	set HeightTop(v) {
-		this.data.heightTop = v
-	}
-	get TopMaterial() {
-		return this.data.szTopMaterial
-	}
-	set TopMaterial(v) {
-		if (this.isDynamic) this._state.topMaterial = v
-		this.data.szTopMaterial = v
-	}
-	get PhysicsMaterial() {
-		return this.data.szPhysicsMaterial
-	}
-	set PhysicsMaterial(v) {
-		this.data.szPhysicsMaterial = v
-	}
-	get OverwritePhysics() {
-		return this.data.overwritePhysics
-	}
-	set OverwritePhysics(v) {
-		this.data.overwritePhysics = v
-	}
-	get CanDrop() {
-		return this.data.isDroppable
-	}
-	set CanDrop(v) {
-		this.data.isDroppable = v
-	}
-	get FlipbookAnimation() {
-		return this.data.isFlipbook
-	}
-	set FlipbookAnimation(v) {
-		this.data.isFlipbook = v
-	}
-	get IsBottomSolid() {
-		return this.data.isBottomSolid
-	}
-	set IsBottomSolid(v) {
-		this.data.isBottomSolid = v
-	}
-	get IsDropped() {
-		return this._state.isDropped
-	}
-	set IsDropped(v) {
-		this._setDropped(v)
-	}
-	get DisplayTexture() {
-		return this.data.displayTexture
-	}
-	set DisplayTexture(v) {
-		this.data.displayTexture = v
-	}
-	get SlingshotStrength() {
-		return this.data.slingshotForce
-	}
-	set SlingshotStrength(v) {
-		this.data.slingshotForce = v
-	}
-	get Elasticity() {
-		return this.data.elasticity
-	}
-	set Elasticity(v) {
-		this.data.elasticity = v
-	}
-	get Friction() {
-		return this.data.friction
-	}
-	set Friction(v) {
-		this.data.friction = v
-	}
-	get Scatter() {
-		return this.data.scatter
-	}
-	set Scatter(v) {
-		this.data.scatter = v
-	}
-	get Visible() {
-		return this.data.isTopBottomVisible
-	}
-	set Visible(v) {
-		if (this.isDynamic) this._state.isTopVisible = v
-		this.data.isTopBottomVisible = v
-	}
-	get SideImage() {
-		return this.data.szSideImage
-	}
-	set SideImage(v) {
-		this._assertNonHdrImage(v)
-		if (this.isDynamic) this._state.sideTexture = v
-		this.data.szSideImage = v
-	}
-	get Disabled() {
-		return this.data.isDisabled
-	}
-	set Disabled(v) {
-		this.data.isDisabled = v
-	}
-	get SideVisible() {
-		return this.data.isSideVisible
-	}
-	set SideVisible(v) {
-		if (this.isDynamic) this._state.isSideVisible = v
-		this.data.isSideVisible = v
-	}
-	get Collidable() {
-		return this.data.isCollidable
-	}
-	set Collidable(v) {
-		this._setCollidable(v)
-	}
-	get SlingshotThreshold() {
-		return this.data.slingshotThreshold
-	}
-	set SlingshotThreshold(v) {
-		this.data.slingshotThreshold = v
-	}
-	get SlingshotAnimation() {
-		return this.data.slingshotAnimation
-	}
-	set SlingshotAnimation(v) {
-		this.data.slingshotAnimation = v
-	}
-	get DisableLighting() {
-		return !!this.data.disableLightingTop
-	}
-	set DisableLighting(v) {
-		this.data.disableLightingTop = v ? 1 : 0
-	}
-	get BlendDisableLighting() {
-		return this.data.disableLightingTop
-	}
-	set BlendDisableLighting(v) {
-		this.data.disableLightingTop = v
-	}
-	get BlendDisableLightingFromBelow() {
-		return this.data.disableLightingBelow
-	}
-	set BlendDisableLightingFromBelow(v) {
-		this.data.disableLightingBelow = v
-	}
-	get ReflectionEnabled() {
-		return this.data.isReflectionEnabled
-	}
-	set ReflectionEnabled(v) {
-		this.data.isReflectionEnabled = v
-	}
-
-	public PlaySlingshotHit(): void {
-		for (const slingLine of this.hitGenerator.lineSling) slingLine.doHitEvent = true
-	}
-
-	private _setDropped(isDropped: boolean): void {
-		if (!this.data.isDroppable) throw new Error(`Surface "${this.Name}" is not droppable.`)
-		if (this._state.isDropped !== isDropped) {
-			this._state.isDropped = isDropped
-			const enabled = !this._state.isDropped && this.data.isCollidable
-			if (this.hits.length > 0 && this.hits[0]!.isEnabled !== enabled)
-				for (const drop of this.hits) drop.setEnabled(enabled)
-		}
-	}
-
-	private _setCollidable(isCollidable: boolean): void {
-		this.data.isCollidable = isCollidable
-		const enabled = this.data.isDroppable ? isCollidable && !this._state.isDropped : isCollidable
-		if (this.hits.length > 0 && this.hits[0]!.isEnabled !== enabled)
-			for (const hit of this.hits) hit.isEnabled = enabled
-	}
-}
-
 /** @see https://github.com/vpinball/vpinball/blob/master/src/parts/surface.cpp */
-export class Surface
-	extends Item<SurfaceData>
-	implements IRenderable<SurfaceState>, IHittable, IScriptable<SurfaceApi>
-{
+export class Surface extends Item<SurfaceData> {
 	private readonly state: SurfaceState
 	private readonly meshGenerator: SurfaceMeshGenerator
-	private readonly hitGenerator: SurfaceHitGenerator
 	private readonly updater: SurfaceUpdater
-	private hits: HitObject[] = []
-	private api?: SurfaceApi
 
 	get heightTop() {
 		return this.data.heightTop
@@ -453,7 +198,6 @@ export class Surface
 			data.szSideImage,
 		)
 		this.meshGenerator = new SurfaceMeshGenerator()
-		this.hitGenerator = new SurfaceHitGenerator(this, data)
 		this.updater = new SurfaceUpdater(this.state, this.data)
 	}
 
@@ -498,33 +242,11 @@ export class Surface
 		return meshes
 	}
 
-	public setupPlayer(player: Player, table: Table): void {
-		this.events = new EventProxy(this)
-		this.hits = this.hitGenerator.generateHitObjects(this.events, table)
-		this.api = new SurfaceApi(this.state, this.data, this.hits, this.hitGenerator, this.events, player, table)
-	}
-
-	public getApi(): SurfaceApi {
-		return this.api!
-	}
-
 	public getState(): SurfaceState {
 		return this.state
 	}
 
 	public getUpdater(): SurfaceUpdater {
 		return this.updater
-	}
-
-	public getHitShapes(): HitObject[] {
-		return this.hits
-	}
-
-	public getEventProxy(): EventProxy {
-		return this.events!
-	}
-
-	public getEventNames(): string[] {
-		return ['Init', 'Hit', 'Slingshot', 'Timer']
 	}
 }

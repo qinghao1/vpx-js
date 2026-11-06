@@ -108,18 +108,38 @@ function isBallLike(o: any, root: Group, mat: MeshStandardMaterial): boolean {
 }
 
 // Procedural DMD quads stream their texture per frame and must stay live.
-function isDmdLike(o: any, dmdNames: Set<string>): boolean {
+function isDmdLike(o: any): boolean {
 	const n = (o.name || '').toLowerCase()
-	return !!o.userData?.isProceduralDMD || o.name.startsWith('DMD_') || n.includes('dmd') || dmdNames.has(n)
+	return !!o.userData?.isProceduralDMD || o.name.startsWith('DMD_') || n.includes('dmd')
 }
 
 export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeRenderApi): number {
 	root.updateMatrixWorld(true)
 	const invRoot = new Matrix4().copy(root.matrixWorld).invert()
-	const movables = new Set(table.getMovables().map(a => a.getName()))
-	const primitives = new Set(Object.values(table.primitives).map(p => p.getName()))
-	const rubbers = new Set(Object.values(table.rubbers).map(r => r.getName()))
-	const animatables = new Set(table.getAnimatables().map(a => a.getName()))
+	// Static-movable name sets (engine lives in WASM; names still key the bake).
+	const dictValues = (dict?: Record<string, { getName(): string }>) => Object.values(dict ?? {})
+	const movables = new Set(
+		[
+			...dictValues(table.flippers),
+			...dictValues(table.gates),
+			...dictValues(table.plungers),
+			...dictValues(table.spinners),
+		].map(a => a.getName()),
+	)
+	const primitives = new Set(dictValues(table.primitives).map(p => p.getName()))
+	const rubbers = new Set(dictValues(table.rubbers).map(r => r.getName()))
+	const animatables = new Set(
+		[
+			...dictValues(table.bumpers),
+			...dictValues(table.flashers),
+			...dictValues(table.flippers),
+			...dictValues(table.gates),
+			...dictValues(table.lights),
+			...dictValues(table.primitives),
+			...dictValues(table.spinners),
+			...dictValues(table.triggers),
+		].map(a => a.getName()),
+	)
 	const dynamicPrimitives = (() => {
 		const s = new Set<string>()
 		for (const p of Object.values(table.primitives))
@@ -144,12 +164,6 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 		return false
 	}
 
-	const dmdNames = new Set<string>()
-	for (const k in (table as any).textboxes) {
-		const item = (table as any).textboxes[k]
-		if (item?.data?.isDMD) dmdNames.add(item.getName().toLowerCase())
-	}
-
 	const buckets = new Map<string, { material: MeshStandardMaterial; meshes: Mesh[] }>()
 	root.traverse((o: any) => {
 		if (!o.isMesh || !o.geometry || !o.material) return
@@ -162,7 +176,7 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 		if (isBallLike(o, root, mat)) return
 		if (!canBatch(mat)) return
 		if (isAnimated(o)) return
-		if (isDmdLike(o, dmdNames)) return
+		if (isDmdLike(o)) return
 		// The flashers type-group roots every flasher subtree: matching it (not
 		// item names or image content) keeps script-driven image swaps and the
 		// updater's live color/opacity writes out of the static bake.

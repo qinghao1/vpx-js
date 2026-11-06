@@ -1,9 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { EventProxy } from '../../game/event-proxy.js'
-import type { IAnimatable, IAnimation, IRenderable, IScriptable, Meshes } from '../../game/interfaces.js'
-import type { Player } from '../../game/player.js'
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { Matrix3D } from '../../math/matrix.js'
@@ -13,12 +10,12 @@ import { handleBiffTag } from '../biff-helper.js'
 import { DragPoint } from '../dragpoint.js'
 import { Enums } from '../enums.js'
 import { Item } from '../item.js'
-import { ItemApi } from '../item-api.js'
 import { ItemData } from '../item-data.js'
 import { ItemState } from '../item-state.js'
 import { Material } from '../material.js'
+import type { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
-import { bakedIntensity, clampLightState, LightAnimation } from './light-physics.js'
+import type { Texture } from '../texture.js'
 import { LightMeshGenerator, LightUpdater } from './light-view.js'
 
 const FLOAT_MAP: Record<string, string> = {
@@ -69,6 +66,32 @@ export interface BulbGlowParams {
 	falloffPower: number
 	intensity: number
 	modulateVsAdd: number
+}
+
+/** Clamps light state according to VPinball rules (0..1, 2 for blinking, -1/255 -> 1). */
+export function clampLightState(state: number): number {
+	if (state < 0) return 1
+	if (state === 2) return 2
+	if (state > 1) return 1
+	return state
+}
+
+/**
+ * Bake-time intensity: base intensity × resolved state.
+ *
+ * Mirrors the bake in upstream `Light::RenderSetup`
+ * (`m_currentIntensity = m_d.m_intensity * m_d.m_intensity_scale * state`,
+ * `src/parts/light.cpp`): fractional states scale linearly and blinking
+ * resolves on the first pattern frame. The transient intensity scale is 1
+ * here (worker-side animation default, matching upstream `SetDefaults`),
+ * so only the resolved state applies.
+ * @see https://github.com/vpinball/vpinball/blob/master/src/parts/light.cpp
+ */
+export function bakedIntensity(data: Pick<LightData, 'intensity' | 'state' | 'rgBlinkPattern'>): number {
+	const clamped = clampLightState(data.state)
+	const level =
+		clamped === Enums.LightStatus.LightStateBlinking ? (data.rgBlinkPattern?.[0] === '1' ? 1 : 0) : clamped
+	return data.intensity * level
 }
 
 /** @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
@@ -208,6 +231,12 @@ export class LightState extends ItemState {
 	public colorFull: number = 0
 	/** Live BulbModulateVsAdd; absent keeps the baked value. */
 	public modulate?: number = undefined
+	/** Engine base intensity (`LightData::m_intensity`); the WASM bridge feeds it. */
+	public baseIntensity = 0
+	/** Engine intensity scale (`LightData::m_intensity_scale`); the WASM bridge feeds it. */
+	public intensityScale = 1
+	/** Engine play state (`Light::m_inPlayState`); the WASM bridge feeds it. */
+	public inPlayState = true
 
 	public static claim(name: string, intensity: number, color: number, colorFull: number): LightState {
 		const state = new LightState()
@@ -219,233 +248,23 @@ export class LightState extends ItemState {
 	}
 }
 
-/** Light API — VBS surface for `Light`. @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
-export class LightApi extends ItemApi<LightData> {
-	constructor(
-		private readonly _state: LightState,
-		private readonly animation: LightAnimation,
-		data: LightData,
-		events: EventProxy,
-		player: Player,
-		table: Table,
-	) {
-		super(data, events, player, table)
-	}
-
-	get Falloff() {
-		return this.data.falloff
-	}
-	set Falloff(v) {
-		if (v > 0) this.data.falloff = v
-	}
-	get FalloffPower() {
-		return this.data.falloffPower
-	}
-	set FalloffPower(v) {
-		this.data.falloffPower = v
-	}
-	get State() {
-		const v = this.animation.lockedByLS ? this.data.state : this.animation.realState
-		return clampLightState(v)
-	}
-	set State(v) {
-		v = clampLightState(v)
-		/* istanbul ignore next: No light sequences yet */
-		if (!this.animation.lockedByLS) this.animation.setState(v, this.player.getPhysics())
-		this.data.state = v
-	}
-	get Color() {
-		return this._state.color
-	}
-	set Color(v) {
-		this._state.color = v
-		this.data.color = v
-	}
-	get ColorFull() {
-		return this._state.colorFull
-	}
-	set ColorFull(v) {
-		this._state.colorFull = v
-		this.data.color2 = v
-	}
-	get X() {
-		return this.data.center.x
-	}
-	set X(v) {
-		this.data.center.x = v
-	}
-	get Y() {
-		return this.data.center.y
-	}
-	set Y(v) {
-		this.data.center.y = v
-	}
-	get BlinkPattern() {
-		return this.data.rgBlinkPattern
-	}
-	set BlinkPattern(v) {
-		this.data.rgBlinkPattern = v || '0'
-		this.animation.restartBlinker(this.player.getPhysics().timeMsec)
-	}
-	get BlinkInterval() {
-		return this.data.blinkInterval
-	}
-	set BlinkInterval(v) {
-		this.data.blinkInterval = v
-		this.animation.timeNextBlink = this.player.getPhysics().timeMsec + this.data.blinkInterval
-	}
-	get Intensity() {
-		return this.data.intensity
-	}
-	set Intensity(v) {
-		this.data.intensity = Math.max(0, v)
-		this.animation.updateIntensity()
-	}
-	get TransmissionScale() {
-		return this.data.transmissionScale
-	}
-	set TransmissionScale(v) {
-		this.data.transmissionScale = Math.max(0, v)
-	}
-	get IntensityScale() {
-		return this.animation.intensityScale
-	}
-	set IntensityScale(v) {
-		this.animation.intensityScale = v
-		this.animation.updateIntensity()
-	}
-	get Surface() {
-		return this.data.szSurface
-	}
-	set Surface(v) {
-		this.data.szSurface = v
-	}
-	get Image() {
-		return this.data.szOffImage
-	}
-	set Image(v) {
-		this.data.szOffImage = v
-	}
-	get DepthBias() {
-		return this.data.depthBias
-	}
-	set DepthBias(v) {
-		this.data.depthBias = v
-	}
-	get FadeSpeedUp() {
-		return this.data.fadeSpeedUp
-	}
-	set FadeSpeedUp(v) {
-		this.data.fadeSpeedUp = v
-	}
-	get FadeSpeedDown() {
-		return this.data.fadeSpeedDown
-	}
-	set FadeSpeedDown(v) {
-		this.data.fadeSpeedDown = v
-	}
-	get Bulb() {
-		return this.data.bulbLight
-	}
-	set Bulb(v) {
-		this.data.bulbLight = v
-	}
-	get ImageMode() {
-		return this.data.imageMode
-	}
-	set ImageMode(v) {
-		this.data.imageMode = v
-	}
-	get ShowBulbMesh() {
-		return this.data.showBulbMesh
-	}
-	set ShowBulbMesh(v) {
-		this.data.showBulbMesh = v
-	}
-	get StaticBulbMesh() {
-		return this.data.staticBulbMesh
-	}
-	set StaticBulbMesh(v) {
-		this.data.staticBulbMesh = v
-	}
-	get ShowReflectionOnBall() {
-		return this.data.showReflectionOnBall
-	}
-	set ShowReflectionOnBall(v) {
-		this.data.showReflectionOnBall = v
-	}
-	get ScaleBulbMesh() {
-		return this.data.meshRadius
-	}
-	set ScaleBulbMesh(v) {
-		this.data.meshRadius = v
-	}
-	get BulbModulateVsAdd() {
-		return this.data.bulbModulateVsAdd
-	}
-	set BulbModulateVsAdd(v) {
-		// Stored raw like native m_d.
-		this._state.modulate = v
-		this.data.bulbModulateVsAdd = v
-	}
-	get BulbHaloHeight() {
-		return this.data.bulbHaloHeight
-	}
-	set BulbHaloHeight(v) {
-		this.data.bulbHaloHeight = v
-	}
-	get Visible() {
-		return this.data.isVisible
-	}
-	set Visible(v) {
-		this.data.isVisible = v
-	}
-
-	get Fader() {
-		return this.data.fader
-	}
-	set Fader(v) {
-		this.data.fader = v
-	}
-
-	public Duration(startState: number, duration: number, endState: number): void {
-		this.animation.setDuration(startState, duration, endState, this.player.getPhysics().timeMsec)
-	}
-
-	/** Live state, including blink/duration overrides. @see Light::GetInPlayState in src/parts/light.cpp */
-	public GetInPlayState(): number {
-		return this.animation.realState
-	}
-
-	/** Live state as on/off, resolved through the blink pattern. @see Light::GetInPlayStateBool in src/parts/light.cpp */
-	public GetInPlayStateBool(): boolean {
-		return this.animation.isInPlayOn()
-	}
-
-	/** Live intensity, mid-fade included. @see Light::GetInPlayIntensity in src/parts/light.cpp */
-	public GetInPlayIntensity(): number {
-		return this._state.intensity
-	}
-
-	get FilamentTemperature() {
-		return this.animation.getFilamentTemperature()
-	}
-	get Shadows() {
-		return this.data.shadows
-	}
-	set Shadows(v) {
-		this.data.shadows = v
-	}
+/** Static render entry for a light mesh (WASM-side scene generation). */
+export interface LightMeshEntry<GEOMETRY> {
+	isVisible: boolean
+	mesh?: Mesh
+	geometry?: GEOMETRY
+	map?: Texture
+	material?: Material
+	depthBias?: number
+	bulbGlow?: BulbGlowParams
 }
 
 /** @see https://github.com/vpinball/vpinball/blob/master/light.cpp */
-export class Light extends Item<LightData> implements IRenderable<LightState>, IAnimatable, IScriptable<LightApi> {
+export class Light extends Item<LightData> {
 	declare public readonly data: LightData
 	private readonly state: LightState
 	private readonly meshGenerator: LightMeshGenerator
 	private readonly updater: LightUpdater
-	private api?: LightApi
-	private animation?: LightAnimation
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<Light> {
 		const data = await LightData.fromStorage(storage, itemName)
@@ -464,20 +283,6 @@ export class Light extends Item<LightData> implements IRenderable<LightState>, I
 		return this.data.isVisible
 	}
 
-	public setupPlayer(player: Player, table: Table): void {
-		this.events = new EventProxy(this)
-		this.animation = new LightAnimation(this.data, this.state, () => player.getPhysics().emu)
-		this.api = new LightApi(this.state, this.animation, this.data, this.events, player, table)
-	}
-
-	public getApi(): LightApi {
-		return this.api!
-	}
-
-	public getAnimation(): IAnimation {
-		return this.animation!
-	}
-
 	public getState(): LightState {
 		return this.state!
 	}
@@ -486,14 +291,10 @@ export class Light extends Item<LightData> implements IRenderable<LightState>, I
 		return this.updater
 	}
 
-	public getEventNames(): string[] {
-		return ['Init', 'Timer']
-	}
-
 	public getMeshes<NODE, GEOMETRY, POINT_LIGHT>(
 		table: Table,
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
-	): Meshes<GEOMETRY> {
+	): Record<string, LightMeshEntry<GEOMETRY>> {
 		const light = this.meshGenerator.getMeshes(table, renderApi)
 		if (light.surfaceLight) {
 			return {
@@ -506,7 +307,7 @@ export class Light extends Item<LightData> implements IRenderable<LightState>, I
 				},
 			}
 		}
-		const meshes: Meshes<GEOMETRY> = {}
+		const meshes: Record<string, LightMeshEntry<GEOMETRY>> = {}
 		// >2: glow quad needs a 3+ point polygon (see hasBulbGlow); fewer points fall back to a point light.
 		if (this.data.bulbLight && this.data.dragPoints.length > 2) {
 			const glowMaterial = new Material()

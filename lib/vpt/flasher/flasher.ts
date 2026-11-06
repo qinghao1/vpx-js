@@ -1,30 +1,23 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { EventProxy } from '../../game/event-proxy.js'
-import type { IAnimatable, IAnimation, IRenderable, IScriptable, Meshes } from '../../game/interfaces.js'
-import type { Player } from '../../game/player.js'
 import type { Storage } from '../../io/ole-doc.js'
-import type { IRenderApi } from '../../render/irender-api.js'
+import type { IRenderApi, Meshes, RenderInfo } from '../../render/irender-api.js'
 import { Item } from '../item.js'
+import type { Material } from '../material.js'
+import type { Mesh } from '../mesh.js'
 import type { Table, TableGenerateOptions } from '../table/table.js'
-import { FlasherAnimation } from './flasher-animation.js'
-import { FlasherApi } from './flasher-api.js'
+import type { Texture } from '../texture.js'
 import { FlasherData } from './flasher-data.js'
 import { FlasherMeshGenerator } from './flasher-mesh-generator.js'
 import { FlasherState } from './flasher-state.js'
 import { FlasherUpdater } from './flasher-updater.js'
 
 /** Runtime flasher. */
-export class Flasher
-	extends Item<FlasherData>
-	implements IScriptable<FlasherApi>, IRenderable<FlasherState>, IAnimatable
-{
-	private api?: FlasherApi
+export class Flasher extends Item<FlasherData> {
 	private readonly state: FlasherState
 	private readonly updater: FlasherUpdater
 	private readonly meshGenerator = new FlasherMeshGenerator()
-	private animation?: FlasherAnimation
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<Flasher> {
 		const data = await FlasherData.fromStorage(storage, itemName)
@@ -77,24 +70,5 @@ export class Flasher
 			depthWrite: false,
 		}
 		return meshes
-	}
-
-	public setupPlayer(player: Player, table: Table): void {
-		this.events = new EventProxy(this)
-		this.updater.resolveLightmap(table)
-		this.animation = new FlasherAnimation(this.data, this.state, () => player.getPhysics().emu)
-		this.api = new FlasherApi(this.data, this.events, player, table, this.state)
-	}
-
-	public getAnimation(): IAnimation {
-		return this.animation!
-	}
-
-	public getApi(): FlasherApi {
-		return this.api!
-	}
-
-	public getEventNames(): string[] {
-		return ['Init', 'Timer']
 	}
 }

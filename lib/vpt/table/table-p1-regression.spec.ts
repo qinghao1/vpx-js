@@ -1,55 +1,14 @@
 import { readFileSync } from 'node:fs'
 import * as path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { BinaryReader } from '../../io/binary-reader.js'
 import type { ReadResult, Storage } from '../../io/ole-doc.js'
-import { type ILogger, Logger } from '../../util/logger.js'
 import type { Texture } from '../texture.js'
 import { Table } from './table.js'
 import { TableData } from './table-data.js'
 
 const TEXTURE_FIXTURE = path.resolve('test/fixtures/table-texture.vpx')
-const DECAL_FIXTURE = path.resolve('test/fixtures/table-decal.vpx')
-const EMPTY_FIXTURE = path.resolve('test/fixtures/table-empty.vpx')
-
 const TEXTURE_BYTES = bytesOf(TEXTURE_FIXTURE)
-const DECAL_BYTES = bytesOf(DECAL_FIXTURE)
-const EMPTY_BYTES = bytesOf(EMPTY_FIXTURE)
-
-function stubRenderApi(): Record<string, (...args: any[]) => any> {
-	return {
-		preloadTextures: async () => {},
-		createParentNode: (name: string) => ({ name, children: [] as unknown[] }),
-		transformScene: () => {},
-		addChildToParent: (parent: any, child: any) => parent.children.push(child),
-		findInGroup: () => undefined,
-		createObjectFromRenderable: () => ({}) as any,
-		createPointLight: () => ({}) as any,
-	}
-}
-
-const ALL_EXPORTS_OFF = {
-	preloadTextures: false,
-	exportPlayfield: false,
-	exportPrimitives: false,
-	exportRubbers: false,
-	exportSurfaces: false,
-	exportFlashers: false,
-	exportFlippers: false,
-	exportBumpers: false,
-	exportRamps: false,
-	exportLightBulbs: false,
-	exportLightBulbLights: false,
-	exportPlayfieldLights: false,
-	exportHitTargets: false,
-	exportGates: false,
-	exportKickers: false,
-	exportTriggers: false,
-	exportSpinners: false,
-	exportPlungers: false,
-}
-
-const PLAYFIELD_ONLY = { preloadTextures: false, exportPlayfield: false }
 
 function bytesOf(fixture: string): Uint8Array {
 	return new Uint8Array(readFileSync(fixture))
@@ -94,61 +53,18 @@ function storageOf(...records: Uint8Array[]): Storage {
 	} as unknown as Storage
 }
 
-const warnings: string[] = []
-const originalLogger = Logger.logger()
-
-function captureWarnings(): void {
-	warnings.length = 0
-	const noop = () => {}
-	Logger.setLogger({
-		wtf: noop,
-		error: noop,
-		warn: (f: string) => warnings.push(f),
-		info: noop,
-		debug: noop,
-	} as ILogger)
-}
-
-afterEach(() => {
-	Logger.setLogger(originalLogger)
-})
-
 describe('Table P1 load regressions', () => {
-	it('keeps tableInfoOnly authoritative through Table.load defaults (no GameStg, no script)', async () => {
+	it('keeps tableInfoOnly authoritative through Table.load defaults (no GameStg)', async () => {
 		const table = await Table.load(new BinaryReader(TEXTURE_BYTES), { tableInfoOnly: true })
 		expect(table.info?.TableName).toBe('Table Name')
 		expect(table.data).toBeUndefined()
-		expect(table.tableScript).toBeUndefined()
 		expect(Object.keys(table.items)).toHaveLength(0)
-	})
-
-	it('still loads the script by default', async () => {
-		const table = await Table.load(new BinaryReader(TEXTURE_BYTES))
-		expect(table.data).toBeDefined()
-		expect(table.tableScript).toContain('Option Explicit')
-	})
-
-	it('still opts into script+info with explicit tableInfoOnly and loadTableScript', async () => {
-		const table = await Table.load(new BinaryReader(TEXTURE_BYTES), {
-			tableInfoOnly: true,
-			loadTableScript: true,
-		})
-		expect(table.info?.TableName).toBe('Table Name')
-		expect(table.tableScript).toContain('Option Explicit')
 	})
 
 	it('consumes BTRA/BTST without storing file values on the table', async () => {
 		const data = await TableData.fromStorage(storageOf(intRecord('BTRA', 1), intRecord('BTST', 75)), 'GameData')
 		expect(data.useTrailForBalls).toBeUndefined()
 		expect(data.ballTrailStrength).toBeUndefined()
-	})
-
-	it('warns that loaded decals are not rendered instead of dropping them silently', async () => {
-		captureWarnings()
-		const table = await Table.load(new BinaryReader(DECAL_BYTES))
-		expect(Object.keys(table.decals)).not.toHaveLength(0)
-		await table.generateTableNode(stubRenderApi() as any, ALL_EXPORTS_OFF)
-		expect(warnings.some(w => /decal/i.test(w))).toBe(true)
 	})
 
 	it('resolves textures case-insensitively like materials', async () => {
@@ -189,13 +105,5 @@ describe('Table P1 load regressions', () => {
 		expectCached()
 		table.textures[keyA] = texA
 		expectCached()
-	})
-
-	it('does not warn about decals when the table has none', async () => {
-		captureWarnings()
-		const table = await Table.load(new BinaryReader(EMPTY_BYTES), { loadTableScript: false })
-		expect(Object.keys(table.decals)).toHaveLength(0)
-		await table.generateTableNode(stubRenderApi() as any, PLAYFIELD_ONLY)
-		expect(warnings.some(w => /decal/i.test(w))).toBe(false)
 	})
 })

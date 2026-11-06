@@ -1,9 +1,15 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { GamelistDB as GamelistDBType } from 'wpc-emu'
+import wpcEmuPkg, { type GamelistDB as GamelistDBType } from 'wpc-emu'
 import { logger } from '../util/logger.js'
-import { resolveWpcEmu } from './wpc-emu-interop.js'
+
+/** Named wpc-emu export regardless of ESM/CJS interop shape (flat vs `.default`-nested). */
+function resolveWpcEmu<T>(name: string): T {
+	const pkg = wpcEmuPkg as unknown as Record<string, unknown> | undefined
+	const nested = pkg?.default as Record<string, unknown> | undefined
+	return (pkg?.[name] ?? nested?.[name]) as T
+}
 
 const GamelistDB = resolveWpcEmu<{
 	getByPinmameName(name: string): GamelistDBType.ClientGameEntry | undefined

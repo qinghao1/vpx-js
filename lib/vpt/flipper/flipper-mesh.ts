@@ -1,6 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-import { MathUtils } from 'three'
+import { degToRad } from '../../math/angle.js'
 import { Matrix3D } from '../../math/matrix.js'
 import { Vertex3D } from '../../math/vector.js'
 import type { Mesh } from '../mesh.js'
@@ -13,7 +13,7 @@ const flipperBaseMesh = loadMesh('flipper-base-mesh')
 /** Flipper mesh. @see https://github.com/vpinball/vpinball/blob/master/flipper.cpp */
 export class FlipperMesh {
 	public generateMeshes(data: FlipperData, table: Table): { base: Mesh; rubber?: Mesh } {
-		const rotation = new Matrix3D().rotateZMatrix(MathUtils.degToRad(180))
+		const rotation = new Matrix3D().rotateZMatrix(degToRad(180))
 		const height = table.getSurfaceHeight(data.szSurface, data.center.x, data.center.y)
 		const baseRadius = data.baseRadius - data.rubberThickness
 		const endRadius = data.endRadius - data.rubberThickness
@@ -33,7 +33,7 @@ export class FlipperMesh {
 
 	private applyScale(mesh: Mesh, data: FlipperData, baseRadius: number, endRadius: number): void {
 		// taper correction, see Flipper::GenerateBaseMesh in upstream src/parts/flipper.cpp
-		const fixAngle = Math.asin(MathUtils.clamp((data.baseRadius - data.endRadius) / data.flipperRadius, -1, 1))
+		const fixAngle = Math.asin(Math.max(-1, Math.min(1, (data.baseRadius - data.endRadius) / data.flipperRadius)))
 		const fixAngleScale = fixAngle / (Math.PI * 0.5)
 		const baseCenterX = FlipperMesh.vertsBaseBottom[6]!.x
 		const baseCenterY = FlipperMesh.vertsBaseBottom[0]!.y

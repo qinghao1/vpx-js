@@ -63,27 +63,6 @@ export { hideCabFlippers, showCabFlippers } from './visibility-heuristics.js'
 type PostProcessOptions = {
 	viewerMode?: 'viewer' | 'play'
 	harnessLog?: (msg: string, level?: string) => void
-	/** Playfield art name for the additive backdrop taps (matched case-insensitively). */
-	playfieldMapName?: string
-}
-
-// Additive halo/flasher materials sample the playfield albedo as the native
-// dst once it streams in; stamp the pending name here so the streaming drain
-// can bind it. Materials created after this pass keep the stub constant.
-function applyBackdropStampPass(nodes: THREE.Object3D[], playfieldMapName: string | undefined): number {
-	if (!playfieldMapName) return 0
-	let stamped = 0
-	for (const child of nodes) {
-		const mesh = child as THREE.Mesh
-		if (!mesh.isMesh) continue
-		for (const mat of meshMaterials(mesh)) {
-			const userData = (mat as { userData?: Record<string, unknown> } | null)?.userData
-			if (!userData?.__backdropArm || typeof userData.__backdropName === 'string') continue
-			userData.__backdropName = playfieldMapName
-			stamped++
-		}
-	}
-	return stamped
 }
 
 function ensureSrgb(map: THREE.Texture | null | undefined): void {
@@ -135,7 +114,7 @@ function isInsertPendingName(pending: unknown): boolean {
  */
 export function postProcessScene(
 	node: THREE.Object3D,
-	{ viewerMode = 'viewer', harnessLog, playfieldMapName }: PostProcessOptions = {},
+	{ viewerMode = 'viewer', harnessLog }: PostProcessOptions = {},
 ): Record<string, number> {
 	const stats: Record<string, number> = {
 		vrKept: 0,
@@ -472,7 +451,5 @@ export function postProcessScene(
 	if (darkOccludersHidden) harnessLog?.(`[wall] Hid ${darkOccludersHidden} dark large occluders`, 'info')
 
 	applyButtonInheritPass(nodes, node)
-	stats.backdropStamped = applyBackdropStampPass(nodes, playfieldMapName)
-	if (stats.backdropStamped) harnessLog?.(`[backdrop] Stamped ${stats.backdropStamped} additive tap(s)`, 'info')
 	return stats
 }

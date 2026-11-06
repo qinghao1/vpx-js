@@ -3,11 +3,9 @@ import type * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { Vertex2D, Vertex3D } from '../../math/vector.js'
-import type { Bumper, BumperState } from '../../vpt/bumper/bumper.js'
 import { DragPoint } from '../../vpt/dragpoint.js'
 import { Enums } from '../../vpt/enums.js'
 import { Light, LightData } from '../../vpt/light/light.js'
-import { TableMeshGenerator } from '../../vpt/table/table-mesh-generator.js'
 import { ThreeLightGenerator } from './three-light-generator.js'
 import { ThreeLightMeshGenerator } from './three-light-mesh-generator.js'
 import { ThreeRenderApi } from './three-render-api.js'
@@ -25,144 +23,6 @@ const requireWalkingDead = (): string => {
 }
 
 describe('regression: playfield lights via szLightmap', () => {
-	it('primitive with szLightmap must react to light intensity even with empty state', async () => {
-		const table: any = new TableBuilder()
-			.addMaterial('VLM.Bake', { baseColor: 0xffffff })
-			.addPrimitive('TestPrim', {
-				szMaterial: 'VLM.Bake',
-				szLightmap: 'L1',
-				addBlend: true,
-				alpha: 100,
-				color: 0xffffff,
-				isVisible: true,
-				disableLightingTop: 1,
-			})
-			.build()
-		const origGetMat = table.getMaterial.bind(table)
-		table.getMaterial = (n: string) => {
-			if (n === 'VLM.Bake') return { baseColor: 0xffffff }
-			return origGetMat(n)
-		}
-		const api = new ThreeRenderApi({ applyMaterials: true } as any) as any
-		const gen = new TableMeshGenerator(table)
-		const scene = gen.generateTableNode(api, {}) as THREE.Group
-		let node: any = null
-		scene.traverse((o: any) => {
-			if (o.name === 'TestPrim') node = o
-		})
-		expect(node, 'TestPrim node must exist').toBeTruthy()
-		// mock light L1
-		let curIntensity = 10
-		table.lights = {
-			L1: {
-				data: { intensity: 10, intensityScale: 1 },
-				getState: () => ({ intensity: curIntensity, color: 0xffffff, colorFull: 0xffffff }),
-				state: {
-					get intensity() {
-						return curIntensity
-					},
-					set intensity(v) {
-						curIntensity = v
-					},
-				},
-			},
-		}
-		table.getLight = (n: string) => table.lights[n]
-		const prim = table.primitives.TestPrim as any
-		// initial light ON => effectiveIntensity 1
-		curIntensity = 10
-		prim.getUpdater().applyState(node, {}, api, table)
-		let mat = (node.children[0]?.material ?? node.material) as any
-		expect(
-			mat.emissiveIntensity,
-			'emissive should be 1 when light on (alpha 100 * lightFactor 1 * 0.01)',
-		).toBeCloseTo(1, 0.01)
-		// light OFF => effectiveIntensity 0
-		curIntensity = 0
-		prim.getUpdater().applyState(node, {}, api, table)
-		mat = (node.children[0]?.material ?? node.material) as any
-		expect(
-			mat.emissiveIntensity,
-			'emissive must go to 0 when light off even with empty state (regression: Viewer must re-apply)',
-		).toEqual(0)
-		// light half
-		curIntensity = 5
-		prim.getUpdater().applyState(node, {}, api, table)
-		mat = (node.children[0]?.material ?? node.material) as any
-		expect(mat.emissiveIntensity, 'half intensity => 0.5').toBeCloseTo(0.5, 0.01)
-	})
-
-	// Dynamic viewer import + TableBuilder scene takes seconds solo; allow
-	// headroom so parallel-suite load does not flake the gate.
-	it('Viewer.applyChangedStates propagates light changes to szLightmap primitives', { timeout: 60000 }, async () => {
-		const { Viewer } = await import('../../../demo-browser/src/viewer.js')
-		const table: any = new TableBuilder()
-			.addMaterial('VLM.Bake', { baseColor: 0xffffff })
-			.addPrimitive('TestPrim', {
-				szMaterial: 'VLM.Bake',
-				szLightmap: 'L1',
-				addBlend: true,
-				alpha: 100,
-				color: 0xffffff,
-				isVisible: true,
-				disableLightingTop: 1,
-			})
-			.build()
-		const origGetMat = table.getMaterial.bind(table)
-		table.getMaterial = (n: string) => {
-			if (n === 'VLM.Bake') return { baseColor: 0xffffff }
-			return origGetMat(n)
-		}
-		const api = new ThreeRenderApi({ applyMaterials: true } as any) as any
-		const scene = new TableMeshGenerator(table).generateTableNode(api, {}) as THREE.Group
-		let curIntensity = 10
-		table.lights = {
-			L1: {
-				data: { intensity: 10, intensityScale: 1 },
-				getState: () => ({ intensity: curIntensity, color: 0xffffff, colorFull: 0xffffff }),
-				state: {
-					get intensity() {
-						return curIntensity
-					},
-					set intensity(v) {
-						curIntensity = v
-					},
-				},
-			},
-		}
-		table.getLight = (n: string) => table.lights[n]
-		// Drive the real Viewer method on a DOM-free stub: only the fields
-		// applyChangedStates touches (tableGroup/table/renderApi/nodeCache).
-		const viewer: any = Object.create(Viewer.prototype)
-		viewer.viewerMode = 'viewer'
-		viewer.tableGroup = scene
-		viewer.table = table
-		viewer.renderApi = api
-		viewer.nodeCache = new Map()
-		viewer._lightmapMap = new Map()
-		viewer._demandPendingSoon = () => {}
-		viewer.buildNodeCache()
-		const primNode = scene.getObjectByName('TestPrim') as any
-		expect(primNode, 'TestPrim node must exist').toBeTruthy()
-		curIntensity = 10
-		table.primitives.TestPrim.getUpdater().applyState(primNode, {}, api, table)
-		let mat = (primNode.children[0]?.material ?? primNode.material) as any
-		expect(mat.emissiveIntensity, 'light on => emissive 1').toBeCloseTo(1, 0.01)
-		// A light-only state change (no primitive entry) must still reach the
-		// lightmapped primitive through the changedLightNames fan-out.
-		curIntensity = 0
-		let released = false
-		viewer.applyChangedStates({
-			changedStates: { L1: { intensity: 0, color: 0xffffff, colorFull: 0xffffff } },
-			release() {
-				released = true
-			},
-		})
-		expect(released, 'changed states must be released').toBe(true)
-		mat = (primNode.children[0]?.material ?? primNode.material) as any
-		expect(mat.emissiveIntensity, 'light off must propagate to szLightmap primitive').toEqual(0)
-	})
-
 	it.skipIf(!walkingDeadVpx)('walking_dead lightmap primitives should exist and be addBlend', async () => {
 		// sanity check that real table has lightmapped primitives
 		const vpx = requireWalkingDead()
@@ -180,7 +40,7 @@ describe('regression: playfield lights via szLightmap', () => {
 				(p.data.szImage ?? '').toLowerCase().includes('playfield'),
 		)
 		// Not strict, but ensure lightFactor path is exercised
-		expect(lightmapped.length).toBeGreaterThan(0)
+		expect(playfieldLM.length).toBeGreaterThan(0)
 	})
 })
 
@@ -264,19 +124,5 @@ describe('direct getMeshes unit tests (no GLB)', () => {
 		expect(light.position.x).toBe(500)
 		expect(light.position.y).toBe(1000)
 		expect(light.position.z).toBe(-(60 + 10))
-	})
-
-	it('drives the bumper ring node from updater state through the real matrix path', () => {
-		const table = new TableBuilder().addBumper('b1').build()
-		const api = new ThreeRenderApi()
-		const bumper = table.bumpers.b1 as Bumper
-		const node = api.createObjectFromRenderable(bumper, table, {})
-		const ring = api.findInGroup(node, 'bumper-ring-b1')
-		expect(ring, 'ring child must exist').toBeDefined()
-		const ringNode = ring as THREE.Object3D
-		bumper.getUpdater().applyState(node, { ringOffset: 7 } as BumperState, api, table)
-		expect(ringNode.position.x).toBe(0)
-		expect(ringNode.position.y).toBe(0)
-		expect(ringNode.position.z).toBe(-7)
 	})
 })

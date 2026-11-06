@@ -3,12 +3,11 @@ import type { Storage } from '../io/ole-doc.js'
 import { ItemType } from './enums.js'
 import { getItemKey, ITEM_KEYS, ITEM_REGISTRY, loadItemByType } from './item-registry.js'
 
+// Renderable table items only: Timer/Textbox/LightSeq/DispReel left with the script surface.
 const EXPECTED_KEYS: Array<[number, string]> = [
 	[ItemType.Surface, 'surfaces'],
 	[ItemType.Flipper, 'flippers'],
-	[ItemType.Timer, 'timers'],
 	[ItemType.Plunger, 'plungers'],
-	[ItemType.Textbox, 'textBoxes'],
 	[ItemType.Bumper, 'bumpers'],
 	[ItemType.Trigger, 'triggers'],
 	[ItemType.Light, 'lights'],
@@ -17,8 +16,6 @@ const EXPECTED_KEYS: Array<[number, string]> = [
 	[ItemType.Gate, 'gates'],
 	[ItemType.Spinner, 'spinners'],
 	[ItemType.Ramp, 'ramps'],
-	[ItemType.DispReel, 'dispReels'],
-	[ItemType.LightSeq, 'lightSeqs'],
 	[ItemType.Primitive, 'primitives'],
 	[ItemType.Flasher, 'flashers'],
 	[ItemType.Rubber, 'rubbers'],
@@ -42,11 +39,16 @@ describe('The VPinball item registry', () => {
 	})
 
 	it('should not register non-game-item types', () => {
-		// Table/LightCenter/DragPoint never appear as GameItems; collections load separately.
+		// Table/LightCenter/DragPoint never appear as GameItems; Timer/Textbox/
+		// LightSeq/DispReel/Collection load separately or not at all.
 		expect(getItemKey(ItemType.Table)).toBeUndefined()
 		expect(getItemKey(ItemType.LightCenter)).toBeUndefined()
 		expect(getItemKey(ItemType.DragPoint)).toBeUndefined()
 		expect(getItemKey(ItemType.Collection)).toBeUndefined()
+		expect(getItemKey(ItemType.Timer)).toBeUndefined()
+		expect(getItemKey(ItemType.Textbox)).toBeUndefined()
+		expect(getItemKey(ItemType.LightSeq)).toBeUndefined()
+		expect(getItemKey(ItemType.DispReel)).toBeUndefined()
 		expect(getItemKey(99)).toBeUndefined()
 	})
 

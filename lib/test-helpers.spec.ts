@@ -4,7 +4,6 @@
 import { describe, expect, it } from 'vitest'
 import { TestRenderApi } from '../test/test-render-api.js'
 import { ThreeHelper } from '../test/three.helper.js'
-import { Matrix3D } from './math/matrix.js'
 
 describe('TestRenderApi conformance', () => {
 	const api = new TestRenderApi()
@@ -28,20 +27,11 @@ describe('TestRenderApi conformance', () => {
 
 	it('accepts every apply/remove/transform call without throwing', () => {
 		const node = {}
-		const matrix = new Matrix3D().setTranslation(1, 2, 3)
 		expect(() => api.addChildToParent(node, node)).not.toThrow()
 		expect(() => api.removeFromParent(node, node)).not.toThrow()
 		expect(() => api.removeFromParent(node, undefined)).not.toThrow()
 		expect(() => api.removeChildren(node)).not.toThrow()
 		expect(() => api.removeChildren(undefined)).not.toThrow()
-		expect(() => api.applyMatrixToNode(matrix, node)).not.toThrow()
-		expect(() => api.applyMatrixToNode(matrix, undefined)).not.toThrow()
-		expect(() => api.applyMeshToNode({} as any, node)).not.toThrow()
-		expect(() => api.applyMeshToNode({} as any, undefined)).not.toThrow()
-		expect(() => api.applyLighting({} as any, node)).not.toThrow()
-		expect(() => api.applyLighting({} as any, undefined)).not.toThrow()
-		expect(() => api.applyVisibility(true, node)).not.toThrow()
-		expect(() => api.applyVisibility(false, undefined)).not.toThrow()
 		expect(() => api.applyMaterial(node, {} as any, 'map')).not.toThrow()
 		expect(() => api.applyMaterial(undefined, {} as any, 'map')).not.toThrow()
 		expect(() => api.transformScene(node, {} as any)).not.toThrow()

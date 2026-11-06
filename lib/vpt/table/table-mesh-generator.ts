@@ -1,8 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { IRenderable } from '../../game/interfaces.js'
-import type { IRenderApi } from '../../render/irender-api.js'
+import type { IRenderApi, IRenderable } from '../../render/irender-api.js'
 import { logger, progress } from '../../util/logger.js'
 import type { Bumper } from '../bumper/bumper.js'
 import type { Flasher } from '../flasher/flasher.js'

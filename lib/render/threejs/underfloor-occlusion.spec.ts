@@ -123,23 +123,7 @@ describe.skipIf(!walkingDeadVpx)('underfloor occlusion: settled walking_dead fro
 		const tableGroup = (await (table as any).generateTableNode(api, { preloadTextures: false } as any)) as any
 		const stats = postProcessScene(tableGroup as any, { viewerMode: 'play' })
 
-		// Settled: script init states like the first viewer frame.
-		try {
-			const { Player } = await import('../../game/player.js')
-			const player = new Player(table as any)
-			player.init()
-			const changed = player.popStates()
-			for (const [name, state] of Object.entries(changed.changedStates as Record<string, any>)) {
-				const item = (table as any).items?.[name]
-				const node = tableGroup.getObjectByName(name) ?? tableGroup.getObjectByName(name.toLowerCase())
-				if (!item?.getUpdater || !node) continue
-				item.getUpdater().applyState(node, state, api, table)
-			}
-			;(changed as any).release?.()
-		} catch {
-			// Scene-graph occlusion does not depend on script state; keep going.
-		}
-
+		// Scene-graph occlusion does not depend on script state; the engine now lives in WASM.
 		api.transformScene(tableGroup as any, table as any)
 		const scene = new THREE.Scene()
 		scene.add(tableGroup as any)

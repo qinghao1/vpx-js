@@ -1,7 +1,6 @@
 import type { BufferGeometry, Object3D, Material as ThreeMaterial } from 'three'
-import type { RenderInfo } from '../../game/interfaces.js'
 import type { Material } from '../../vpt/material.js'
-import type { MeshConvertOptions } from '../irender-api.js'
+import type { MeshConvertOptions, RenderInfo } from '../irender-api.js'
 
 /** Shared contract for classic and TSL node material generators. */
 export interface IMaterialGenerator {

@@ -50,11 +50,6 @@ describe('ThreeConverter.createMesh mapping', () => {
 			converter.createMesh({ isVisible: true, geometry: box(), depthBias: 0 } as any).renderOrder,
 			'zero bias leaves the default',
 		).to.equal(0)
-		expect(
-			converter.createMesh({ isVisible: true, geometry: box(), depthBias: 5, material: { name: 'ball' } } as any)
-				.renderOrder,
-			'ball wins over bias',
-		).to.equal(1)
 	})
 
 	it('overrides depthWrite from RenderInfo and leaves it alone when unset', () => {

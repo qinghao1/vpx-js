@@ -382,7 +382,7 @@ describe('WASM scene sync', () => {
 		expect(state.inPlayState).toBe(true)
 	})
 
-	it('never hides exempt parts (authored VR room/cabinet)', () => {
+	it('honors the row for VR room parts (the VR-mode script picks the room)', () => {
 		const table = new TableBuilder().addPrimitive('VR_MegaWall005').addPrimitive('PR2').build()
 		const api = new RecordingApi()
 		const byName = (collection: unknown, name: string): { getState(): ItemState; getUpdater(): ItemUpdater<any> } =>
@@ -393,9 +393,7 @@ describe('WASM scene sync', () => {
 			[30, slotFor({}, room.getState(), room.getUpdater())],
 			[31, slotFor({}, plain.getState(), plain.getUpdater())],
 		])
-		const sync = new WasmSceneSync<object, unknown, unknown>(mockScene(slots), mockBalls(), api as any, table, {
-			neverHide: idx => idx === 30,
-		})
+		const sync = new WasmSceneSync<object, unknown, unknown>(mockScene(slots), mockBalls(), api as any, table)
 		const row = (idx: number): number[] => [
 			idx,
 			1,
@@ -421,9 +419,9 @@ describe('WASM scene sync', () => {
 			3,
 		]
 		expect(sync.syncPrims(new Float32Array([...row(30), ...row(31)]))).toBe(2)
-		expect((room.getState() as unknown as { isVisible: boolean }).isVisible).toBe(true)
+		expect((room.getState() as unknown as { isVisible: boolean }).isVisible).toBe(false)
 		expect((plain.getState() as unknown as { isVisible: boolean }).isVisible).toBe(false)
-		expect(api.visibilities.filter(v => v.visible === false)).toHaveLength(1)
+		expect(api.visibilities.filter(v => v.visible === false)).toHaveLength(2)
 	})
 
 	it('never shows host-hidden parts even when the engine reports them visible', () => {
@@ -469,7 +467,7 @@ describe('WASM scene sync', () => {
 		expect((plain.getState() as unknown as { isVisible: boolean }).isVisible).toBe(true)
 	})
 
-	it('neverShow wins over neverHide on the same part', () => {
+	it('neverShow wins over a visible row', () => {
 		const table = new TableBuilder().addPrimitive('VR_MegaWall005').build()
 		const api = new RecordingApi()
 		const room = (table.primitives as Record<string, { getState(): ItemState; getUpdater(): ItemUpdater<any> }>)[
@@ -477,7 +475,6 @@ describe('WASM scene sync', () => {
 		]!
 		const slots = new Map<number, PartSlot<object>>([[30, slotFor({}, room.getState(), room.getUpdater())]])
 		const sync = new WasmSceneSync<object, unknown, unknown>(mockScene(slots), mockBalls(), api as any, table, {
-			neverHide: idx => idx === 30,
 			neverShow: idx => idx === 30,
 		})
 		const row = [30, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 1, 0xffffff, 100, 0, 0, -1]

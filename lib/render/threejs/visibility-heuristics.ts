@@ -7,6 +7,7 @@ import {
 	type CustomMaterialUserData,
 	classify,
 	flatName,
+	isAuthorDebugName,
 	isBakedPlayfield,
 	isBasePlayfield,
 	isCabName,
@@ -46,6 +47,31 @@ export function hideCabFlippers(root: THREE.Object3D): number {
 		child.visible = false
 	})
 	return hidden
+}
+
+/** Author debug leftover on the node or any ancestor (`debug_BLW3`, `surface.top-debug_*`). */
+export function isInAuthorDebug(obj: THREE.Object3D): boolean {
+	for (let cur: THREE.Object3D | null = obj; cur; cur = cur.parent) {
+		if (isAuthorDebugName(cur.name ?? '')) return true
+	}
+	return false
+}
+
+/**
+ * Author-debug leftover pass: tables sometimes ship file-visible `debug*`
+ * items (e.g. TWD's `debug_BLW3` dummy triangle). Hide the whole subtree —
+ * scripts can still re-show the item through normal state updates.
+ */
+export function applyAuthorDebugPass(nodes: THREE.Object3D[], stats: Record<string, number>): number {
+	let debugHidden = 0
+	for (const child of nodes) {
+		const mesh = child as THREE.Mesh
+		if (!mesh.isMesh || !mesh.visible) continue
+		if (!isInAuthorDebug(child)) continue
+		hideMesh(mesh, null, stats)
+		debugHidden++
+	}
+	return debugHidden
 }
 
 /**

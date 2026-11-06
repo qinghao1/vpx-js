@@ -1,7 +1,6 @@
 import { AddEquation, AdditiveBlending, CustomBlending, OneFactor, OneMinusSrcAlphaFactor } from 'three'
 import { describe, expect, it } from 'vitest'
 import { TableBuilder } from '../../../test/table-builder.js'
-import { TestRenderApi } from '../../../test/test-render-api.js'
 import { Vertex2D } from '../../math/vector.js'
 import type { IRenderApi } from '../../render/irender-api.js'
 import {
@@ -13,8 +12,6 @@ import { ThreeNodeMaterialGenerator } from '../../render/threejs/three-node-mate
 import { DragPoint } from '../dragpoint.js'
 import { Flasher } from './flasher.js'
 import { FlasherAddBlend, FlasherData } from './flasher-data.js'
-import { FlasherState } from './flasher-state.js'
-import { FlasherUpdater } from './flasher-updater.js'
 
 /** FlasherData's constructor is private; construct fixtures through a minimal cast. */
 function createFlasherData(name: string): FlasherData {
@@ -49,7 +46,7 @@ function makeGenerator(): ThreeNodeMaterialGenerator {
 describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD still approximate)', () => {
 	it('threads the tri-state mode through getMeshes instead of collapsing absorb to additive', () => {
 		const table = new TableBuilder().build()
-		const renderApi = new TestRenderApi() as unknown as IRenderApi<any, any, any>
+		const renderApi = {} as unknown as IRenderApi<any, any, any>
 		const cases = [
 			{ mode: FlasherAddBlend.None, addBlend: false },
 			{ mode: FlasherAddBlend.Add, addBlend: true },
@@ -188,81 +185,5 @@ describe('Flasher absorb parity (upstream flasher.cpp SetupAddBlendState; AB_ADD
 		// uniform is required for overdrive correctness.
 		expect(mat.userData.__uModulate?.value, 'absorb keeps the modulate uniform').toBeCloseTo(0.5, 12)
 		expect(mat.userData.__blend, 'absorb mode still applies').toBe('absorb')
-	})
-
-	it('stamps premultiplied-over onto live absorb materials while keeping the additive uniform path', () => {
-		const table = new TableBuilder().build()
-		const data = quadData('AbsorbLive')
-		data.addBlendMode = FlasherAddBlend.Absorb
-		data.intensityScale = 2
-		const state = FlasherState.claim('AbsorbLive', true, 0xff8844, 80)
-		const updater = new FlasherUpdater(state, data)
-
-		let tintColor = 0
-		const targetMesh = {
-			isMesh: true,
-			material: {
-				// Simulates a forked clone rebuilt as plain additive: blending must be repaired.
-				blending: AdditiveBlending,
-				needsUpdate: false,
-				userData: {
-					// Real clones carry __addBlend from the factory; the guard
-					// keeps classic materials on their own path.
-					__addBlend: true,
-					__uTint: { value: { set: (hex: number) => (tintColor = hex) } },
-					__uIntensity: { value: 0 },
-				},
-			},
-		}
-		const node = {
-			visible: false,
-			traverse: (callback: (child: unknown) => void) => callback(targetMesh),
-		}
-		const renderApi = new TestRenderApi() as unknown as IRenderApi<any, any, any>
-		updater.applyState(node, state, renderApi, table)
-
-		expect(node.visible).toBe(true)
-		expect(tintColor, 'absorb shares the additive tint path').toBe(0xff8844)
-		expect(targetMesh.material.userData.__uIntensity.value).toBeCloseTo((80 * 2) / 100, 1e-5)
-		const mat = targetMesh.material as Record<string, any>
-		expect(mat.blending, 'live absorb material must absorb').toBe(CustomBlending)
-		expect(mat.blendSrc).toBe(OneFactor)
-		expect(mat.blendDst).toBe(OneMinusSrcAlphaFactor)
-		expect(mat.blendEquation).toBe(AddEquation)
-		expect(mat.userData.__blend).toBe('absorb')
-	})
-
-	it('leaves add and plain materials alone in the updater', () => {
-		const table = new TableBuilder().build()
-		const renderApi = new TestRenderApi() as unknown as IRenderApi<any, any, any>
-
-		const addData = quadData('AddUntouched')
-		addData.addBlend = true
-		const addState = FlasherState.claim('AddUntouched', true, 0xff8844, 80)
-		const addUpdater = new FlasherUpdater(addState, addData)
-		const addMat = { blending: AdditiveBlending, needsUpdate: false, userData: {} }
-		const addNode = {
-			visible: false,
-			traverse: (callback: (child: unknown) => void) => callback({ isMesh: true, material: addMat }),
-		}
-		addUpdater.applyState(addNode, addState, renderApi, table)
-		expect(addNode.visible).toBe(true)
-		expect(addMat.blending, 'add keeps its material blending').toBe(AdditiveBlending)
-		expect(
-			(addMat.userData as Record<string, unknown>).__blend,
-			'non-overlay never enters conversion',
-		).toBeUndefined()
-
-		const plainData = quadData('PlainUntouched')
-		const plainState = FlasherState.claim('PlainUntouched', true, 0x112233, 50)
-		const plainUpdater = new FlasherUpdater(plainState, plainData)
-		const plainMat: { opacity?: number; transparent?: boolean; needsUpdate?: boolean } = { opacity: 1 }
-		const plainNode = {
-			visible: false,
-			traverse: (callback: (child: unknown) => void) => callback({ isMesh: true, material: plainMat }),
-		}
-		plainUpdater.applyState(plainNode, plainState, renderApi, table)
-		expect(plainNode.visible).toBe(true)
-		expect(plainMat.opacity).toBeCloseTo(0.5, 1e-5)
 	})
 })

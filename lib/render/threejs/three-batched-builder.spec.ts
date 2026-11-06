@@ -145,7 +145,6 @@ describe('batchStaticOpaques geometry identity', () => {
 		expect(batched, 'different shapes take the BatchedMesh path').to.have.lengthOf(1)
 		for (const mesh of meshes) {
 			expect(mesh.visible).to.equal(false)
-			expect((mesh.userData.__batched as { isInstanced?: boolean }).isInstanced).to.not.equal(true)
 		}
 	})
 
@@ -179,13 +178,6 @@ describe('batchStaticOpaques geometry identity', () => {
 			const child = group.children[0] as THREE.Mesh
 			child.updateMatrixWorld(true)
 			expect(m4.elements[12]).to.be.closeTo(child.matrixWorld.elements[12] ?? 0, 0.01)
-		}
-		// The pre-batch matrix is saved so visibility toggles can restore the slot.
-		for (const group of groups) {
-			const child = group.children[0] as THREE.Mesh
-			const info = child.userData.__batched as { isInstanced?: boolean; matrix?: THREE.Matrix4 }
-			expect(info.isInstanced).to.equal(true)
-			expect(info.matrix).to.be.instanceOf(THREE.Matrix4)
 		}
 	})
 })

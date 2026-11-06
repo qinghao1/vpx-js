@@ -89,10 +89,11 @@ describe('Backglass layout', () => {
 			backdropRectToNdc(0, 0, 21, 40),
 			digitCellUV(0, 9, false, 1),
 		)
-		expect(quad.material.alphaTest).to.be.closeTo(128 / 255, 1e-9)
-		expect(quad.material.depthTest).to.equal(true)
-		expect(quad.material.depthWrite).to.equal(true)
+		const quadMaterial = quad.material as THREE.MeshBasicMaterial
+		expect(quadMaterial.alphaTest).to.be.closeTo(128 / 255, 1e-9)
+		expect(quadMaterial.depthTest).to.equal(true)
+		expect(quadMaterial.depthWrite).to.equal(true)
 		const flat = createBackdropPlane(undefined, 0x123456)
-		expect(flat.material.color.getHex()).to.equal(0x123456)
+		expect((flat.material as THREE.MeshBasicMaterial).color.getHex()).to.equal(0x123456)
 	})
 })

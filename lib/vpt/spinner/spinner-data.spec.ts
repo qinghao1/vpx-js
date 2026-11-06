@@ -4,16 +4,10 @@
 import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
-import { MathUtils } from 'three'
-import { ThreeHelper } from '../../../test/three.helper'
-import { Player } from '../../game/player.js'
-import { NodeBinaryReader } from '../../io/binary-reader.node.js'
 import type { ReadResult, Storage } from '../../io/ole-doc.js'
-import { Table } from '../table/table.js'
 import { SpinnerData } from './spinner-data.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
-const three = new ThreeHelper()
 
 async function loadWithAngles(angleMax: number, angleMin: number): Promise<SpinnerData> {
 	const record = new Uint8Array(32)
@@ -54,42 +48,5 @@ describe('The spinner angle tags', () => {
 		const data = await loadWithAngles(720, -720)
 		expect(data.angleMax).to.equal(720)
 		expect(data.angleMin).to.equal(-720)
-	})
-})
-
-describe('The spinner angle correction', () => {
-	it('should correct inverted angles at setupPlayer like upstream PhysicSetup', async () => {
-		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-spinner.vpx')))
-		const spinner = table.spinners.Spinner
-		spinner.data.angleMax = -45
-		spinner.data.angleMin = 45
-		new Player(table).init()
-		expect(spinner.data.angleMin).to.equal(-45)
-		expect(spinner.data.angleMax).to.equal(45)
-		expect(spinner.getMover().angleMin).to.be.closeTo(MathUtils.degToRad(-45), 1e-6)
-		expect(spinner.getMover().angleMax).to.be.closeTo(MathUtils.degToRad(45), 1e-6)
-	})
-
-	it('should leave ordered angles untouched at setupPlayer', async () => {
-		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-spinner.vpx')))
-		const spinner = table.spinners.Spinner
-		expect(spinner.data.angleMin).to.equal(-90)
-		expect(spinner.data.angleMax).to.equal(90)
-		new Player(table).init()
-		expect(spinner.data.angleMin).to.equal(-90)
-		expect(spinner.data.angleMax).to.equal(90)
-	})
-
-	it('should clamp setter values to the corrected range', async () => {
-		const table = await Table.load(new NodeBinaryReader(three.fixturePath('table-spinner.vpx')))
-		const spinner = table.spinners.Spinner
-		spinner.data.angleMax = -45
-		spinner.data.angleMin = 45
-		new Player(table).init()
-		const api = spinner.getApi()
-		api.AngleMax = 91
-		expect(api.AngleMax).to.equal(45)
-		api.AngleMin = -91
-		expect(api.AngleMin).to.equal(-45)
 	})
 })

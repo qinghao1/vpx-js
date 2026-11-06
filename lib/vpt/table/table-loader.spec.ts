@@ -9,8 +9,6 @@ import { type LoadedTable, TableLoader } from './table-loader.js'
 const EMPTY_FIXTURE = path.resolve('test/fixtures/table-empty.vpx')
 const TEXTURE_FIXTURE = path.resolve('test/fixtures/table-texture.vpx')
 const PRIMITIVE_FIXTURE = path.resolve('test/fixtures/table-primitive.vpx')
-const TEXTBOX_FIXTURE = path.resolve('test/fixtures/table-textbox.vpx')
-const TIMER_FIXTURE = path.resolve('test/fixtures/table-timer.vpx')
 
 interface BytePatch {
 	anchor: string
@@ -76,48 +74,23 @@ describe('TableLoader TableInfo', () => {
 	})
 })
 
-describe('TableLoader script framing', () => {
-	it('reads CODE exactly (cchar bytes, no ENDB trim)', async () => {
-		const out = await loadFixture(TEXTURE_FIXTURE, { loadTableScript: true })
-		// A stale endsWith('ENDB') trim would corrupt scripts ending in ENDB.
-		expect(out.tableScript).toBe("'Empty Table\r\n\r\nOption Explicit\r\n\r\n\r\n' EOF")
-	})
-
-	it('loads an empty script as empty (cchar 0, not trailing ENDB bytes)', async () => {
-		const out = await loadFixture(TIMER_FIXTURE, { loadTableScript: true })
-		expect(out.tableScript).toBe('')
-	})
-})
-
 async function loadFixture(fixture: string, opts: TableLoadOptions): Promise<LoadedTable> {
 	return new TableLoader().load(new BinaryReader(new Uint8Array(readFileSync(fixture))), opts)
 }
 
 describe('TableLoader options matrix', () => {
-	it('loads everything when only the script flag is set', async () => {
-		const out = await loadFixture(TEXTURE_FIXTURE, { loadTableScript: true })
+	it('loads everything by default', async () => {
+		const out = await loadFixture(TEXTURE_FIXTURE, {})
 		expect(out.data).toBeDefined()
-		expect(out.tableScript).toContain('Option Explicit')
 		expect(out.textures).toHaveLength(8)
 		expect(Object.keys(out.items)).toHaveLength(8)
-		expect(out.collections).toHaveLength(0)
 		expect(out.info?.TableName).toBe('Table Name')
 	})
 
 	it('loads only game data with tableDataOnly', async () => {
 		const out = await loadFixture(TEXTURE_FIXTURE, { tableDataOnly: true })
 		expect(out.data).toBeDefined()
-		expect(out.tableScript).toBeUndefined()
 		expect(out.textures).toBeUndefined()
-		expect(out.collections).toBeUndefined()
-		expect(out.info).toBeUndefined()
-		expect(Object.keys(out.items)).toHaveLength(0)
-	})
-
-	it('adds the script to a data-only load when requested', async () => {
-		const out = await loadFixture(TEXTURE_FIXTURE, { tableDataOnly: true, loadTableScript: true })
-		expect(out.data).toBeDefined()
-		expect(out.tableScript).toContain('Option Explicit')
 		expect(out.info).toBeUndefined()
 		expect(Object.keys(out.items)).toHaveLength(0)
 	})
@@ -126,35 +99,19 @@ describe('TableLoader options matrix', () => {
 		const out = await loadFixture(TEXTURE_FIXTURE, { tableInfoOnly: true })
 		expect(out.info?.TableName).toBe('Table Name')
 		expect(out.data).toBeUndefined()
-		expect(out.tableScript).toBeUndefined()
 		expect(out.textures).toBeUndefined()
 		expect(Object.keys(out.items)).toHaveLength(0)
 	})
 
-	it('loads the script and info for tableInfoOnly with loadTableScript', async () => {
-		const out = await loadFixture(TEXTURE_FIXTURE, { tableInfoOnly: true, loadTableScript: true })
-		expect(out.info?.TableName).toBe('Table Name')
-		expect(out.tableScript).toContain('Option Explicit')
-	})
-
-	it('skips only the script with loadTableScript false', async () => {
-		const out = await loadFixture(TEXTURE_FIXTURE, { loadTableScript: false })
-		expect(out.tableScript).toBeUndefined()
-		expect(out.data).toBeDefined()
-		expect(out.textures).toHaveLength(8)
-		expect(Object.keys(out.items)).toHaveLength(8)
-		expect(out.info?.TableName).toBe('Table Name')
-	})
-
 	it('returns an empty texture list with skipTextures', async () => {
-		const out = await loadFixture(TEXTURE_FIXTURE, { skipTextures: true, loadTableScript: true })
+		const out = await loadFixture(TEXTURE_FIXTURE, { skipTextures: true })
 		expect(out.textures).toEqual([])
 		expect(out.data).toBeDefined()
 		expect(Object.keys(out.items)).toHaveLength(8)
 	})
 
 	it('loads primitive meshes by default', async () => {
-		const out = await loadFixture(PRIMITIVE_FIXTURE, { loadTableScript: true })
+		const out = await loadFixture(PRIMITIVE_FIXTURE, {})
 		const cube = out.primitives?.find(p => p.getName() === 'Cube')
 		expect(cube?.data.numVertices).toBe(24)
 		expect((cube?.data as unknown as { numIndices: number } | undefined)?.numIndices).toBe(36)
@@ -163,7 +120,7 @@ describe('TableLoader options matrix', () => {
 	})
 
 	it('skips mesh bulk data but keeps counts with skipMeshes', async () => {
-		const out = await loadFixture(PRIMITIVE_FIXTURE, { skipMeshes: true, loadTableScript: true })
+		const out = await loadFixture(PRIMITIVE_FIXTURE, { skipMeshes: true })
 		const cube = out.primitives?.find(p => p.getName() === 'Cube')
 		expect(cube?.data.numVertices).toBe(24)
 		expect((cube?.data as unknown as { numIndices: number } | undefined)?.numIndices).toBe(36)
@@ -178,7 +135,7 @@ describe('TableLoader duplicate part names', () => {
 			[{ anchor: 'Primitive2', replacement: Buffer.from('Primitive1', 'utf16le') }],
 			TEXTURE_FIXTURE,
 		)
-		const table = await Table.load(new BinaryReader(bytes), { loadTableScript: false })
+		const table = await Table.load(new BinaryReader(bytes))
 		expect(Object.keys(table.items)).toHaveLength(8)
 		expect(table.items.Primitive1).toBeDefined()
 		const renamed = Object.keys(table.items).find(name => /^Primitive1\d{3}$/.test(name))
@@ -188,36 +145,5 @@ describe('TableLoader duplicate part names', () => {
 				.map(primitive => primitive.getName())
 				.sort(),
 		).toEqual(['Primitive1', 'Primitive1001', 'Primitive3', 'Primitive4', 'Primitive5', 'Primitive6'])
-	})
-})
-
-describe('TableLoader loadInvisibleItems', () => {
-	async function loadTable(loadInvisibleItems?: boolean): Promise<Table> {
-		const bytes = new Uint8Array(readFileSync(TEXTBOX_FIXTURE))
-		return loadInvisibleItems === undefined
-			? Table.load(new BinaryReader(bytes))
-			: Table.load(new BinaryReader(bytes), { loadInvisibleItems })
-	}
-
-	it('loads timers and textboxes by default', async () => {
-		const table = await loadTable()
-		expect(Object.keys(table.timers)).toEqual(['Timer'])
-		expect(Object.keys(table.textboxes).sort()).toEqual(['NudgeText', 'TextBox1'])
-	})
-
-	it('loads timers and textboxes when enabled', async () => {
-		const table = await loadTable(true)
-		expect(Object.keys(table.timers)).toEqual(['Timer'])
-		expect(Object.keys(table.textboxes).sort()).toEqual(['NudgeText', 'TextBox1'])
-		expect(Object.keys(table.items).sort()).toEqual(['NudgeText', 'Plunger1', 'TextBox1', 'Timer'])
-	})
-
-	it('omits timers and textboxes from their dicts when disabled but keeps every item', async () => {
-		const table = await loadTable(false)
-		expect(Object.keys(table.timers)).toHaveLength(0)
-		expect(Object.keys(table.textboxes)).toHaveLength(0)
-		// Visible items are unaffected, and `items` still registers every game item.
-		expect(Object.keys(table.plungers)).toEqual(['Plunger1'])
-		expect(Object.keys(table.items).sort()).toEqual(['NudgeText', 'Plunger1', 'TextBox1', 'Timer'])
 	})
 })

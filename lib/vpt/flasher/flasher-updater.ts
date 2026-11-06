@@ -1,14 +1,14 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { Object3D } from 'three'
 import type { IRenderApi } from '../../render/irender-api.js'
-import { clampModulateVsAdd } from './flasher-blend.js'
-import { convertFlasherBlend } from '../../render/threejs/nodes/primitive-bdl-node.js'
+// Follow-up: fold blend-target switching into a flasher-material protocol so
+// this import (three material mutation) can move behind `IRenderApi` too.
+import { convertFlasherBlend, updatePrimitiveBdl } from '../../render/threejs/nodes/primitive-bdl-node.js'
 import { ItemUpdater, noteTextureDemand } from '../item-updater.js'
-import type { Light } from '../light/light.js'
-import type { LightAnimation } from '../light/light-physics.js'
+import { type EmuFloatState, lightmapAlphaFactor, tryGetLinkedFloatState } from '../state-link.js'
 import type { Table } from '../table/table.js'
+import { clampModulateVsAdd } from './flasher-blend.js'
 import { FlasherAddBlend, type FlasherData } from './flasher-data.js'
 
 import { FlasherMeshGenerator } from './flasher-mesh-generator.js'
@@ -22,7 +22,7 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 	private lastImageA: string
 	private lastAddBlend = true
 	private lastAddBlendMode = FlasherAddBlend.Add
-	private linkedLight?: Light
+	private emuProvider?: () => EmuFloatState | undefined
 
 	constructor(
 		state: FlasherState,
@@ -39,9 +39,26 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 		this.lastAddBlendMode = data.addBlendMode
 	}
 
-	/** Resolves the LMAP-linked light. @see Flasher::RenderSetup (`m_lightmap = m_ptable->GetLight(m_d.m_szLightmap)`) */
-	public resolveLightmap(table: Table): void {
-		this.linkedLight = this.data.szLightmap ? table.lights[this.data.szLightmap] : undefined
+	/** Controller-state source for SLNK modulation (same contract as the primitive updater). */
+	public setEmuProvider(provider: () => EmuFloatState | undefined): void {
+		this.emuProvider = provider
+	}
+
+	/** Engine state overrides win over authored data; absent keeps the data path. */
+	private get effIntensityScale(): number {
+		return this.state.intensityScale ?? this.data.intensityScale
+	}
+
+	private get effModulateVsAdd(): number {
+		return this.state.modulateVsAdd ?? this.data.modulateVsAdd
+	}
+
+	private get effAddBlend(): boolean {
+		return this.state.addBlend ?? this.data.addBlend
+	}
+
+	private get effAddBlendMode(): number {
+		return this.state.addBlendMode ?? this.data.addBlendMode
 	}
 
 	public applyState<NODE, GEOMETRY, POINT_LIGHT>(
@@ -52,7 +69,10 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 	): void {
 		this.state.mergeFrom(state)
 		this.applyTransform(obj, renderApi, table)
-		const target = obj as unknown as Object3D
+		const target = obj as unknown as {
+			visible: boolean
+			traverse(cb: (child: any) => void): void
+		}
 		if (!target) return
 		this.applyImage(target, renderApi)
 
@@ -65,25 +85,25 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 			!this.isSequencerOff() &&
 			this.state.isVisible &&
 			alpha > 0 &&
-			this.data.intensityScale !== 0 &&
-			(!this.data.addBlend || this.state.color !== 0)
+			this.effIntensityScale !== 0 &&
+			this.state.color !== 0
 
 		target.visible = visible
 		if (!visible) return
 
-		const intensity = (alpha * this.data.intensityScale) / 100
+		const intensity = (alpha * this.effIntensityScale) / 100
 		// The absorb sign flip lives in the shader encoding, not here.
-		const absorb = this.data.addBlendMode === FlasherAddBlend.Absorb
+		const absorb = this.effAddBlendMode === FlasherAddBlend.Absorb
 		target.traverse((child: any) => {
 			if (!child.isMesh || !child.material) return
 			const mats = Array.isArray(child.material) ? child.material : [child.material]
 			for (const mat of mats) {
 				const userData = mat.userData as Record<string, any>
-				if (this.data.addBlend) {
+				if (this.effAddBlend) {
 					if (userData?.__uTint?.value?.set) userData.__uTint.value.set(this.state.color)
 					if (userData?.__uIntensity) userData.__uIntensity.value = intensity
 					// Script-animated values track without rebuild.
-					if (userData?.__uModulate) userData.__uModulate.value = clampModulateVsAdd(this.data.modulateVsAdd)
+					if (userData?.__uModulate) userData.__uModulate.value = clampModulateVsAdd(this.effModulateVsAdd)
 					if (userData?.__uFlat?.value?.set)
 						userData.__uFlat.value.set(this.state.color).multiplyScalar(intensity)
 					convertFlasherBlend(mat, absorb ? 'absorb' : 'additive')
@@ -91,6 +111,14 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 					// Node graphs ignore classic color/opacity writes; they convert instead.
 					if (userData?.__addBlend === true) convertFlasherBlend(mat, 'plain')
 					else {
+						// BDL overlays carry tint/fade as uniforms (same protocol
+						// the primitive updater uses); the classic writes below
+						// only reach classic materials. updatePrimitiveBdl
+						// no-ops there, so both paths stay correct.
+						updatePrimitiveBdl(mat, {
+							albedo: this.state.color,
+							opacity: Math.min(1, Math.max(0, alpha / 100)),
+						})
 						if (mat.color?.set) mat.color.set(this.state.color)
 						mat.opacity = Math.min(1, Math.max(0, alpha / 100))
 						const transparent = mat.opacity < 1
@@ -114,21 +142,24 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 	 * @see Flasher::Render in src/parts/flasher.cpp:1007-1020
 	 */
 	private effectiveAlpha(table: Table): number {
-		// The controller link (if resolved) is already folded into state.alpha by
-		// FlasherAnimation, which then suppresses this lightmap fallback — upstream
-		// applies `linkState` *or* the lightmap ratio, exclusively.
-		if (this.state.slnkResolved) return this.state.alpha
-		const alpha = this.state.alpha
-		const light = this.linkedLight ?? (this.data.szLightmap ? table.lights[this.data.szLightmap] : undefined)
-		if (light) {
-			const intensity = light.data.intensity
-			const scale = (light.getAnimation() as LightAnimation | undefined)?.intensityScale ?? 1
-			if (intensity === 0 || scale === 0) {
-				return 0
-			}
-			return (alpha * light.getState().intensity) / (intensity * scale)
-		}
-		return alpha
+		// Upstream applies the controller link *or* the lightmap ratio,
+		// never both (@see Flasher::Render in src/parts/flasher.cpp:1011-1020).
+		// The WASM row carries the raw authored alpha, so both paths live here.
+		const slnk = this.slnkLinkState()
+		if (slnk !== undefined) return this.state.alpha * slnk
+		return this.state.alpha * lightmapAlphaFactor(table, this.data.szLightmap)
+	}
+
+	/**
+	 * Resolved SLNK controller value, or undefined when no link is set, no
+	 * emulator is wired, or the link does not resolve (upstream then falls back
+	 * to the lightmap). @see Flasher::Render in src/parts/flasher.cpp
+	 */
+	private slnkLinkState(): number | undefined {
+		const link = this.data.stateSrcLink
+		if (!link || !this.emuProvider) return undefined
+		const linked = tryGetLinkedFloatState(this.emuProvider(), link)
+		return linked.ok ? linked.value : undefined
 	}
 
 	/**
@@ -136,11 +167,14 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 	 * `GetImage(m_d.m_szImageA)` every frame (`Flasher::Render`); the
 	 * build-time map only covers the authored image. Runs ahead of the
 	 * visibility gate so a reshown flasher never flashes a stale image.
- * DMD flashers keep the live node material; a script image swap must
- * not replace it.
+	 * DMD flashers keep the live node material; a script image swap must
+	 * not replace it.
 	 */
 	private applyImage<NODE, GEOMETRY, POINT_LIGHT>(
-		target: Object3D,
+		target: {
+			visible: boolean
+			traverse(cb: (child: any) => void): void
+		},
 		renderApi: IRenderApi<NODE, GEOMETRY, POINT_LIGHT>,
 	): void {
 		if (this.data.isDMD) return
@@ -166,15 +200,15 @@ export class FlasherUpdater extends ItemUpdater<FlasherState> {
 			current.rotY === this.lastRotY &&
 			current.rotZ === this.lastRotZ &&
 			current.height === this.lastHeight &&
-			this.data.addBlend === this.lastAddBlend &&
-			this.data.addBlendMode === this.lastAddBlendMode
+			this.effAddBlend === this.lastAddBlend &&
+			this.effAddBlendMode === this.lastAddBlendMode
 		) {
 			return
 		}
 		// Geometry regenerates here; the overlay material converts in place in
 		// applyState, since applyMeshToNode carries geometry only.
-		this.lastAddBlend = this.data.addBlend
-		this.lastAddBlendMode = this.data.addBlendMode
+		this.lastAddBlend = this.effAddBlend
+		this.lastAddBlendMode = this.effAddBlendMode
 		this.lastRotX = current.rotX
 		this.lastRotY = current.rotY
 		this.lastRotZ = current.rotZ

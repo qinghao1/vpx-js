@@ -7,9 +7,7 @@ import { spy } from 'sinon'
 import sinonChai from 'sinon-chai'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { TestRenderApi } from '../../../test/test-render-api.js'
-import type { RenderInfo } from '../../game/interfaces.js'
-import { Player } from '../../game/player.js'
-import type { IRenderApi } from '../../render/irender-api.js'
+import type { IRenderApi, RenderInfo } from '../../render/irender-api.js'
 import { Enums } from '../enums.js'
 import type { Table } from '../table/table.js'
 import type { RampState } from './ramp.js'
@@ -18,7 +16,6 @@ chai.use((sinonChai as any).default ?? sinonChai)
 
 describe('The VPinball ramp updater', () => {
 	let table: Table
-	let player: Player
 
 	beforeEach(() => {
 		table = new TableBuilder()
@@ -28,23 +25,6 @@ describe('The VPinball ramp updater', () => {
 			.addRamp('ramp2', { szMaterial: 'transparent', rampType: Enums.RampType.RampTypeFlat })
 			.addRamp('ramp3', { szMaterial: 'transparent', rampType: Enums.RampType.RampType4Wire })
 			.build()
-
-		// init player
-		player = new Player(table).init()
-	})
-
-	it('should not update visibility when opacity is inactive', async () => {
-		table.ramps.ramp1.getApi().Visible = false
-		const states = player.popStates()
-		expect(states.getState<RampState>('ramp1')).not.to.be.ok
-	})
-
-	it('should update visibility when opacity is active', async () => {
-		table.ramps.ramp2.getApi().Visible = false
-		const states = player.popStates()
-
-		expect(states.getState<RampState>('ramp2').isVisible).to.equal(false)
-		states.getState<RampState>('ramp2').release()
 	})
 
 	it('should apply visibility', async () => {
@@ -110,7 +90,6 @@ describe('The VPinball ramp updater', () => {
 			.addMaterial('semi', { isOpacityActive: true, opacity: 1 })
 			.addRamp('ramp', { szMaterial: 'semi', rampType: Enums.RampType.RampTypeFlat })
 			.build()
-		new Player(t).init()
 		for (const info of Object.values(t.ramps.ramp.getMeshes(t))) {
 			expect(info.isTransparent).to.equal(false)
 		}

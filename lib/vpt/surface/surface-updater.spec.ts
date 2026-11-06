@@ -7,7 +7,6 @@ import { spy } from 'sinon'
 import sinonChai from 'sinon-chai'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { TestRenderApi } from '../../../test/test-render-api.js'
-import { Player } from '../../game/player.js'
 import type { Matrix3D } from '../../math/matrix.js'
 import type { IRenderApi } from '../../render/irender-api.js'
 import type { Table } from '../table/table.js'
@@ -17,7 +16,6 @@ chai.use((sinonChai as any).default ?? sinonChai)
 
 describe('The VPinball surface updater', () => {
 	let table: Table
-	let player: Player
 
 	beforeEach(() => {
 		table = new TableBuilder()
@@ -26,25 +24,6 @@ describe('The VPinball surface updater', () => {
 			.addSurface('s1', { szTopMaterial: 'static', szSideMaterial: 'dynamic' })
 			.addSurface('s2', { szTopMaterial: 'static', szSideMaterial: 'static' })
 			.build()
-
-		// init player
-		player = new Player(table).init()
-	})
-
-	it('should not update visibility when opacity is disabled', () => {
-		table.surfaces.s2.getApi().Visible = false
-		table.surfaces.s2.getApi().SideVisible = false
-		const states = player.popStates()
-		expect(states.getState<SurfaceState>('s2')).not.to.be.ok
-	})
-
-	it('should update visibility when opacity is active', () => {
-		table.surfaces.s1.getApi().SideVisible = false
-		table.surfaces.s1.getApi().Visible = false
-		const states = player.popStates()
-		expect(states.getState<SurfaceState>('s1').isTopVisible).to.equal(false)
-		expect(states.getState<SurfaceState>('s1').isSideVisible).to.equal(false)
-		states.getState<SurfaceState>('s1').release()
 	})
 
 	it('should apply visibility', async () => {

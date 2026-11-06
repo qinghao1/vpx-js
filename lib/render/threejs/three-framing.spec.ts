@@ -285,7 +285,10 @@ describe('regression: framing keeps DMD and full playfield visible', () => {
 		const group = buildWalkingDeadGroup()
 		const state = computeViewerFraming(group)
 		const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 4000)
-		const controls = { target: new THREE.Vector3(), update: () => {} }
+		const controls: { target: THREE.Vector3; update: () => void; maxDistance?: number; minDistance?: number } = {
+			target: new THREE.Vector3(),
+			update: () => {},
+		}
 		applyCameraState(camera, controls, state)
 		const dist = state.position.distanceTo(state.target)
 		expect(controls.maxDistance, 'dolly-out must stay near the table').to.be.closeTo(dist * 3, 1)

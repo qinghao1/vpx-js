@@ -222,28 +222,6 @@ describe('regression: artifact postprocess', () => {
 		expect(stats.greenHidden, 'only the untextured green offender hides').to.equal(1)
 	})
 
-	it('exempts only the exact ball material from the metal flattening pass', () => {
-		const root = new THREE.Group()
-		root.name = 'table'
-		const ballMat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.08 })
-		ballMat.name = 'material:ball'
-		const ballMesh = makeMesh('primitive-ball', new THREE.BoxGeometry(200, 200, 200), ballMat)
-		root.add(ballMesh)
-
-		const fireballMat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.1 })
-		fireballMat.name = 'material:fireball'
-		const fireballMesh = makeMesh('primitive-playfieldtoy', new THREE.BoxGeometry(200, 200, 200), fireballMat)
-		root.add(fireballMesh)
-
-		root.updateMatrixWorld(true)
-		const stats = postProcessScene(root, { harnessLog: () => {}, viewerMode: 'viewer' })
-
-		expect(ballMat.metalness, 'exact ball material keeps its metalness').to.equal(1)
-		const fixedFireball = fireballMesh.material as THREE.MeshStandardMaterial
-		expect(fixedFireball.metalness, 'ball-substring material must flatten like other metals').to.be.lessThan(1)
-		expect(stats.metalFixed, 'only the non-ball metal flattens').to.equal(1)
-	})
-
 	it('classify keeps vr/cab flags on the mesh name (no per-material disagreement)', () => {
 		// isVr/isCab currently derive from the mesh name alone, so OR-reducing
 		// classify across a multi-material mesh cannot disagree: this documents

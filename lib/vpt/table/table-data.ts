@@ -5,15 +5,17 @@ import { BiffParser } from '../../io/biff-parser.js'
 import { getDataView } from '../../io/binary-helpers.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { Vertex2D, Vertex3D } from '../../math/vector.js'
-import {
-	DEFAULT_TABLE_CONTACTFRICTION,
-	DEFAULT_TABLE_ELASTICITY,
-	DEFAULT_TABLE_ELASTICITY_FALLOFF,
-	DEFAULT_TABLE_GRAVITY,
-	DEFAULT_TABLE_PFSCATTERANGLE,
-	GRAVITYCONST,
-} from '../../physics/constants.js'
 import { logger } from '../../util/logger.js'
+
+/** Table data defaults (upstream `PinTable` member inits; physics now lives in WASM). */
+const DEFAULT_TABLE_CONTACTFRICTION = 0.075
+const DEFAULT_TABLE_ELASTICITY = 0.25
+const DEFAULT_TABLE_ELASTICITY_FALLOFF = 0
+const DEFAULT_TABLE_GRAVITY = 0.97
+const DEFAULT_TABLE_PFSCATTERANGLE = 0
+/** VP units: 1U = 0.53975mm, 1T = 10ms, Earth g ≈ 1.81751 U/T². */
+const GRAVITYCONST = 1.81751
+
 import { handleBiffTag } from '../biff-helper.js'
 import { ItemData } from '../item-data.js'
 import { Material, SaveMaterial, SavePhysicsMaterial } from '../material.js'

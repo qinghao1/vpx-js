@@ -1,8 +1,6 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { describe, expect, it } from 'vitest'
-import { PrimitiveState } from '../../vpt/primitive/primitive-state.js'
-import { PrimitiveUpdater } from '../../vpt/primitive/primitive-updater.js'
 import { ThreeNodeMaterialGenerator } from './three-node-material-generator.js'
 
 function makeGenerator() {
@@ -88,42 +86,5 @@ describe('regression: alpha-image decals blend from the first frame', () => {
 			convertOpts,
 		)
 		expect(mat.transparent, 'opacity-inactive material must stay opaque').toBe(false)
-	})
-
-	it('script updates keep the alpha-image decal blended (creation/updater agreement)', () => {
-		// Stub BDL node material as creation now yields it (opaque pre-fix state
-		// to prove the updater restores blending instead of agreeing with it).
-		const stubMat: any = {
-			userData: {
-				__primitiveKind: 'bdl',
-				__primitiveCloned: true,
-				__uAlbedo: { value: { set() {}, getHex: () => 0xffffff } },
-				__uAlpha: { value: 1 },
-				__uBDL: { value: 0 },
-				__uLitF: { value: 1 },
-				__uCarry: { value: 0 },
-			},
-			transparent: false,
-			depthWrite: true,
-		}
-		const data = {
-			szImage: 'flipperbatshadow',
-			szLightmap: 'LM_shlnk',
-			color: 0xffffff,
-			alpha: 100,
-			disableLightingTop: 0,
-			disableLightingBelow: 0,
-			staticRendering: false,
-		} as any
-		const updater = new PrimitiveUpdater(data, new PrimitiveState())
-		const table = {
-			getMaterial: () => shadowFileMaterial(),
-			getTexture: (name: string) =>
-				name === 'flipperbatshadow' ? { isOpaque: false, getName: () => name } : undefined,
-		} as any
-		const renderApi = { applyVisibility: () => {} } as any
-		updater.applyState({ children: [{ material: stubMat }] } as any, { alpha: 100 } as any, renderApi, table)
-		expect(stubMat.transparent, 'updater must blend the alpha-image decal').toBe(true)
-		expect(stubMat.depthWrite, 'updater must keep depthWrite off for the decal').toBe(false)
 	})
 })

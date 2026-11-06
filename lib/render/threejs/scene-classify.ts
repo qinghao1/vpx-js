@@ -14,16 +14,6 @@ export const flatName = (name: string): string => name.toLowerCase().replace(/[_
 export const isCabName = (name: string): boolean => RE_CAB.test(flatName(name))
 
 /**
- * VR-room or cabinet content by node name. The viewer keeps these visible
- * despite script-driven hides (VR-authored tables hide their room via
- * `object.visible = 0` in desktop mode) in both viewer and play modes.
- */
-export function isShowcaseRoomNode(name: string | undefined): boolean {
-	if (!name) return false
-	return RE_VR.test(name) || isCabName(name)
-}
-
-/**
  * Author debug leftover (`debug_BLW3`, `debugKicker`, `surface.top-debug_*`):
  * a `debug` token at a name boundary. Matched against the raw name (not the
  * flattened form) so `topdebug` would not match while `top-debug` does.
@@ -120,12 +110,6 @@ export const isBasePlayfield = (meshName: string, info: { isBakedMat: boolean })
 // The generated slab itself (three-playfield-mesh-generator), as opposed to
 // authored `primitive-*` extras sharing the footprint.
 export const isGeneratedPlayfieldBase = (meshName: string): boolean => meshName.toLowerCase() === 'playfield_base'
-// Meshes whose UVs are the planar playfield mapping 1:1: the generated slab
-// and the authored `playfield_mesh` collision/decoy primitive (same footprint,
-// same planar UVs). Only these qualify as planar-UV backdrop-tap sources —
-// baked `BM_Playfield` meshes carry atlas-space lightmap UVs instead.
-export const isPlanarPlayfieldMesh = (meshName: string | undefined): boolean =>
-	!!meshName && (meshName === 'playfield_base' || meshName === 'primitive-playfield_mesh')
 // The authored playfield collision mesh, by engine/item name (scene nodes
 // carry a group prefix, e.g. `primitive-playfield_mesh`). vpx-js renders the
 // playfield through the generated base slab instead and force-hides this

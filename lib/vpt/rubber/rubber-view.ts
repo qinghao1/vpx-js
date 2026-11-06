@@ -1,11 +1,14 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { MathUtils } from 'three'
+import { degToRad } from '../../math/angle.js'
 import { Matrix3D } from '../../math/matrix.js'
 import { Vertex3D } from '../../math/vector.js'
-import { HIT_SHAPE_DETAIL_LEVEL } from '../../physics/constants.js'
 import type { IRenderApi } from '../../render/irender-api.js'
+
+/** Mesh tessellation detail (upstream `HitShapeDetailLevel` default). */
+const HIT_SHAPE_DETAIL_LEVEL = 7.0
+
 import { isLowQuality } from '../../util/quality.js'
 import { SplineVertex } from '../../util/spline-vertex.js'
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
@@ -144,10 +147,10 @@ export class RubberMeshGenerator {
 		const height = createHitShape ? this.data.hitHeight : this.data.height
 		const fullMatrix = new Matrix3D()
 		const tempMat = new Matrix3D()
-		fullMatrix.rotateZMatrix(MathUtils.degToRad(this.data.rotZ))
-		tempMat.rotateYMatrix(MathUtils.degToRad(this.data.rotY))
+		fullMatrix.rotateZMatrix(degToRad(this.data.rotZ))
+		tempMat.rotateYMatrix(degToRad(this.data.rotY))
 		fullMatrix.multiply(tempMat)
-		tempMat.rotateXMatrix(MathUtils.degToRad(this.data.rotX))
+		tempMat.rotateXMatrix(degToRad(this.data.rotX))
 		fullMatrix.multiply(tempMat)
 
 		const vertMatrix = new Matrix3D()
@@ -209,15 +212,15 @@ export class RubberUpdater extends ItemUpdater<RubberState> {
 		// V(data)·RH·N = V(state)·RH, i.e. N = RH·V(data)⁻¹·V(state)·RH. The Z-mirror
 		// conjugation flips X/Y rotation signs and Z translations (Z rotation is invariant),
 		// and R(data)⁻¹·R(state) expands without an inverse since R = Rz·Ry·Rx.
-		const rot = Matrix3D.claim().rotateXMatrix(MathUtils.degToRad(this.data.rotX))
+		const rot = Matrix3D.claim().rotateXMatrix(degToRad(this.data.rotX))
 		const tmp = Matrix3D.claim()
-		tmp.rotateYMatrix(MathUtils.degToRad(this.data.rotY))
+		tmp.rotateYMatrix(degToRad(this.data.rotY))
 		rot.multiply(tmp)
-		tmp.rotateZMatrix(MathUtils.degToRad(this.state.rotZ - this.data.rotZ))
+		tmp.rotateZMatrix(degToRad(this.state.rotZ - this.data.rotZ))
 		rot.multiply(tmp)
-		tmp.rotateYMatrix(MathUtils.degToRad(-this.state.rotY))
+		tmp.rotateYMatrix(degToRad(-this.state.rotY))
 		rot.multiply(tmp)
-		tmp.rotateXMatrix(MathUtils.degToRad(-this.state.rotX))
+		tmp.rotateXMatrix(degToRad(-this.state.rotX))
 		rot.multiply(tmp)
 		const m = Matrix3D.claim()
 		tmp.setTranslation(-this.middlePoint.x, -this.middlePoint.y, this.data.height + table.getTableHeight())

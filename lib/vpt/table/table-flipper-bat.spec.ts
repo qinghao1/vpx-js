@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { TestRenderApi } from '../../../test/test-render-api.js'
-import { Player } from '../../game/player.js'
 import type { Matrix3D } from '../../math/matrix.js'
 import { Vertex2D, Vertex3D } from '../../math/vector.js'
 import type { Primitive } from '../primitive/primitive.js'
@@ -23,9 +22,7 @@ function buildFlipperBatTable(): Table {
 		.build()
 }
 
-function captureUpdaterDelta(table: Table, prim: Primitive, player: Player): Matrix3D | null {
-	const states = player.popStates()
-	const diff = states.getState<PrimitiveState>('BatLeft')
+function captureUpdaterDelta(table: Table, prim: Primitive, diff: PrimitiveState): Matrix3D | null {
 	const renderApi = new TestRenderApi()
 	let captured: Matrix3D | null = null
 	const orig = renderApi.applyMatrixToNode.bind(renderApi)
@@ -34,7 +31,6 @@ function captureUpdaterDelta(table: Table, prim: Primitive, player: Player): Mat
 		return orig(matrix as any, node as any)
 	}) as any
 	prim.getUpdater().applyState({} as any, diff as any, renderApi as any, table)
-	diff.release()
 	return captured
 }
 
@@ -50,11 +46,11 @@ describe('flipper-bat primitives keep upstream rotation semantics (no load-time 
 	it('script clear-and-drive at rest yields identity updater delta (no jump, no double)', () => {
 		const table = buildFlipperBatTable()
 		const prim = table.primitives.BatLeft
-		const player = new Player(table).init()
-		const api = prim.getApi() as unknown as Record<string, number>
-		api.ObjRotZ = 0
-		api.RotZ = REST_ANGLE
-		const captured = captureUpdaterDelta(table, prim, player)
+		// Former script drive `ObjRotZ = 0; RotZ = REST_ANGLE` wrote state directly.
+		const captured = captureUpdaterDelta(table, prim, {
+			rotation: { x: 0, y: 0, z: REST_ANGLE },
+			objectRotation: { x: 0, y: 0, z: 0 },
+		} as PrimitiveState)
 		expect(captured).not.toBeNull()
 		const elements = (captured as Matrix3D).elements
 		expect(elements[0]).toBeCloseTo(1, 3)
@@ -66,11 +62,11 @@ describe('flipper-bat primitives keep upstream rotation semantics (no load-time 
 	it('mid-swing drive renders the absolute upstream angle', () => {
 		const table = buildFlipperBatTable()
 		const prim = table.primitives.BatLeft
-		const player = new Player(table).init()
-		const api = prim.getApi() as unknown as Record<string, number>
-		api.ObjRotZ = 0
-		api.RotZ = SWING_ANGLE
-		const captured = captureUpdaterDelta(table, prim, player)
+		// Former script drive `ObjRotZ = 0; RotZ = SWING_ANGLE` wrote state directly.
+		const captured = captureUpdaterDelta(table, prim, {
+			rotation: { x: 0, y: 0, z: SWING_ANGLE },
+			objectRotation: { x: 0, y: 0, z: 0 },
+		} as PrimitiveState)
 		expect(captured).not.toBeNull()
 		const elements = (captured as Matrix3D).elements
 		const rendered = REST_ANGLE + (Math.atan2(elements[1], elements[0]) * 180) / Math.PI

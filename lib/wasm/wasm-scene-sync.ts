@@ -50,20 +50,9 @@ export interface SyncScene<NODE> {
 	plungerFrameCount(partIdx: number): number
 }
 
-/**
- * Host policy for engine state the scene must not honor. `neverHide` names
- * part indices the engine must never hide: room/cabinet content that
- * authors and scripts hide on desktop, but this showcase viewer keeps
- * visible in both viewer and play modes. Everything else in the row
- * still applies.
- */
+/** Host policy for engine state the scene must not honor; everything else in the row still applies. */
 export interface WasmSyncPolicy {
-	neverHide?: (partIdx: number) => boolean
-	/**
-	 * Parts the engine must never show: host-hidden nodes (e.g. the
-	 * force-hidden playfield decoy the generated base slab replaces).
-	 * Wins over the row and over neverHide; other row state still applies.
-	 */
+	/** Parts the engine must never show (e.g. the playfield decoy the generated base slab replaces). */
 	neverShow?: (partIdx: number) => boolean
 	/**
 	 * Current script image name for a flasher part, once the bridge exposes
@@ -136,16 +125,8 @@ export class WasmSceneSync<NODE, GEOMETRY, POINT_LIGHT> {
 		private readonly policy: WasmSyncPolicy = {},
 	) {}
 
-	private keepVisible(partIdx: number): boolean {
-		try {
-			return this.policy.neverHide?.(partIdx) === true
-		} catch {
-			return false
-		}
-	}
-
 	private resolveVisible(rowVisible: boolean, partIdx: number): boolean {
-		return (rowVisible || this.keepVisible(partIdx)) && !this.neverShow(partIdx)
+		return rowVisible && !this.neverShow(partIdx)
 	}
 
 	private neverShow(partIdx: number): boolean {

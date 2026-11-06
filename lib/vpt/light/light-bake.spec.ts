@@ -5,8 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { Vertex2D, Vertex3D } from '../../math/vector.js'
 import { DragPoint } from '../dragpoint.js'
 import { Enums } from '../enums.js'
-import { Light, LightData } from './light.js'
-import { bakedIntensity } from './light-physics.js'
+import { bakedIntensity, Light, LightData } from './light.js'
 
 function mkData(over: Partial<LightData> = {}): LightData {
 	const d = new LightData('L1')
@@ -61,12 +60,6 @@ describe('bakedIntensity', () => {
 })
 
 describe('light bake sites agree', () => {
-	it('seeds the ctor state from the baked level', () => {
-		expect(new Light(mkData({ state: 0.5, intensity: 10 })).getState().intensity).toBe(5)
-		expect(new Light(mkData({ state: 2, intensity: 10, rgBlinkPattern: '01' })).getState().intensity).toBe(0)
-		expect(new Light(mkData({ state: Enums.LightStatus.LightStateOn, intensity: 4 })).getState().intensity).toBe(4)
-	})
-
 	it('bakes the glow params from the baked level, not isOn()', () => {
 		const mockApi: any = { createBulbGlowGeometry: () => ({}) }
 		// Fractional: the old isOn() gate baked 0 while the ctor baked 5.

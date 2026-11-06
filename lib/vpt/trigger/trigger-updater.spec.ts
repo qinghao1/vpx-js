@@ -7,7 +7,6 @@ import { spy } from 'sinon'
 import sinonChai from 'sinon-chai'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { TestRenderApi } from '../../../test/test-render-api.js'
-import { Player } from '../../game/player.js'
 import type { IRenderApi } from '../../render/irender-api.js'
 import type { Table } from '../table/table.js'
 import type { TriggerState } from './trigger-state.js'
@@ -16,21 +15,9 @@ chai.use((sinonChai as any).default ?? sinonChai)
 
 describe('The VPinball trigger updater', () => {
 	let table: Table
-	let player: Player
 
 	beforeEach(() => {
 		table = new TableBuilder().addMaterial('mat').addTrigger('trigger').build()
-
-		// init player
-		player = new Player(table).init()
-	})
-
-	it('should update visibility', async () => {
-		table.triggers.trigger.getApi().Visible = false
-		const states = player.popStates()
-
-		expect(states.getState<TriggerState>('trigger').isVisible).to.equal(false)
-		states.getState<TriggerState>('trigger').release()
 	})
 
 	it('should apply visibility', async () => {

@@ -1,7 +1,7 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { MathUtils } from 'three'
+import { degToRad } from '../../math/angle.js'
 import { Matrix3D } from '../../math/matrix.js'
 import { CatmullCurve2D } from '../../util/catmull-curve.js'
 import { RenderVertex, Vertex3DNoTex2 } from '../../util/vertex.js'
@@ -92,9 +92,9 @@ export class FlasherMeshGenerator {
 		}
 
 		const m1 = Matrix3D.claim().setTranslation(-centerX, -centerY, 0)
-		const rz = Matrix3D.claim().rotateZMatrix(MathUtils.degToRad(data.rotZ))
-		const ry = Matrix3D.claim().rotateYMatrix(MathUtils.degToRad(data.rotY))
-		const rx = Matrix3D.claim().rotateXMatrix(MathUtils.degToRad(data.rotX))
+		const rz = Matrix3D.claim().rotateZMatrix(degToRad(data.rotZ))
+		const ry = Matrix3D.claim().rotateYMatrix(degToRad(data.rotY))
+		const rx = Matrix3D.claim().rotateXMatrix(degToRad(data.rotX))
 		const m2 = Matrix3D.claim().setTranslation(
 			centerX,
 			centerY,

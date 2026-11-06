@@ -4,59 +4,17 @@ import * as chai from 'chai'
 import { expect } from 'chai'
 import sinonChai from 'sinon-chai'
 import * as THREE from 'three'
-import { TableBuilder } from '../../../test/table-builder.js'
 import { _resetQualityCache, isLowQuality } from '../../util/quality.js'
-import { Mesh } from '../../vpt/mesh.js'
 import type { Table } from '../../vpt/table/table.js'
 import { batchStaticOpaques, canBatch } from './three-batched-builder.js'
-import { ThreeRenderApi } from './three-render-api.js'
+import type { ThreeRenderApi } from './three-render-api.js'
 
 chai.use((sinonChai as any).default ?? sinonChai)
 
-function makeMesh(name, geometry, mat) {
+function makeMesh(name: string, geometry: THREE.BufferGeometry, mat: THREE.Material): THREE.Mesh {
 	const mesh = new THREE.Mesh(geometry, mat)
 	mesh.name = name
 	return mesh
-}
-function batchBatchedPair(): { groupB: THREE.Group; meshB: THREE.Mesh; batched: any } {
-	const root = new THREE.Group()
-	root.name = 'table'
-	const mockTable = {
-		getMovables: () => [],
-		getAnimatables: () => [],
-		getSurfaceHeight: () => 0,
-		getScaleZ: () => 1,
-		primitives: {},
-		rubbers: {},
-		lights: {},
-		flashers: {},
-		textboxes: {},
-		getDimensions: () => ({ width: 100, height: 100 }),
-	}
-	const matA = new THREE.MeshStandardMaterial({ color: 0x112233 })
-	matA.name = 'material:shared'
-	const matB = matA.clone()
-	matB.name = 'material:shared'
-	const groupA = new THREE.Group()
-	groupA.name = 'kicker1'
-	groupA.add(makeMesh('kicker-kicker1', new THREE.BoxGeometry(10, 10, 1, 4, 4, 4), matA))
-	const groupB = new THREE.Group()
-	groupB.name = 'kicker2'
-	const meshB = makeMesh('kicker-kicker2', new THREE.BoxGeometry(10, 10, 1, 4, 4, 4), matB) as THREE.Mesh
-	groupB.add(meshB)
-	root.add(groupA)
-	root.add(groupB)
-	root.updateMatrixWorld(true)
-	const api = { getMapGenerator: () => ({ getCache: () => new Map() }), getMaterialGenerator: () => ({}) }
-	const buckets = batchStaticOpaques(root, mockTable as unknown as Table, api as unknown as ThreeRenderApi)
-	expect(buckets).to.equal(1)
-	expect(meshB.visible).to.equal(false)
-	let batched: any
-	root.traverse(o => {
-		if ((o as any).isBatchedMesh) batched = o
-	})
-	expect(batched, 'a BatchedMesh must own the pair').to.not.equal(undefined)
-	return { groupB, meshB, batched }
 }
 
 describe('regression: artifact batching', () => {
@@ -95,7 +53,7 @@ describe('regression: artifact batching', () => {
 		woodMesh1.position.set(20, 0, 0)
 		woodMesh1.updateMatrixWorld(true)
 		const woodMesh2 = makeMesh('primitive-wood2', woodGeom.clone(), woodMat.clone())
-		woodMesh2.material.name = 'Wood'
+		;(woodMesh2.material as THREE.Material).name = 'Wood'
 		woodMesh2.position.set(40, 0, 0)
 		woodMesh2.updateMatrixWorld(true)
 		root.add(woodMesh1)
@@ -103,7 +61,7 @@ describe('regression: artifact batching', () => {
 		root.updateMatrixWorld(true)
 		expect(bakedMesh.visible).to.equal(true)
 		const api = { getMapGenerator: () => ({ getCache: () => new Map() }), getMaterialGenerator: () => ({}) }
-		const res = batchStaticOpaques(root, mockTable as unknown as Table, api as unknown as ThreeRenderApi)
+		batchStaticOpaques(root, mockTable as unknown as Table, api as unknown as ThreeRenderApi)
 		expect(bakedMesh.visible).to.equal(true)
 		let batchedBaked = false
 		root.traverse(o => {
@@ -119,6 +77,7 @@ describe('regression: artifact batching', () => {
 		})
 		expect(batchedBaked).to.equal(false)
 	})
+
 	it('transparent meshes must never batch, even in low-quality mode', () => {
 		const root = new THREE.Group()
 		root.name = 'table'
@@ -173,46 +132,5 @@ describe('regression: artifact batching', () => {
 			else delete (globalThis as any).location
 			_resetQualityCache()
 		}
-	})
-	it('script material writes must unbatch the hidden original', () => {
-		// Kickers batch (not movable/animatable) and take unconditional script
-		// material state, so a write must restore the original and hide the stale copy.
-		const { groupB, meshB, batched } = batchBatchedPair()
-		const slot = meshB.userData.__batched.instanceId as number
-		const table = new TableBuilder().addMaterial('newMat', { baseColor: 0xff0000 }).build()
-		const api = new ThreeRenderApi({ applyMaterials: true } as any)
-		api.applyMaterial(groupB, table.getMaterial('newMat'))
-		expect(meshB.visible, 'written mesh must become visible').to.equal(true)
-		expect(meshB.userData.__batched, 'write must release the batch slot').to.equal(undefined)
-		expect(batched.getVisibleAt(slot), 'stale batch copy must hide').to.equal(false)
-		expect((meshB.material as THREE.MeshStandardMaterial).color.getHex()).to.equal(0xff0000)
-	})
-	it('script mesh writes must unbatch the hidden original', () => {
-		const { meshB, batched } = batchBatchedPair()
-		const slot = meshB.userData.__batched.instanceId as number
-		const vertCount = (meshB.geometry as THREE.BufferGeometry).getAttribute('position').count
-		const verts: number[][] = []
-		for (let vertIndex = 0; vertIndex < vertCount; vertIndex++) verts.push([vertIndex, 0, 0, 0, 0, 1, 0, 0])
-		const api = new ThreeRenderApi({ applyMaterials: true } as any)
-		api.applyMeshToNode(Mesh.fromArray(verts, []), meshB)
-		expect(meshB.visible, 'written mesh must become visible').to.equal(true)
-		expect(meshB.userData.__batched, 'write must release the batch slot').to.equal(undefined)
-		expect(batched.getVisibleAt(slot), 'stale batch copy must hide').to.equal(false)
-	})
-	it('script-driven shows reach initially-hidden meshes (Royal Flush slings/options)', () => {
-		// Royal Flush 76 authors slingshot rubbers and option ramps hidden
-		// and shows them from script (RSling1.Visible = 1,
-		// Option1.visible = true). Only bulb-glow quads carry a sticky
-		// authored stamp; plain meshes must follow the live flag.
-		const api = new ThreeRenderApi({ applyMaterials: true } as any)
-		const group = new THREE.Group()
-		group.name = 'lsling1'
-		const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0xffffff }))
-		mesh.name = 'lsling1-mesh'
-		mesh.visible = false
-		group.visible = false
-		group.add(mesh)
-		api.applyVisibility(true, group)
-		expect(mesh.visible, 'script show must reveal initially-hidden sling').to.equal(true)
 	})
 })

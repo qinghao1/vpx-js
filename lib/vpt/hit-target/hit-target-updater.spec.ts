@@ -7,7 +7,6 @@ import { spy } from 'sinon'
 import sinonChai from 'sinon-chai'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { TestRenderApi } from '../../../test/test-render-api.js'
-import { Player } from '../../game/player.js'
 import type { Matrix3D } from '../../math/matrix.js'
 import { Vertex3D } from '../../math/vector.js'
 import type { Table } from '../table/table.js'
@@ -25,21 +24,9 @@ class CapturingRenderApi extends TestRenderApi {
 
 describe('The VPinball hit target updater', () => {
 	let table: Table
-	let player: Player
 
 	beforeEach(() => {
 		table = new TableBuilder().addMaterial('opaque', { isOpacityActive: false }).addHitTarget('target').build()
-
-		// init player
-		player = new Player(table).init()
-	})
-
-	it('should update visibility', async () => {
-		table.hitTargets.target.getApi().Visible = false
-		const states = player.popStates()
-
-		expect(states.getState<HitTargetState>('target').isVisible).to.equal(false)
-		states.getState<HitTargetState>('target').release()
 	})
 
 	it('should apply visibility', async () => {

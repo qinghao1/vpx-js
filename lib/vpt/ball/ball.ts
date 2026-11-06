@@ -1,49 +1,31 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { EventProxy } from '../../game/event-proxy.js'
-import type { IMovable, IPlayable, IRenderable, IScriptable, Meshes } from '../../game/interfaces.js'
-import type { Player } from '../../game/player.js'
 import { Matrix3D } from '../../math/matrix.js'
 import { Vertex3D } from '../../math/vector.js'
-import type { HitObject } from '../../physics/hit-object.js'
-import type { IRenderApi } from '../../render/irender-api.js'
+import type { IRenderApi, Meshes, RenderInfo } from '../../render/irender-api.js'
 import { Material } from '../material.js'
+import type { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
 import { Texture } from '../texture.js'
-import { BallApi } from './ball-api.js'
 import type { BallData } from './ball-data.js'
-import { BallHit } from './ball-hit.js'
 import { BallMeshGenerator } from './ball-mesh-generator.js'
-import type { BallMover } from './ball-mover.js'
 import type { BallState } from './ball-state.js'
 import { BallUpdater } from './ball-updater.js'
 
-/** Runtime ball — playable, movable and renderable. @see https://github.com/vpinball/vpinball/blob/master/ball.cpp */
-export class Ball implements IPlayable, IMovable, IRenderable<BallState>, IScriptable<BallApi> {
+/** Runtime ball — renderable WASM snapshot. @see https://github.com/vpinball/vpinball/blob/master/ball.cpp */
+export class Ball {
 	public static idCounter = 0
 	public oldVel = new Vertex3D()
-	public readonly hit: BallHit
 	private readonly meshGenerator: BallMeshGenerator
-	private readonly events: EventProxy
-	private readonly api: BallApi
 	private readonly updater: BallUpdater
-	get coll() {
-		return this.hit.coll
-	}
 
 	constructor(
 		public id: number,
 		public readonly data: BallData,
 		public readonly state: BallState,
-		initialVelocity: Vertex3D,
-		player: Player,
-		table: Table,
 	) {
 		this.meshGenerator = new BallMeshGenerator(data)
-		this.events = new EventProxy(this)
-		this.hit = new BallHit(this, this.data, this.state, initialVelocity, table.data!)
-		this.api = new BallApi(this, this.state, this.hit, this.data, this.events, player, table)
 		this.updater = new BallUpdater(this.state, this.data)
 	}
 
@@ -53,24 +35,11 @@ export class Ball implements IPlayable, IMovable, IRenderable<BallState>, IScrip
 	public getState(): BallState {
 		return this.state
 	}
-	public getMover(): BallMover {
-		return this.hit.getMoverObject()
-	}
 	public getUpdater(): BallUpdater {
 		return this.updater
 	}
-	public getApi(): BallApi {
-		return this.api
-	}
-	public getHitShapes(): HitObject[] {
-		return [this.hit]
-	}
 	public isCollidable(): boolean {
 		return true
-	}
-	public setupPlayer(): void {}
-	public getEventNames(): string[] {
-		return []
 	}
 
 	public async addToScene<NODE, GEOMETRY, POINT_LIGHT>(

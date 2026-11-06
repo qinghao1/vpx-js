@@ -8,7 +8,6 @@ import sinonChai from 'sinon-chai'
 import { MathUtils } from 'three'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { TestRenderApi } from '../../../test/test-render-api.js'
-import { Player } from '../../game/player.js'
 import type { Matrix3D } from '../../math/matrix.js'
 import type { IRenderApi } from '../../render/irender-api.js'
 import type { Table } from '../table/table.js'
@@ -26,7 +25,6 @@ class CapturingRenderApi extends TestRenderApi {
 
 describe('The VPinball bumper updater', () => {
 	let table: Table
-	let player: Player
 
 	beforeEach(() => {
 		table = new TableBuilder()
@@ -45,33 +43,6 @@ describe('The VPinball bumper updater', () => {
 				szSkirtMaterial: 'static',
 			})
 			.build()
-
-		// init player
-		player = new Player(table).init()
-	})
-
-	it('should not update visibility when opacity is disabled', () => {
-		table.bumpers.b1.getApi().CapVisible = false
-		table.bumpers.b1.getApi().RingVisible = false
-		table.bumpers.b2.getApi().BaseVisible = false
-		table.bumpers.b2.getApi().SkirtVisible = false
-		const states = player.popStates()
-		expect(states.getState<BumperState>('b1')).not.to.be.ok
-		expect(states.getState<BumperState>('b2')).not.to.be.ok
-	})
-
-	it('should update visibility when static rendering is disabled', () => {
-		table.bumpers.b2.getApi().CapVisible = false
-		table.bumpers.b2.getApi().RingVisible = false
-		table.bumpers.b1.getApi().BaseVisible = false
-		table.bumpers.b1.getApi().SkirtVisible = false
-		const states = player.popStates()
-		expect(states.getState<BumperState>('b2').isCapVisible).to.equal(false)
-		expect(states.getState<BumperState>('b2').isRingVisible).to.equal(false)
-		expect(states.getState<BumperState>('b1').isBaseVisible).to.equal(false)
-		expect(states.getState<BumperState>('b1').isSkirtVisible).to.equal(false)
-		states.getState<BumperState>('b1').release()
-		states.getState<BumperState>('b2').release()
 	})
 
 	it('should apply visibility', async () => {

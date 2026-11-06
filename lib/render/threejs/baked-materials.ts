@@ -190,8 +190,10 @@ export const createBakedMaterialResolver = (): ((
 	return (base: THREE.MeshStandardMaterial, meshLower: string): THREE.MeshStandardMaterial => {
 		const matName = (base.name ?? '').toLowerCase()
 		const pending = pendingOf(base)
-		const mapPre = ((base.map as THREE.Texture | undefined)?.name ?? pending).toLowerCase()
 		const baseUserData = base.userData as CustomMaterialUserData | undefined
+		const boundName =
+			(base.map as THREE.Texture | undefined)?.name ?? (baseUserData?.__mapName as string | undefined) ?? ''
+		const mapPre = (boundName || pending).toLowerCase()
 		const bakedFlag = !!baseUserData?.__isBaked
 		const addBlend = !!baseUserData?.__addBlend
 		const { isMainBake, isVlmBake, needsAlpha } = classify(meshLower, matName, mapPre, bakedFlag, addBlend)
@@ -200,18 +202,22 @@ export const createBakedMaterialResolver = (): ((
 		const alpha = !isMainBake && !isRamp && !isApron && needsAlpha
 		const kind = resolveBakedKind(isMainBake, isVlmBake, meshLower, alpha)
 		const role = `${isApron ? 'a' : 'x'}|${isRamp ? 'r' : 'x'}|${needsAlpha ? 'n' : 'x'}`
-		const key = `${base.name}|${(base.map as THREE.Texture | undefined)?.name ?? ''}|${pending}|${kind}|${base.polygonOffset ? `${base.polygonOffsetFactor}/${base.polygonOffsetUnits}` : '0'}|${role}`
+		const key = `${base.name}|${boundName}|${pending}|${kind}|${base.polygonOffset ? `${base.polygonOffsetFactor}/${base.polygonOffsetUnits}` : '0'}|${role}`
 		const cached = bakedCache.get(key)
 		if (cached) return cached
 		const cloned = cloneMaterialForWrite(base) as THREE.MeshStandardMaterial
 		const clonedUserData = cloned.userData as CustomMaterialUserData | undefined
+		const clonedTex =
+			(cloned.map as THREE.Texture | undefined) ?? (clonedUserData?.__map as THREE.Texture | undefined)
 		if (kind === 'main') {
-			fixBaked(cloned, cloned.map as THREE.Texture | undefined)
-			if (!isBakedNodeMaterial(cloned) && !cloned.map && pending) {
+			fixBaked(cloned, clonedTex)
+			if (!isBakedNodeMaterial(cloned) && !clonedTex && pending) {
+				// Emit nothing pre-arrival (matches the node path's
+				// BAKED_PLACEHOLDER_ALPHA = 0): a white flash is worse.
 				cloned.color.set(0x000000)
-				if (!cloned.emissive) cloned.emissive = new THREE.Color(0xffffff)
-				else cloned.emissive.set(0xffffff)
-				cloned.emissiveIntensity = BAKED_EMISSIVE
+				if (!cloned.emissive) cloned.emissive = new THREE.Color(0x000000)
+				else cloned.emissive.set(0x000000)
+				cloned.emissiveIntensity = 0
 			}
 			cloned.transparent = false
 			if (!(cloned.alphaTest > 0)) cloned.alphaTest = 0
@@ -234,7 +240,7 @@ export const createBakedMaterialResolver = (): ((
 			cloned.toneMapped = false
 			cloned.needsUpdate = true
 		} else if (kind === 'overlay_gi' || kind === 'overlay_off') {
-			fixBaked(cloned, cloned.map as THREE.Texture | undefined)
+			fixBaked(cloned, clonedTex)
 			if (clonedUserData?.__primitiveKind === PRIMITIVE_ADDITIVE_KIND) {
 				updatePrimitiveAdditive(cloned, { intensity: kind === 'overlay_gi' ? 1 : 0 })
 			} else {
@@ -280,13 +286,16 @@ export const createVrMaterialResolver = (): ((
 	const vrCache = new Map<string, THREE.MeshStandardMaterial>()
 	return (base: THREE.MeshStandardMaterial, meshLower = ''): THREE.MeshStandardMaterial => {
 		const pending = pendingOf(base)
+		const baseUserData = base.userData as CustomMaterialUserData | undefined
+		const boundName =
+			(base.map as THREE.Texture | undefined)?.name ?? (baseUserData?.__mapName as string | undefined) ?? pending
 		const isCab = isCabName(meshLower)
-		const key = `${base.name}|${(base.map as THREE.Texture | undefined)?.name ?? pending}|${base.polygonOffset ? `${base.polygonOffsetFactor}/${base.polygonOffsetUnits}` : '0'}|${isCab ? 'cab' : 'vr'}`
+		const key = `${base.name}|${boundName}|${base.polygonOffset ? `${base.polygonOffsetFactor}/${base.polygonOffsetUnits}` : '0'}|${isCab ? 'cab' : 'vr'}`
 		const cached = vrCache.get(key)
 		if (cached) return cached
 		const cloned = cloneMaterialForWrite(base) as THREE.MeshStandardMaterial
 		fixVr(cloned, isCab)
-		const hasPending = !!pending && !base.map
+		const hasPending = !!pending && !base.map && !baseUserData?.__map
 		// Baked node materials hide pre-arrival pixels in-shader (placeholder
 		// alpha) and the map bind never restores opacity, so skip the zeroing.
 		if (hasPending && !isBakedNodeMaterial(base)) {

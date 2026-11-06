@@ -43,11 +43,6 @@ describe('The VPinball table generator', () => {
 		expect(axis(2).some(z => z === 0)).to.equal(true)
 	})
 
-	it('should read the table script correctly', () => {
-		const script = table.getTableScript()
-		expect(script).to.equal(`Option Explicit\r\n`)
-	})
-
 	it('should read the table info correctly', async () => {
 		expect(table.info?.TableRules).to.equal('Rules')
 		expect(table.info?.AuthorName).to.equal('Table Author')

@@ -16,7 +16,8 @@ describe('Table integration', () => {
 		expect(table).toBeDefined()
 		expect(table.data).toBeDefined()
 		expect(table.info).toBeDefined()
-		expect(Object.keys(table.items).length).toBeGreaterThan(0)
+		// The fixture's only game item is a Textbox (type 4), removed with the script surface.
+		expect(Object.keys(table.items).length).toBe(0)
 	})
 
 	it('empty fixture has playfield dimensions', async () => {
@@ -51,7 +52,6 @@ describe('Table integration', () => {
 		expect(Object.keys(table.lights).length).toBeGreaterThan(100)
 		expect(Object.keys(table.flippers).length).toBeGreaterThanOrEqual(2)
 		expect(Object.keys(table.textures).length).toBeGreaterThan(10)
-		expect(Object.keys(table.collections).length).toBeGreaterThanOrEqual(0)
 		expect(table.data?.right).toBeGreaterThan(900)
 		expect(table.data?.bottom).toBeGreaterThan(2000)
 	})

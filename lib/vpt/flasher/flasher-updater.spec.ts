@@ -1,4 +1,4 @@
-import { AdditiveBlending, NoBlending, OneFactor } from 'three'
+import { NoBlending, OneFactor, ReverseSubtractEquation, SrcAlphaFactor } from 'three'
 import { describe, expect, it } from 'vitest'
 import { TableBuilder } from '../../../test/table-builder.js'
 import { TestRenderApi } from '../../../test/test-render-api.js'
@@ -354,7 +354,8 @@ describe('The VPinball flasher mesh generator and updater', () => {
 		data.addBlendMode = FlasherAddBlend.Add
 		updater.applyState(node, state, renderApi, table)
 		expect(material.userData.__blend).toBe('additive')
-		expect(material.blending).toBe(AdditiveBlending)
+		expect(material.blendEquation).toBe(ReverseSubtractEquation)
+		expect(material.blendSrc).toBe(SrcAlphaFactor)
 		expect(material.version).toBe(1)
 
 		updater.applyState(node, state, renderApi, table)
@@ -381,7 +382,8 @@ describe('The VPinball flasher mesh generator and updater', () => {
 		data.addBlendMode = FlasherAddBlend.Add
 		updater.applyState(node, state, renderApi, table)
 		expect(material.userData.__blend).toBe('additive')
-		expect(material.blending).toBe(AdditiveBlending)
+		expect(material.blendEquation).toBe(ReverseSubtractEquation)
+		expect(material.blendSrc).toBe(SrcAlphaFactor)
 		expect(material.version).toBe(4)
 	})
 

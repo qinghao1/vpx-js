@@ -1,45 +1,26 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-import { MathUtils } from 'three'
 
-import { EventProxy } from '../../game/event-proxy.js'
-import type {
-	IAnimatable,
-	IAnimation,
-	IHittable,
-	IMovable,
-	IPlayable,
-	IRenderable,
-	IScriptable,
-	Meshes,
-} from '../../game/interfaces.js'
-import type { Player } from '../../game/player.js'
 import type { Storage } from '../../io/ole-doc.js'
+import { degToRad } from '../../math/angle.js'
 import { Matrix3D } from '../../math/matrix.js'
 import type { Vertex2D } from '../../math/vector.js'
-import type { HitObject } from '../../physics/hit-object.js'
+import type { Meshes, RenderInfo } from '../../render/irender-api.js'
 import { Item } from '../item.js'
+import type { Material } from '../material.js'
+import type { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
-import { FlipperAnimation } from './flipper-animation.js'
-import { FlipperApi } from './flipper-api.js'
+import type { Texture } from '../texture.js'
 import { FlipperData } from './flipper-data.js'
-import { FlipperHit } from './flipper-hit.js'
 import { FlipperMesh } from './flipper-mesh.js'
-import type { FlipperMover } from './flipper-mover.js'
 import { FlipperState } from './flipper-state.js'
 import { FlipperUpdater } from './flipper-updater.js'
 
 /** @see https://github.com/vpinball/vpinball/blob/master/flipper.cpp */
-export class Flipper
-	extends Item<FlipperData>
-	implements IRenderable<FlipperState>, IPlayable, IMovable, IHittable, IScriptable<FlipperApi>, IAnimatable
-{
+export class Flipper extends Item<FlipperData> {
 	private readonly mesh: FlipperMesh
 	private readonly state: FlipperState
 	private readonly updater: FlipperUpdater
-	private readonly animation: FlipperAnimation
-	private hit?: FlipperHit
-	private api?: FlipperApi
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<Flipper> {
 		const data = await FlipperData.fromStorage(storage, itemName)
@@ -51,7 +32,7 @@ export class Flipper
 		this.mesh = new FlipperMesh()
 		this.state = FlipperState.claim(
 			this.getName(),
-			MathUtils.degToRad(this.data.startAngle),
+			degToRad(this.data.startAngle),
 			this.data.center.clone(),
 			this.data.isVisible,
 			this.data.szMaterial!,
@@ -59,31 +40,13 @@ export class Flipper
 			this.data.szRubberMaterial!,
 		)
 		this.updater = new FlipperUpdater(this.data, this.state)
-		this.animation = new FlipperAnimation(this.state)
 	}
 
 	public isCollidable(): boolean {
 		return true
 	}
-	public getMover(): FlipperMover {
-		return this.hit?.getMoverObject()
-	}
 	public getState(): FlipperState {
 		return this.state
-	}
-
-	public setupPlayer(player: Player, table: Table): void {
-		this.events = new EventProxy(this)
-		this.hit = FlipperHit.getInstance(this.data, this.state, this.events, player.getPhysics(), table)
-		this.api = new FlipperApi(this.data, this.state, this.hit, this.getMover(), this.events, player, table)
-		this.animation.setEvents(this.events)
-	}
-
-	public getApi(): FlipperApi {
-		return this.api!
-	}
-	public getHitShapes(): HitObject[] {
-		return [this.hit!]
 	}
 
 	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {
@@ -112,17 +75,9 @@ export class Flipper
 
 	private getMatrix(rotation: number = this.data.startAngle): Matrix3D {
 		const trafoMatrix = new Matrix3D().setTranslation(this.data.center.x, this.data.center.y, 0)
-		const rotMatrix = new Matrix3D().rotateZMatrix(MathUtils.degToRad(rotation))
+		const rotMatrix = new Matrix3D().rotateZMatrix(degToRad(rotation))
 		rotMatrix.multiply(trafoMatrix)
 		return rotMatrix
-	}
-
-	public getEventNames(): string[] {
-		return ['Init', 'Timer', 'LimitEOS', 'LimitBOS', 'Hit', 'Collide', 'Animate']
-	}
-
-	public getAnimation(): IAnimation {
-		return this.animation
 	}
 
 	public getUpdater(): FlipperUpdater {

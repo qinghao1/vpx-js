@@ -1,50 +1,28 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-import { MathUtils } from 'three'
-import { EventProxy } from '../../game/event-proxy.js'
-import type {
-	IAnimatable,
-	IAnimation,
-	IHittable,
-	IMovable,
-	IPlayable,
-	IRenderable,
-	IScriptable,
-	Meshes,
-} from '../../game/interfaces.js'
-import type { Player } from '../../game/player.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { Matrix3D } from '../../math/matrix.js'
-import { Vertex2D } from '../../math/vector.js'
-import type { HitCircle } from '../../physics/hit-circle.js'
-import type { HitObject } from '../../physics/hit-object.js'
-import type { LineSeg } from '../../physics/line-seg.js'
 import { Item } from '../item.js'
+import type { Material } from '../material.js'
+import type { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
-import { GateAnimation } from './gate-animation.js'
-import { GateApi } from './gate-api.js'
 import { GateData } from './gate-data.js'
-import type { GateHit } from './gate-hit.js'
-import { GateHitGenerator } from './gate-hit-generator.js'
 import { GateMeshGenerator } from './gate-mesh-generator.js'
-import type { GateMover } from './gate-mover.js'
 import { GateState } from './gate-state.js'
 import { GateUpdater } from './gate-updater.js'
 
+/** Static render entry for a gate mesh (WASM-side scene generation). */
+export interface GateMeshEntry {
+	isVisible: boolean
+	mesh?: Mesh
+	material?: Material
+}
+
 /** @see https://github.com/vpinball/vpinball/blob/master/gate.cpp */
-export class Gate
-	extends Item<GateData>
-	implements IRenderable<GateState>, IPlayable, IMovable, IHittable, IScriptable<GateApi>, IAnimatable
-{
+export class Gate extends Item<GateData> {
 	private readonly meshGenerator: GateMeshGenerator
-	private readonly hitGenerator: GateHitGenerator
 	private readonly state: GateState
 	private readonly updater: GateUpdater
-	private readonly animation: GateAnimation
-	private api?: GateApi
-	private hitGate?: GateHit
-	private hitLines?: LineSeg[]
-	private hitCircles?: HitCircle[]
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<Gate> {
 		const data = await GateData.fromStorage(storage, itemName)
@@ -55,16 +33,14 @@ export class Gate
 		super(data)
 		this.state = GateState.claim(this.getName(), 0, data.szMaterial, data.showBracket, data.isVisible)
 		this.meshGenerator = new GateMeshGenerator(data)
-		this.hitGenerator = new GateHitGenerator(data)
 		this.updater = new GateUpdater(this.data, this.state)
-		this.animation = new GateAnimation(this.state)
 	}
 
 	public isCollidable(): boolean {
 		return this.data.isCollidable
 	}
 
-	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {
+	public getMeshes<GEOMETRY>(table: Table): Record<string, GateMeshEntry> {
 		const gate = this.meshGenerator.getMeshes(table)
 		return {
 			wire: {
@@ -80,57 +56,11 @@ export class Gate
 		}
 	}
 
-	public setupPlayer(player: Player, table: Table): void {
-		const height = table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y)
-		// correct angle inversions like upstream PhysicSetup (gate.cpp) — unconditional, incl. twoWay
-		const angleMin = Math.min(this.data.angleMin, this.data.angleMax)
-		const angleMax = Math.max(this.data.angleMin, this.data.angleMax)
-		this.data.angleMin = angleMin
-		this.data.angleMax = angleMax
-		const radAngle = MathUtils.degToRad(this.data.rotation)
-		const tangent = new Vertex2D(Math.cos(radAngle), Math.sin(radAngle))
-		this.events = new EventProxy(this)
-		this.hitGate = this.hitGenerator.generateGateHit(this.state, this.events, height)
-		this.hitLines = this.hitGenerator.generateLineSegs(this.events, height, tangent)
-		this.hitCircles = this.hitGenerator.generateBracketHits(this.state, this.events, height, tangent)
-		this.api = new GateApi(
-			this.data,
-			this.events,
-			this.state,
-			this.getMover(),
-			this.hitGate,
-			this.hitLines.length ? this.hitLines[0]! : null,
-			player,
-			table,
-		)
-		this.animation.setEvents(this.events)
-	}
-
-	public getHitShapes(): HitObject[] {
-		return [this.hitGate!, ...this.hitLines!, ...this.hitCircles!]
-	}
-
-	public getMover(): GateMover {
-		return this.hitGate?.getMoverObject()
-	}
-
 	public getState(): GateState {
 		return this.state
 	}
 
-	public getApi(): GateApi {
-		return this.api!
-	}
-
 	public getUpdater(): GateUpdater {
 		return this.updater
-	}
-
-	public getEventNames(): string[] {
-		return ['Hit', 'Init', 'LimitBOS', 'LimitEOS', 'Timer', 'Animate']
-	}
-
-	public getAnimation(): IAnimation {
-		return this.animation
 	}
 }

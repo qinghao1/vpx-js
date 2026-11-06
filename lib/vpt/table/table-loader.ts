@@ -1,15 +1,11 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { decodeExternalAudio } from '../../audio/wav-decoder.js'
-import { warnOnce } from '../../emu/warn-once.js'
 import { type IBinaryReader, OleCompoundDoc, type Storage } from '../../io/ole-doc.js'
 import { logger, progress } from '../../util/logger.js'
-import { Collection } from '../collection/collection.js'
 import type { Item } from '../item.js'
 import type { ItemData } from '../item-data.js'
 import { ITEM_KEYS, ITEM_REGISTRY, loadItemByType } from '../item-registry.js'
-import { Sound } from '../sound.js'
 import { Texture } from '../texture.js'
 import type { TableLoadOptions } from './table.js'
 import { TableData } from './table-data.js'
@@ -20,14 +16,10 @@ const tableInfoDecoder = new TextDecoder('utf-16le')
 // Yield during bulk OLE parsing so 1000+ item tables don't block the UI.
 const YIELD_EVERY_GAME_ITEMS = 32
 const YIELD_EVERY_TEXTURES = 16
-const YIELD_EVERY_SOUNDS = 16
-const YIELD_EVERY_COLLECTIONS = 16
 
 // Cap parallel OLE reads to bound I/O contention (each load also min()s with hardwareConcurrency).
 const MAX_CONCURRENCY_GAME_ITEMS = 4
 const MAX_CONCURRENCY_TEXTURES = 6
-const MAX_CONCURRENCY_SOUNDS = 6
-const MAX_CONCURRENCY_COLLECTIONS = 4
 
 function hardwareConcurrency(): number {
 	return (
@@ -39,7 +31,6 @@ function hardwareConcurrency(): number {
 const defaultTableLoadOptions: TableLoadOptions = {
 	tableDataOnly: false,
 	tableInfoOnly: false,
-	loadInvisibleItems: true,
 	loadTableScript: true,
 }
 
@@ -80,15 +71,12 @@ export class TableLoader {
 				const gameStg = this.doc.storage('GameStg')
 				out.data = await TableData.fromStorage(gameStg, 'GameData')
 				if (!opts.tableDataOnly) {
-					// Collections first: part names yield to collection names upstream.
-					await this.loadCollections(out, gameStg, out.data.numCollections)
 					await this.loadGameItems(out, gameStg, out.data.numGameItems, opts)
 					if (!opts.skipTextures) await this.loadTextures(out, gameStg, out.data.numTextures)
 					else {
 						out.textures = []
 						logger().debug('[Table.load] Skipped %s textures (play without textures)', out.data.numTextures)
 					}
-					await this.loadSounds(out, gameStg, out.data.numSounds)
 				}
 				if (opts.loadTableScript) {
 					// CODE is exactly cchar bytes with no trim (upstream AsScript); 0 means empty script.
@@ -154,13 +142,13 @@ export class TableLoader {
 			types[index] = type
 			return loadItemByType(storage, name, type, opts)
 		})
-		const used = new Set((out.collections ?? []).map(collection => collection.getName().toLowerCase()))
+		const used = new Set<string>()
 		for (let index = 0; index < numItems; index++) {
 			const item = results[index]
 			if (!item) continue
 			const type = types[index]!
 			const key = ITEM_REGISTRY[type]?.key
-			if (key && ((key !== 'textBoxes' && key !== 'timers') || opts.loadInvisibleItems)) {
+			if (key) {
 				;((out as unknown as Record<string, Item<ItemData>[] | undefined>)[key] ??= []).push(item)
 			}
 			const oldName = item.getName()
@@ -190,41 +178,6 @@ export class TableLoader {
 		}
 	}
 
-	private async loadSounds(out: LoadedTable, storage: Storage, numItems: number): Promise<void> {
-		progress().show('Loading sounds')
-		out.sounds = []
-		if (numItems === 0) return
-		const concurrency = Math.min(MAX_CONCURRENCY_SOUNDS, hardwareConcurrency())
-		// One corrupt stream must not abort the table (upstream skips it too):
-		// failures resolve to null and are skipped below.
-		const results = await this.loadConcurrent(numItems, concurrency, YIELD_EVERY_SOUNDS, async index => {
-			const name = `Sound${index}`
-			try {
-				const sound = await Sound.fromStorage(storage, name)
-				// Embedded MP3/OGG bytes decode through the browser only; Sound.parse's
-				// sync WAV path already covered everything sync-decodable.
-				if (!sound.isPlayable()) {
-					const decoded = await decodeExternalAudio(sound.data)
-					if (decoded) {
-						sound.pcm = decoded.pcm
-						sound.sampleRate = decoded.sampleRate
-						sound.channels = decoded.channels
-					}
-				}
-				return sound
-			} catch (error) {
-				warnOnce(`table-sound:${name}`, '[Table] Skipping corrupt sound stream "%s": %s', name, error)
-				return null
-			}
-		})
-		for (let index = 0; index < numItems; index++) {
-			const sound = results[index]
-			if (!sound) continue
-			out.sounds.push(sound)
-			progress().details(sound.getName())
-		}
-	}
-
 	private async loadTableInfo(out: LoadedTable): Promise<void> {
 		const stg = this.doc.storage('TableInfo')
 		out.info = {}
@@ -234,20 +187,6 @@ export class TableLoader {
 			const data = await stg.read(key)
 			// TableInfo values are NUL-truncated UTF-16LE (upstream ReadInfoValue).
 			if (data) out.info[key] = tableInfoDecoder.decode(data).split('\0', 1)[0]!
-		}
-	}
-
-	private async loadCollections(out: LoadedTable, storage: Storage, numItems: number): Promise<void> {
-		out.collections = []
-		if (numItems === 0) return
-		const concurrency = Math.min(MAX_CONCURRENCY_COLLECTIONS, hardwareConcurrency())
-		const results = await this.loadConcurrent(numItems, concurrency, YIELD_EVERY_COLLECTIONS, index =>
-			Collection.fromStorage(storage, `Collection${index}`),
-		)
-		for (let index = 0; index < numItems; index++) {
-			const col = results[index]!
-			out.collections.push(col)
-			out.items[col.getName()] = col
 		}
 	}
 
@@ -284,8 +223,6 @@ export interface LoadedTable {
 	items: Record<string, Item<ItemData>>
 	tableScript?: string
 	textures?: Texture[]
-	sounds?: Sound[]
-	collections?: Collection[]
 	surfaces?: import('../surface/surface.js').Surface[]
 	primitives?: import('../primitive/primitive.js').Primitive[]
 	rubbers?: import('../rubber/rubber.js').Rubber[]
@@ -300,9 +237,5 @@ export interface LoadedTable {
 	triggers?: import('../trigger/trigger.js').Trigger[]
 	spinners?: import('../spinner/spinner.js').Spinner[]
 	plungers?: import('../plunger/plunger.js').Plunger[]
-	textBoxes?: import('../textbox/textbox.js').Textbox[]
 	decals?: import('../decal/decal.js').Decal[]
-	lightSeqs?: import('../lightseq/lightseq.js').LightSeq[]
-	dispReels?: import('../dispreel/dispreel.js').DispReel[]
-	timers?: import('../timer/timer.js').Timer[]
 }

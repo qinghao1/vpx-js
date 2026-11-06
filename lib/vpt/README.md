@@ -21,16 +21,10 @@ The main class of a playfield item is the class interacting with the rest of the
 library. They are named without any suffix, like `Flipper`, `Rubber` and `Ball`.
 They all extend [`Item`](item.ts).
 
-- `IRenderable<STATE>` is for table elements that are rendered on the playfield
-- `IHittable` means the ball can collide with it
-- `IMovable` indicates there is some physically-based movement
-- `IAnimatable` indicates the item somehow animates
-- `IPlayable` is implemented for logic during game play
-- `IScriptable` means the item offers a VBScript API
-
-The difference between `IMovable` and `IAnimatable` is subtle: While `IMovable`
-computes its state on the physics loop and thus has a somewhat real-world based
-behavior, `IAnimatable`s are only updated once every frame.
+- `IRenderable<STATE>` is for table elements that are rendered on the playfield.
+  Collision (`IHittable`), movement (`IMovable`), animation (`IAnimatable`),
+  gameplay (`IPlayable`), and script APIs (`IScriptable`) run inside the
+  headless-WASM engine now.
 
 ## Helper Classes
 
@@ -58,14 +52,6 @@ States are updated directly in the physics loop or via the script API. The
 Since the state changes in the worker thread and needs to be passed to the main
 thread, the transfer object only contains the changed values of the state.
 
-### APIs
-
-API helpers expose the item's Visual Pinball API (editor and VBScript)
-without leaking internals.
-
-Playfield items with an API implement `IScriptable`. The returned API class
-extends [`ItemApi`](item-api.ts).
-
 ### Mesh Generators
 
 Mesh generators provide 3D meshes of the playfield item based on their
@@ -76,44 +62,9 @@ Mesh generators are called within the main class implementing `IRenderable`.
 Their interface isn't defined, but they usually return a left-handed version
 of `IRenderable`'s `getMeshes()`.
 
-### Hit Generators
-
-Hit generators create the hit shapes that make the ball collide with the table
-item. The generated shapes are a collection of generic hit objects like circle,
-line, triangle or point.
-
-The `IHittable` interface requires a `getHitShapes()` method, which a hit
-generator provides.
-
-### Hits
-
-Hits or hit objects are item-specific hit shapes. Contrarily to hit generators,
-they provide an instance of their own type. It is however possible to mix both,
-for example the spinner has both its own hit object for dealing with the moving
-plate, as well as a hit generator for the socket.
-
-### Movers
-
-Movers are created within the hit object of items implementing `IMovable`:
-
-- Calculate the item's transformation and velocity on each physics cycle
-- Provide additional parameters to the hit object's collision calculations
-- Read and update the state depending on the above
-
-So movers sit deeply in the physics loop, but they can also interact with the
-outside. For example, for moving a flipper, the flipper API would provide a
-`RotateToEnd()` method which would set the solenoid state of the mover to
-`true`, which results in building up the acceleration of the flipper through the
-mover, which results in the flipper's `angle` state to change and hence the
-renderer applying a different rotation matrix on the object.
-
-### Animations
-
-Animation helpers are the "dumb" version of movers: a static sequence of
-transformations computed once per frame (usually just a state parameter
-changing).
-
-Animation helpers are created by classes which implement `IAnimatable`.
+Collision (`Hits`, `Movers`), script APIs (`IScriptable`), and frame
+animation (`IAnimatable`) run inside the headless-WASM engine now; only
+state application remains on the TS side.
 
 ### Updaters
 
@@ -128,20 +79,17 @@ changes to the scene.
 
 ### Loader flow
 
-`Table.load()` (`table/table.ts:98-102`) runs `TableLoader.load()`
-(`table/table-loader.ts:38-69`), which fills a `LoadedTable`: one array per
-`ITEM_REGISTRY` key (`item-registry.ts:40-63`), plus `items[name]` for every
-game item and collection. The `Table` constructor then converts each array
-into a name-keyed dict (`flippers`, `lights`, …; `textBoxes` becomes
-`textboxes`) via `populateFromLoaded` (`table/table.ts:118-143`).
+`Table.load()` runs `TableLoader.load()`, which fills a `LoadedTable`: one
+array per `ITEM_REGISTRY` key, plus `items[name]` for every game item. The
+`Table` constructor then converts each array into a name-keyed dict
+(`flippers`, `lights`, …) via `populateFromLoaded`.
 
 ### Script execution
 
 The VBScript source rides along in the `CODE` tag (see
 [`lib/io/README.md`](../io/README.md)) and is decoded when `loadTableScript`
-is set. `Player.init()`/`initAsync()` calls `Table.runTableScript[Async]()`,
-which runs `new Transpiler(table, player).execute[Async](script)`
-(`table/table.ts:330-350`, `../game/player.ts:58-84`).
+is set. It is handed to the headless-WASM engine with the table bytes; there
+is no TS transpiler anymore.
 
 ### Material and texture resolution
 
@@ -156,7 +104,7 @@ unrelated: it only serves built-in static JSON meshes.)
 ### Units and coordinates
 
 Table geometry stays in VP units until the scene root: 1 unit = 0.53975mm
-(`../physics/constants.ts:24`); the renderer applies `SCALE = 0.05` once
+(Earth g ≈ 1.81751 U/T² for the parsed gravity default); the renderer applies `SCALE = 0.05` once
 (`../render/threejs/three-render-api.ts:39`). The playfield plane is XY at
 z = 0 with +Z pointing up toward the glass. VP math is left-handed, three.js
 is right-handed, so every mesh generator flips Z via
@@ -225,44 +173,15 @@ a bulb mesh (`showBulbMesh` + `meshRadius`), a bulb glow polygon (`bulbLight`
 - 3 or more drag points), a playfield-surface insert (neither, + drag
   points), or a backglass light (`isBackglass`). `fader` (default Linear = 1)
   selects the brightness envelope: None = 0, Linear = 1, Incandescent = 2
-  (`enums.ts:273-275`); Incandescent runs a filament-temperature simulation
-  (`light/light-physics.ts:86-88`).
-
-### Light sequencers
-
-`LightSeq.Play()` is implemented: `lightseq/lightseq-animation.ts` runs a
-100-entry animation queue (`play()`, `:204-238`) over a grid of the
-collection's lights/flashers/primitives, firing `PlayDone` when done.
-
-### DispReel
-
-A DispReel is an electromechanical score reel (the `Reel` object in VBS):
-one spinning digit drum per reel, with `reelCount`, `reelSpacing`,
-`motorSteps`, `digitRange`, and optional image-grid digits
-(`dispreel/dispreel.ts:26-100`). Script ops (`AddValue`, `SetValue`,
-`SpinReel`, `ResetToZero`) run through `DispReelAnimation` (`:229-238`).
+  (`enums.ts:273-275`); bake-time levels come from `bakedIntensity`
+  (`light/light.ts`), live levels from the WASM bridge.
 
 ### `SizingType`, DMD, transparency
 
 - `SizingType` exists only on decals: AutoSize = 0, AutoWidth = 1,
   ManualSize = 2 (`enums.ts:471-473`).
-- `isDMD` (dot-matrix-display rendering) is on textbox and flasher data.
-- `isTransparent` is on textbox and dispreel data.
-
-### Collections: `fireEvents` / `stopSingleEvents`
-
-A collection groups item APIs under one name with group events and
-`Count`/`Item(i)` access (`collection/collection.ts:50-120`). `fireEvents`
-(`EVNT` tag) lets the group fire shared events; `stopSingleEvents` (`SSNG`
-tag) suppresses the members' individual events (`:17-26`). Members are wired
-in `Table.setupCollections` (`table/table.ts:367-383`).
-
-### `TimerMode`
-
-`Update` = 0 (1000Hz update cycle), `OnNewFrame` = -1, `OnGameSync` = -2,
-`TIMER_DISABLED` = 0xffffffff (`timer/timer-const.ts:15-21`). `TimerData`
-itself holds only the editor center; interval/enabled live on `data.timer`
-(`timer/timer.ts:27` + `:74-85`).
+- `isDMD` (dot-matrix-display rendering) is on flasher data.
+- `isTransparent` is on flasher data.
 
 ### Plunger: the `PlungerDesc` lathe
 
@@ -274,13 +193,5 @@ axis by the mesh generator (`plunger/plunger-mesh-generator.ts:34-56`).
 
 ### Small-family `Data` classes
 
-- `TimerData` (`timer/timer.ts:27`) — editor center only, plus the common
-  timer block.
-- `TextboxData` (`textbox/textbox.ts:23`) — text rectangle, text, colors,
-  alignment, `isTransparent`/`isDMD`.
 - `DecalData` (`decal/decal.ts:24`) — center/size/rotation, image-or-text
   (`decalType`), `sizingType`, target surface, material.
-- `DispReelData` (`dispreel/dispreel.ts:26`) — reel geometry, count, spacing,
-  motor steps, digit range, image and sound.
-- `CollectionData` (`collection/collection.ts:22`) — member `itemNames` plus
-  `fireEvents`/`groupElements`/`stopSingleEvents`.

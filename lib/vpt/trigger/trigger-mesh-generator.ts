@@ -1,6 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-import { MathUtils } from 'three'
+import { degToRad } from '../../math/angle.js'
 import { Matrix3D } from '../../math/matrix.js'
 import { Vertex3D } from '../../math/vector.js'
 import { logger } from '../../util/logger.js'
@@ -71,15 +71,15 @@ export class TriggerMeshGenerator {
 	private getFullMatrix(): Matrix3D {
 		const m = new Matrix3D()
 		if (this.data.shape === Enums.TriggerShape.TriggerWireB) {
-			m.rotateXMatrix(MathUtils.degToRad(-23))
-			const tmp = new Matrix3D().rotateZMatrix(MathUtils.degToRad(this.data.rotation))
+			m.rotateXMatrix(degToRad(-23))
+			const tmp = new Matrix3D().rotateZMatrix(degToRad(this.data.rotation))
 			m.multiply(tmp)
 		} else if (this.data.shape === Enums.TriggerShape.TriggerWireC) {
-			m.rotateXMatrix(MathUtils.degToRad(140))
-			const tmp = new Matrix3D().rotateZMatrix(MathUtils.degToRad(this.data.rotation))
+			m.rotateXMatrix(degToRad(140))
+			const tmp = new Matrix3D().rotateZMatrix(degToRad(this.data.rotation))
 			m.multiply(tmp)
 		} else {
-			m.rotateZMatrix(MathUtils.degToRad(this.data.rotation))
+			m.rotateZMatrix(degToRad(this.data.rotation))
 		}
 		return m
 	}

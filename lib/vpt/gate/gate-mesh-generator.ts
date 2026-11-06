@@ -1,6 +1,6 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-import { MathUtils } from 'three'
+import { degToRad } from '../../math/angle.js'
 import { Matrix3D } from '../../math/matrix.js'
 import { Vertex3D } from '../../math/vector.js'
 import { logger } from '../../util/logger.js'
@@ -48,7 +48,7 @@ export class GateMeshGenerator {
 	}
 
 	private positionMesh(mesh: Mesh, table: Table, baseHeight: number): Mesh {
-		const m = new Matrix3D().rotateZMatrix(MathUtils.degToRad(this.data.rotation))
+		const m = new Matrix3D().rotateZMatrix(degToRad(this.data.rotation))
 		const len = this.data.length
 		const zScale = table.getScaleZ()
 		const height = this.data.height * zScale

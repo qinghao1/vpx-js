@@ -1,47 +1,21 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { EventProxy } from '../../game/event-proxy.js'
-import type {
-	IAnimatable,
-	IAnimation,
-	IHittable,
-	IMovable,
-	IPlayable,
-	IRenderable,
-	IScriptable,
-	Meshes,
-} from '../../game/interfaces.js'
-import type { Player } from '../../game/player.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { Matrix3D } from '../../math/matrix.js'
-import type { HitCircle } from '../../physics/hit-circle.js'
-import type { HitObject } from '../../physics/hit-object.js'
+import type { Meshes } from '../../render/irender-api.js'
 import { Item } from '../item.js'
 import type { Table } from '../table/table.js'
-import { SpinnerAnimation } from './spinner-animation.js'
-import { SpinnerApi } from './spinner-api.js'
 import { SpinnerData } from './spinner-data.js'
-import { SpinnerHit } from './spinner-hit.js'
-import { SpinnerHitGenerator } from './spinner-hit-generator.js'
 import { SpinnerMeshGenerator } from './spinner-mesh-generator.js'
-import type { SpinnerMover } from './spinner-mover.js'
 import { SpinnerState } from './spinner-state.js'
 import { SpinnerUpdater } from './spinner-updater.js'
 
 /** @see https://github.com/vpinball/vpinball/blob/master/src/parts/spinner.cpp */
-export class Spinner
-	extends Item<SpinnerData>
-	implements IRenderable<SpinnerState>, IPlayable, IMovable, IHittable, IScriptable<SpinnerApi>, IAnimatable
-{
+export class Spinner extends Item<SpinnerData> {
 	private readonly meshGenerator: SpinnerMeshGenerator
 	private readonly state: SpinnerState
-	private readonly hitGenerator: SpinnerHitGenerator
 	private readonly updater: SpinnerUpdater
-	private readonly animation: SpinnerAnimation
-	private hit?: SpinnerHit
-	private hitCircles: HitCircle[] = []
-	private api?: SpinnerApi
 
 	get angleMin() {
 		return this.data.angleMin
@@ -66,9 +40,7 @@ export class Spinner
 			data.isVisible,
 		)
 		this.meshGenerator = new SpinnerMeshGenerator(data)
-		this.hitGenerator = new SpinnerHitGenerator(data)
 		this.updater = new SpinnerUpdater(this.state, this.data, this.meshGenerator)
-		this.animation = new SpinnerAnimation(this.state)
 	}
 
 	public isCollidable(): boolean {
@@ -94,45 +66,11 @@ export class Spinner
 		}
 	}
 
-	public setupPlayer(player: Player, table: Table): void {
-		const height = table.getSurfaceHeight(this.data.szSurface, this.data.center.x, this.data.center.y)
-		// correct angle inversions like upstream PhysicSetup (spinner.cpp) — parse keeps raw values
-		const angleMin = Math.min(this.data.angleMin, this.data.angleMax)
-		const angleMax = Math.max(this.data.angleMin, this.data.angleMax)
-		this.data.angleMin = angleMin
-		this.data.angleMax = angleMax
-		this.events = new EventProxy(this)
-		this.hit = new SpinnerHit(this.data, this.state, this.events, height)
-		this.hitCircles = this.hitGenerator.getHitShapes(height)
-		this.api = new SpinnerApi(this.state, this.hit.getMoverObject(), this.data, this.events, player, table)
-		this.animation.setEvents(this.events)
-	}
-
-	public getApi(): SpinnerApi {
-		return this.api!
-	}
-
-	public getEventNames(): string[] {
-		return ['Init', 'LimitBOS', 'LimitEOS', 'Spin', 'Timer', 'Animate']
-	}
-
-	public getHitShapes(): HitObject[] {
-		return [this.hit!, ...this.hitCircles]
-	}
-
-	public getMover(): SpinnerMover {
-		return this.hit?.getMoverObject()
-	}
-
 	public getState(): SpinnerState {
 		return this.state
 	}
 
 	public getUpdater(): SpinnerUpdater {
 		return this.updater
-	}
-
-	public getAnimation(): IAnimation {
-		return this.animation
 	}
 }

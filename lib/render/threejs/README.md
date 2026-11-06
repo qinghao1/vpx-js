@@ -28,19 +28,15 @@ pipeline in [`../README.md`](../README.md).
 
 ## Upstream parity notes
 
-Three deliberate divergences from VPinball, each pinned by a spec:
+`AB_ADD` flashers and bulb halos use the native negatively-encoded
+`REVSUBTRACT` composite (`nodes/modulate-vs-add.ts`) through `outputNode`, as
+NodeMaterial clamps `colorNode` output to `max(0)`. It needs the pipeline's float
+scene pass; the direct-render fallback's 8-bit canvas clamps it away.
 
-- `AB_ADD` flashers and bulb halos composite positive light additively
-  (`dst + ((1−m) + m·d)·glow` per channel), matching the `fs_flasher.sc` /
-  `fs_light.sc` modulate-vs-add closed form, with `d` sampled per fragment
-  from the streamed playfield albedo at the playfield UV (pre-stream: the
-  `ADDITIVE_MODULATE_DST_REF = 0.4` sRGB stub, `~102/255` gray). The native
-  `REVSUBTRACT` blend state with negatively-encoded output draws nothing
-  on the WebGPU backend, so there is no native-blend arm; the albedo
-  misses live GI/dynamic light, so halos under strong GI read slightly
-  dimmer than native.
+The headless engine plays in VR mode (bridge patch 0015), so scripts show their
+own VR room and cabinet and hide desktop-only parts, as in native VR.
+
+Deliberate divergences from VPinball, each pinned by a spec:
+
 - `AB_ABSORB` stays premultiplied-over with positive output (its negative
   encoding is a follow-up).
-- VR-room/cabinet meshes are always forced visible (upstream hides them via
-  `PartGroupData::PlayerModeVisibilityMask` per player mode); threading the
-  real player mode through is a follow-up.

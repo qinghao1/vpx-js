@@ -4,7 +4,6 @@
 import type { Storage } from '../io/ole-doc.js'
 import { Bumper } from './bumper/bumper.js'
 import { Decal } from './decal/decal.js'
-import { DispReel } from './dispreel/dispreel.js'
 import { ItemType } from './enums.js'
 import { Flasher } from './flasher/flasher.js'
 import { Flipper } from './flipper/flipper.js'
@@ -14,7 +13,6 @@ import type { Item } from './item.js'
 import type { ItemData } from './item-data.js'
 import { Kicker } from './kicker/kicker.js'
 import { Light } from './light/light.js'
-import { LightSeq } from './lightseq/lightseq.js'
 import { Plunger } from './plunger/plunger.js'
 import { Primitive } from './primitive/primitive.js'
 import { Ramp } from './ramp/ramp.js'
@@ -22,8 +20,6 @@ import { Rubber } from './rubber/rubber.js'
 import { Spinner } from './spinner/spinner.js'
 import { Surface } from './surface/surface.js'
 import type { TableLoadOptions } from './table/table.js'
-import { Textbox } from './textbox/textbox.js'
-import { Timer } from './timer/timer.js'
 import { Trigger } from './trigger/trigger.js'
 
 export type ItemFactory = (storage: Storage, name: string, opts: TableLoadOptions) => Promise<Item<ItemData> | null>
@@ -52,12 +48,8 @@ export const ITEM_REGISTRY: Record<number, RegistryEntry> = {
 	[ItemType.Kicker]: { key: 'kickers', factory: (s, n) => Kicker.fromStorage(s, n) },
 	[ItemType.Trigger]: { key: 'triggers', factory: (s, n) => Trigger.fromStorage(s, n) },
 	[ItemType.Spinner]: { key: 'spinners', factory: (s, n) => Spinner.fromStorage(s, n) },
-	[ItemType.Timer]: { key: 'timers', factory: (s, n) => Timer.fromStorage(s, n) },
 	[ItemType.Plunger]: { key: 'plungers', factory: (s, n) => Plunger.fromStorage(s, n) },
-	[ItemType.Textbox]: { key: 'textBoxes', tableKey: 'textboxes', factory: (s, n) => Textbox.fromStorage(s, n) },
 	[ItemType.Decal]: { key: 'decals', factory: (s, n) => Decal.fromStorage(s, n) },
-	[ItemType.LightSeq]: { key: 'lightSeqs', factory: (s, n) => LightSeq.fromStorage(s, n) },
-	[ItemType.DispReel]: { key: 'dispReels', factory: (s, n) => DispReel.fromStorage(s, n) },
 }
 
 /** All keys used in LoadedTable for game items. */

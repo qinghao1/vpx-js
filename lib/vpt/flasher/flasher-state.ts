@@ -14,14 +14,17 @@ export class FlasherState extends ItemState {
 	public height = 50
 	/** Sequencer lock. @see Flasher::m_lockedByLS in src/parts/flasher.h */
 	public lockedByLS = false
+	/**
+	 * Engine-driven overrides (`FlasherData::m_intensity_scale/m_modulate_vs_add/
+	 * m_addBlend/m_addBlendMode`). Absent keeps the authored data; the updater
+	 * prefers these when set so the WASM bridge can drive them per frame.
+	 */
+	public intensityScale?: number = undefined
+	public modulateVsAdd?: number = undefined
+	public addBlend?: boolean = undefined
+	public addBlendMode?: number = undefined
 	/** Sequencer-driven on/off; script Visible keeps flowing to isVisible. @see Flasher::m_inPlayState in src/parts/flasher.h */
 	public inPlayState = true
-	/**
-	 * Whether the SLNK controller link resolved on the last animation tick.
-	 * Piped to the updater so it can apply the link *or* the lightmap, never both
-	 * (@see Flasher::Render in src/parts/flasher.cpp).
-	 */
-	public slnkResolved = false
 
 	public static claim(
 		name: string,

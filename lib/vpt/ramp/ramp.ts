@@ -1,23 +1,20 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { EventProxy } from '../../game/event-proxy.js'
-import type { IHittable, IRenderable, IScriptable, Meshes } from '../../game/interfaces.js'
-import type { Player } from '../../game/player.js'
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { Vertex2D } from '../../math/vector.js'
-import type { HitObject } from '../../physics/hit-object.js'
+import type { Meshes, RenderInfo } from '../../render/irender-api.js'
 import { handleBiffTag } from '../biff-helper.js'
 import { type DragPoint, dragPointNestedTag } from '../dragpoint.js'
 import { Enums } from '../enums.js'
 import { Item } from '../item.js'
-import { ItemApi } from '../item-api.js'
 import { type IPhysicalData, ItemData } from '../item-data.js'
 import { ItemState } from '../item-state.js'
+import type { Material } from '../material.js'
 import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
-import { RampHitGenerator } from './ramp-physics.js'
+import type { Texture } from '../texture.js'
 import { isTransparentRampMaterial, RampMeshGenerator, RampUpdater } from './ramp-view.js'
 
 const FLOAT_MAP: Record<string, string> = {
@@ -170,214 +167,12 @@ export class RampState extends ItemState {
 	}
 }
 
-/** Ramp API — VBS surface for `Ramp`. @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
-export class RampApi extends ItemApi<RampData> {
-	private readonly isDynamic: boolean
-
-	constructor(
-		private readonly _state: RampState,
-		private readonly hits: HitObject[],
-		data: RampData,
-		events: EventProxy,
-		player: Player,
-		table: Table,
-	) {
-		super(data, events, player, table)
-		const material = table.getMaterial(data.szMaterial)
-		this.isDynamic = !!material && material.isOpacityActive
-	}
-
-	get HeightBottom() {
-		return this.data.heightBottom
-	}
-	set HeightBottom(v) {
-		if (this.isDynamic) this._state.heightBottom = v
-		this.data.heightBottom = v
-	}
-	get HeightTop() {
-		return this.data.heightTop
-	}
-	set HeightTop(v) {
-		if (this.isDynamic) this._state.heightTop = v
-		this.data.heightTop = v
-	}
-	get WidthBottom() {
-		return this.data.widthBottom
-	}
-	set WidthBottom(v) {
-		if (this.isDynamic) this._state.widthBottom = v
-		this.data.widthBottom = v
-	}
-	get WidthTop() {
-		return this.data.widthTop
-	}
-	set WidthTop(v) {
-		if (this.isDynamic) this._state.widthTop = v
-		this.data.widthTop = v
-	}
-	get Material() {
-		return this.data.szMaterial
-	}
-	set Material(v) {
-		if (this.isDynamic) this._state.material = v
-		this.data.szMaterial = v
-	}
-	get Type() {
-		return this.data.rampType
-	}
-	set Type(v) {
-		if (this.isDynamic) this._state.type = v
-		this.data.rampType = v
-	}
-	get Image() {
-		return this.data.szImage
-	}
-	set Image(v) {
-		this._assertNonHdrImage(v)
-		if (this.isDynamic) this._state.texture = v
-		this.data.szImage = v
-	}
-	get ImageAlignment() {
-		return this.data.imageAlignment
-	}
-	set ImageAlignment(v) {
-		if (this.isDynamic) this._state.textureAlignment = v
-		this.data.imageAlignment = v
-	}
-	get HasWallImage() {
-		return this.data.imageWalls
-	}
-	set HasWallImage(v) {
-		if (this.isDynamic) this._state.hasWallImage = v
-		this.data.imageWalls = v
-	}
-	get LeftWallHeight() {
-		return this.data.leftWallHeight
-	}
-	set LeftWallHeight(v) {
-		if (this.isDynamic) this._state.leftWallHeight = v
-		this.data.leftWallHeight = v
-	}
-	get RightWallHeight() {
-		return this.data.rightWallHeight
-	}
-	set RightWallHeight(v) {
-		if (this.isDynamic) this._state.rightWallHeight = v
-		this.data.rightWallHeight = v
-	}
-	get VisibleLeftWallHeight() {
-		return this.data.leftWallHeightVisible
-	}
-	set VisibleLeftWallHeight(v) {
-		if (this.isDynamic) this._state.leftWallHeightVisible = v
-		this.data.leftWallHeightVisible = v
-	}
-	get VisibleRightWallHeight() {
-		return this.data.rightWallHeightVisible
-	}
-	set VisibleRightWallHeight(v) {
-		if (this.isDynamic) this._state.rightWallHeightVisible = v
-		this.data.rightWallHeightVisible = v
-	}
-	get Elasticity() {
-		return this.data.elasticity
-	}
-	set Elasticity(v) {
-		this.data.elasticity = v
-	}
-	get Friction() {
-		return this.data.friction
-	}
-	set Friction(v) {
-		this.data.friction = v
-	}
-	get Scatter() {
-		return this.data.scatter
-	}
-	set Scatter(v) {
-		this.data.scatter = v
-	}
-	get Collidable() {
-		const firstHit = this.hits[0]
-		return firstHit ? firstHit.isEnabled : this.data.isCollidable
-	}
-	set Collidable(v) {
-		if (this.hits.length === 0) this.data.isCollidable = v
-		else if (v !== this.Collidable) for (const hit of this.hits) hit.isEnabled = v
-	}
-	get HasHitEvent() {
-		return this.data.hitEvent
-	}
-	set HasHitEvent(v) {
-		this.data.hitEvent = v
-	}
-	get Threshold() {
-		return this.data.threshold
-	}
-	set Threshold(v) {
-		this.data.threshold = v
-	}
-	get Visible() {
-		return this.data.isVisible
-	}
-	set Visible(v) {
-		if (this.isDynamic) this._state.isVisible = v
-		this.data.isVisible = v
-	}
-	get ReflectionEnabled() {
-		return this.data.isReflectionEnabled
-	}
-	set ReflectionEnabled(v) {
-		this.data.isReflectionEnabled = v
-	}
-	get DepthBias() {
-		return this.data.depthBias
-	}
-	set DepthBias(v) {
-		if (this.isDynamic) this._state.depthBias = v
-		this.data.depthBias = v
-	}
-	get WireDiameter() {
-		return this.data.wireDiameter
-	}
-	set WireDiameter(v) {
-		this.data.wireDiameter = v
-	}
-	get WireDistanceX() {
-		return this.data.wireDistanceX
-	}
-	set WireDistanceX(v) {
-		this.data.wireDistanceX = v
-	}
-	get WireDistanceY() {
-		return this.data.wireDistanceY
-	}
-	set WireDistanceY(v) {
-		this.data.wireDistanceY = v
-	}
-	get PhysicsMaterial() {
-		return this.data.szPhysicsMaterial
-	}
-	set PhysicsMaterial(v) {
-		this.data.szPhysicsMaterial = v
-	}
-	get OverwritePhysics() {
-		return this.data.overwritePhysics
-	}
-	set OverwritePhysics(v) {
-		this.data.overwritePhysics = v
-	}
-}
-
 /** @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
-export class Ramp extends Item<RampData> implements IRenderable<RampState>, IHittable, IScriptable<RampApi> {
+export class Ramp extends Item<RampData> {
 	private readonly meshGenerator: RampMeshGenerator
-	private readonly hitGenerator: RampHitGenerator
 
 	private readonly state: RampState
 	private readonly updater: RampUpdater
-	private hits?: HitObject[]
-	private api?: RampApi
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<Ramp> {
 		const data = await RampData.fromStorage(storage, itemName)
@@ -406,7 +201,6 @@ export class Ramp extends Item<RampData> implements IRenderable<RampState>, IHit
 			data.isVisible && (data.widthTop !== 0 || data.widthBottom !== 0),
 		)
 		this.meshGenerator = new RampMeshGenerator(data, this.state)
-		this.hitGenerator = new RampHitGenerator(data, this.meshGenerator)
 		this.updater = new RampUpdater(this.state, this.meshGenerator)
 	}
 
@@ -419,30 +213,12 @@ export class Ramp extends Item<RampData> implements IRenderable<RampState>, IHit
 		return this.meshGenerator.getMeshes(isTransparentRampMaterial(material), table)
 	}
 
-	public setupPlayer(player: Player, table: Table): void {
-		this.events = new EventProxy(this)
-		this.hits = this.hitGenerator.generateHitObjects(table, this.events)
-		this.api = new RampApi(this.state, this.hits, this.data, this.events, player, table)
-	}
-
-	public getApi(): RampApi {
-		return this.api!
-	}
-
-	public getHitShapes(): HitObject[] {
-		return this.hits!
-	}
-
 	public getState(): RampState {
 		return this.state
 	}
 
 	public getUpdater(): RampUpdater {
 		return this.updater
-	}
-
-	public getEventNames(): string[] {
-		return ['Hit', 'Init', 'Timer']
 	}
 
 	public getSurfaceHeight(x: number, y: number, table: Table): number {

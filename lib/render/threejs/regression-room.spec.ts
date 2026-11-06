@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import { createVrMaterialResolver } from './baked-materials.js'
 import { createUnshadedBakedNodeMaterial } from './nodes/unshaded-baked-node.js'
-import { isShowcaseRoomNode } from './scene-classify.js'
+import { isPlayfieldDecoyName } from './scene-classify.js'
 import { classify, isBakedPlayfield, isBasePlayfield, postProcessScene } from './three-scene-postprocess.js'
 import { hasBakedPlayfield } from './visibility-heuristics.js'
 
@@ -184,33 +184,6 @@ describe('regression: room must remain visible', () => {
 		expect(dark.visible, 'dark VR wall stays').toEqual(true)
 	})
 
-	it('isShowcaseRoomNode covers the script-hidden room and cabinet names', () => {
-		// Royal Flush hides VRCab + ColRoom1/ColRoomMinimal on desktop
-		// (`for each Object in VRCab : object.visible = 0`); the showcase
-		// viewer keeps exactly these visible.
-		for (const name of [
-			'VR_Cab',
-			'VR_Backbox',
-			'VR_Cab_Leg_Front_Right',
-			'VR_CabFlipperLeft',
-			'VR_Coin_Door',
-			'VR_Primary_plunger',
-			'VR_Platform',
-			'VR_Sphere',
-			'VRMega1',
-			'VRMeag11',
-			'BM_VR_Cab_Siderails',
-			'VR_Cab_StartButton',
-			'primitive-coin-door-trim',
-			'primitive-lock-bar-trim',
-		]) {
-			expect(isShowcaseRoomNode(name), `${name} is showcase room content`).toEqual(true)
-		}
-		for (const name of ['Playfield', 'primitive-plunger', 'LeftFlipper', 'cover', undefined]) {
-			expect(isShowcaseRoomNode(name), `${String(name)} is not room content`).toEqual(false)
-		}
-	})
-
 	it('getVr keeps baked-node VR materials opaque while maps are pending', () => {
 		// The room/cabinet bake their maps after postprocess; zeroing the
 		// material here hid them permanently (the map bind later only sets
@@ -227,6 +200,18 @@ describe('regression: room must remain visible', () => {
 		const mat = createUnshadedBakedNodeMaterial({ transmission: false })
 		const out = createVrMaterialResolver()(mat as unknown as THREE.MeshStandardMaterial, 'primitive-vr-cab-trim')
 		expect(out.polygonOffset, 'hyphenated cab takes the cab path').toEqual(true)
+	})
+
+	it('isPlayfieldDecoyName matches only the redundant collision mesh', () => {
+		// Space Cadet's playfield_mesh is force-hidden at parse and replaced
+		// by the generated base slab; the live engine still reports it
+		// visible, so the viewer suppresses exactly this name.
+		expect(isPlayfieldDecoyName('playfield_mesh'), 'decoy matches').toEqual(true)
+		expect(isPlayfieldDecoyName('Playfield_Mesh'), 'match is case-insensitive').toEqual(true)
+		expect(isPlayfieldDecoyName('playfield_base'), 'generated base is not the decoy').toEqual(false)
+		expect(isPlayfieldDecoyName('playfield_wall'), 'wall extra is not the decoy').toEqual(false)
+		expect(isPlayfieldDecoyName('primitive-playfield_mesh'), 'scene node prefix is not an item name').toEqual(false)
+		expect(isPlayfieldDecoyName(undefined), 'missing name is not the decoy').toEqual(false)
 	})
 
 	it('isBakedPlayfield unifies the bake-side name checks', () => {

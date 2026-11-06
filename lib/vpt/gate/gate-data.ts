@@ -46,7 +46,8 @@ export class GateData extends ItemData {
 	public showBracket = true
 	public szMaterial?: string
 	public szSurface?: string
-	public twoWay = true
+	/** Upstream `Gate::m_twoWay` defaults to one-way (tagless 1990s tables swing one way). */
+	public twoWay = false
 	public center!: Vertex2D
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<GateData> {

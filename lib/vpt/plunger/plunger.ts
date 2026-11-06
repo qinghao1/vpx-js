@@ -1,36 +1,32 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { EventProxy } from '../../game/event-proxy.js'
-import type { IHittable, IMovable, IPlayable, IRenderable, IScriptable, Meshes } from '../../game/interfaces.js'
-import type { IBallCreationPosition, Player } from '../../game/player.js'
-import type { PlayerPhysics } from '../../game/player-physics.js'
 import type { Storage } from '../../io/ole-doc.js'
-import { Vertex3D } from '../../math/vector.js'
-import type { HitObject } from '../../physics/hit-object.js'
-import type { Ball } from '../ball/ball.js'
 import { Item } from '../item.js'
+import type { Material } from '../material.js'
+import type { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
-import { PlungerApi } from './plunger-api.js'
+import type { Texture } from '../texture.js'
 import { PlungerData } from './plunger-data.js'
-import { PlungerHit } from './plunger-hit.js'
 import { PlungerMeshGenerator } from './plunger-mesh-generator.js'
-import type { PlungerMover } from './plunger-mover.js'
 import { PlungerState } from './plunger-state.js'
 import { PlungerUpdater } from './plunger-updater.js'
 
+/** Static render entry for a plunger mesh (WASM-side scene generation). */
+export interface PlungerMeshEntry {
+	isVisible: boolean
+	mesh?: Mesh
+	material?: Material
+	map?: Texture
+}
+
 /** @see https://github.com/vpinball/vpinball/blob/master/plunger.cpp */
-export class Plunger
-	extends Item<PlungerData>
-	implements IRenderable<PlungerState>, IPlayable, IMovable, IHittable, IBallCreationPosition, IScriptable<PlungerApi>
-{
+export class Plunger extends Item<PlungerData> {
 	public static PLUNGER_HEIGHT = 50
 
 	private readonly meshGenerator: PlungerMeshGenerator
 	private readonly state: PlungerState
 	private readonly updater: PlungerUpdater
-	private api?: PlungerApi
-	private hit?: PlungerHit
 
 	public static async fromStorage(storage: Storage, itemName: string): Promise<Plunger> {
 		const data = await PlungerData.fromStorage(storage, itemName)
@@ -48,9 +44,9 @@ export class Plunger
 		return this.state
 	}
 
-	public getMeshes<GEOMETRY>(table: Table): Meshes<GEOMETRY> {
+	public getMeshes<GEOMETRY>(table: Table): Record<string, PlungerMeshEntry> {
 		const plunger = this.meshGenerator.generateMeshes(0, table)
-		const meshes: Meshes<GEOMETRY> = {}
+		const meshes: Record<string, PlungerMeshEntry> = {}
 		const material = table.getMaterial(this.data.szMaterial)
 		const map = table.getTexture(this.data.szImage)
 		if (plunger.rod) meshes.rod = { isVisible: this.data.isVisible, mesh: plunger.rod, material, map }
@@ -63,56 +59,8 @@ export class Plunger
 		return true
 	}
 
-	public setupPlayer(player: Player, table: Table): void {
-		this.events = new EventProxy(this)
-		this.hit = new PlungerHit(this.data, this.state, this.events, this.meshGenerator.cFrames, player, table)
-		this.api = new PlungerApi(this.data, this.state, this.hit, this.events, this, player, table)
-	}
-
-	public getApi(): PlungerApi {
-		return this.api!
-	}
-
-	public getMover(): PlungerMover {
-		return this.hit?.getMoverObject()
-	}
-
-	public getHitShapes(): HitObject[] {
-		return [this.hit!]
-	}
-
-	public getEventProxy(): EventProxy {
-		return this.events!
-	}
-
-	public pullBack(): void {
-		this.getMover().pullBack(this.data.speedPull)
-	}
-
-	public fire(): void {
-		this.getMover().fire(this.data.autoPlunger ? 1 : 0)
-	}
-
 	public getUpdater(): PlungerUpdater {
 		return this.updater
-	}
-
-	public getBallCreationPosition(table: Table): Vertex3D {
-		const mover = this.getMover()
-		const x = (mover.x + mover.x2) * 0.5
-		const y = mover.pos - 25.01
-		const height = table.getSurfaceHeight(this.data.szSurface, x, y)
-		return new Vertex3D(x, y, height)
-	}
-
-	public getBallCreationVelocity(_table: Table): Vertex3D {
-		return new Vertex3D()
-	}
-
-	public onBallCreated(_physics: PlayerPhysics, _ball: Ball): void {}
-
-	public getEventNames(): string[] {
-		return ['Init', 'Timer', 'LimitEOS', 'LimitBOS']
 	}
 }
 
