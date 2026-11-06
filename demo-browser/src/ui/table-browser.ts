@@ -44,9 +44,20 @@ const hostOf = (url: string) => {
 
 /** Readable cross-origin and not an HTML page: the viewer can fetch it as-is. */
 async function isFetchable(url: string): Promise<boolean> {
+	const okNotHtml = (res: Response) => res.ok && !res.headers.get('content-type')?.includes('text/html')
 	try {
 		const res = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) })
-		return res.ok && !res.headers.get('content-type')?.includes('text/html')
+		// Some hosts reject HEAD (405): retry those once with a zero-byte read.
+		if (res.status !== 405) return okNotHtml(res)
+	} catch {
+		// Network/timeout: fall through to the ranged GET below.
+	}
+	try {
+		const res = await fetch(url, {
+			headers: { Range: 'bytes=0-0' },
+			signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+		})
+		return okNotHtml(res)
 	} catch {
 		return false
 	}
@@ -181,6 +192,7 @@ export function initTableBrowser(viewer: BrowserViewer, syncParam: (key: Kind, v
 				)
 			} else {
 				dialog.close()
+				syncParam('vpx', url)
 				viewer.load(url).catch(error => console.error('[catalog] table load failed', error))
 			}
 		})
@@ -244,7 +256,12 @@ export function initTableBrowser(viewer: BrowserViewer, syncParam: (key: Kind, v
 				fetchWithProgress(
 					url,
 					url === VPS_DB_URL
-						? (p: number) => setStatus(`Downloading catalog… ${Math.round(p * 100)}%`)
+						? progress =>
+								setStatus(
+									progress.total
+										? `Downloading catalog… ${Math.round((progress.received / progress.total) * 100)}%`
+										: `Downloading catalog… ${progress.received} bytes`,
+								)
 						: undefined,
 					{ signal },
 				),

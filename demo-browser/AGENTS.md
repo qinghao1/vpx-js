@@ -19,7 +19,7 @@ URL options (all optional):
 
 Tables and ROMs also load by drag & drop, the file pickers, or the table browser. A ROM belongs to the table on screen (or the one dropped with it): it reboots that table's engine, and a new table without one clears it. Only server-fetchable sources are mirrored into `?vpx`/`?rom`; local files clear them.
 
-Requires `dist-esm` built. `server.fs.allow` covers the repo root, `~/Downloads`, `~/.pinmame/roms` (`strict:false`, COOP/COEP/CORP, `assetsInclude` `*.vpx/*.wasm/*.zip`). The engine artifact is served from `public/wasm/`. `public/test/fixtures/table-empty.vpx` is a tracked copy of `test/fixtures/table-empty.vpx` so static builds ship the default table; keep the two identical.
+Requires `dist-esm` built. `server.fs.allow` covers the repo root, `~/Downloads`, `~/.pinmame/roms` (`strict:false`, COOP/COEP/CORP, `assetsInclude` `*.vpx/*.wasm/*.zip`); the ROM middleware also resolves `~/pinmame/roms` (non-dot) and `public/pinmame/roms/`. The engine artifact is served from `public/wasm/`. `public/test/fixtures/table-empty.vpx` is a tracked copy of `test/fixtures/table-empty.vpx` so static builds ship the default table; keep the two identical.
 
 ## Structure
 
@@ -30,12 +30,12 @@ Requires `dist-esm` built. `server.fs.allow` covers the repo root, `~/Downloads`
 - `src/viewer.ts` — Viewer coordinator: renderer lifecycle (incl. device-loss recovery), load pipeline, engine boot, mode switches, frame loop
 - `src/wasm-engine.ts` — adapter over the headless vpinball WASM engine (script, physics, audio, DMD)
 - `src/config.js` — controls, camera presets & constants
-- `src/styles/app.css` — consolidated CSS tokens
+- `src/styles/app.css` + `src/styles/table-browser.css` — consolidated CSS tokens + catalog dialog styles
 - `src/input.js` — `attachInput`: attaches keyboard, pointer/touch and nudge input once through one host and one `AbortController`
 - `src/input/input-manager.ts` — keys, touch flipper zones, swipe nudges & cabinet button raycasting
 - `src/input/nudge-controller.ts` — device-motion shake nudges and gamepad nudges (polled on the viewer's frame loop)
 - `src/dmd/dmd-renderer.ts`, `src/backglass/backglass-renderer.ts` — on-table DMD mesh updater and desktop backglass overlay
-- `src/ui/stats-overlay.ts`, `help-dialog.ts`, `log-viewer.ts` — stats HUD, controls dialog, page log (no `console`/`fetch`/`XHR` monkey-patch)
+- `src/ui/stats-overlay.ts`, `help-dialog.ts`, `log-viewer.ts`, `src/overlays/dirty-overlay.ts` — stats HUD, controls dialog, page log (no `console`/`fetch`/`XHR` monkey-patch), dirty-gated present loop
 - `src/ui/table-browser.ts` — Virtual Pinball Spreadsheet table/ROM browser (`lib/emu/vps-catalog.ts`)
 - `src/utils/candidate-resolver.ts`, `texture-filter.ts` — VPX resolution, downloads & glass-texture filtering
 - `src/env.js`, `src/utils.js` — env caps/quality flags + `$`/`fmtBytes` helpers and `utils/*` re-exports

@@ -146,6 +146,7 @@ export class Viewer {
 		this.dom = {
 			canvas: $('canvas'),
 			loading: $('loading'),
+			bar: $('bar'),
 			barFill: $('bar-fill'),
 			barText: $('bar-text'),
 			loadDetail: $('load-detail'),
@@ -727,7 +728,9 @@ export class Viewer {
 		dispatchEvent(new CustomEvent('viewer:modechange', { detail: { mode: this.viewerMode } }))
 	}
 	setBar(pct, txt) {
-		if (this.dom.barFill) this.dom.barFill.style.setProperty('--progress', String(Math.max(0, Math.min(100, pct))))
+		const clamped = Math.max(0, Math.min(100, pct))
+		if (this.dom.barFill) this.dom.barFill.style.setProperty('--progress', String(clamped))
+		if (this.dom.bar) this.dom.bar.setAttribute('aria-valuenow', String(Math.round(clamped)))
 		if (this.dom.barText) this.dom.barText.textContent = txt ?? `${pct.toFixed(0)}%`
 	}
 	_loading(pct, title, detail = '') {
@@ -1278,55 +1281,41 @@ export class Viewer {
 		this._setStreamProgress(0, textures.length)
 		if (this.dom.streamLabel) this.dom.streamLabel.textContent = 'Enhancing visuals…'
 		const streamId = ++this._streamId
+		// Load B mounts a new tableGroup mid-stream: every late block below
+		// must bail unless the stream and the scene still match this load.
+		const node0 = this.tableGroup
+		const isCurrent = () => this._streamId === streamId && this.tableGroup === node0 && !!this.tableGroup
 		void (async () => {
-			const total = textures.length
-			let done = 0
-			const t0 = performance.now()
-			this.log(`[stream] Streaming ${total} textures…`, 'debug')
-			let scheduled = false
-			// Exposed for the demand hook below (mid-game script image swaps).
-			const patchCloned = (this._patchCloned = () => {
-				const cache = this.renderApi.getMapGenerator?.().getCache?.()
-				if (!cache || !this.tableGroup) return 0
-				let fixed = 0
-				this.tableGroup.traverse(o => {
-					if (!o.isMesh || !o.material) return
-					const mats = Array.isArray(o.material) ? o.material : [o.material]
-					for (const m of mats) {
-						for (const k of ['map', 'normalMap', 'envMap', 'emissiveMap']) {
-							const pk = `pending${k[0].toUpperCase()}${k.slice(1)}`
-							const name = m.userData?.[pk]
-							if (!name) continue
-							// The cache is dual-keyed (exact + lowercase) at every
-							// insert, so this is the whole case-insensitive
-							// search — no linear scan over the growing cache.
-							const tex = cache.get(name) ?? cache.get(String(name).toLowerCase())
-							if (!tex) continue
-							if (isBakedNodeMaterial(m)) {
-								if (k !== 'map') {
-									delete m.userData[pk]
-									continue
-								}
-								const changed = setBakedMap(m, tex, String(name))
-								delete m.userData[pk]
-								let cut = false
-								if (!(m.userData as any)?.__addBlend && !((m as any).alphaTest > 0)) {
-									const cutout =
-										(m.userData as any)?.__alphaTestValue ??
-										(tex as any)?.userData?.alphaTestValue ??
-										0
-									if (cutout > 0 && cutout <= 1) {
-										;(m as any).alphaTest = cutout
-										m.needsUpdate = true
-										cut = true
+			try {
+				const total = textures.length
+				let done = 0
+				const t0 = performance.now()
+				this.log(`[stream] Streaming ${total} textures…`, 'debug')
+				let scheduled = false
+				// Exposed for the demand hook below (mid-game script image swaps).
+				const patchCloned = (this._patchCloned = () => {
+					const cache = this.renderApi.getMapGenerator?.().getCache?.()
+					if (!cache || !this.tableGroup) return 0
+					let fixed = 0
+					this.tableGroup.traverse(o => {
+						if (!o.isMesh || !o.material) return
+						const mats = Array.isArray(o.material) ? o.material : [o.material]
+						for (const m of mats) {
+							for (const k of ['map', 'normalMap', 'envMap', 'emissiveMap']) {
+								const pk = `pending${k[0].toUpperCase()}${k.slice(1)}`
+								const name = m.userData?.[pk]
+								if (!name) continue
+								// The cache is dual-keyed (exact + lowercase) at every
+								// insert, so this is the whole case-insensitive
+								// search — no linear scan over the growing cache.
+								const tex = cache.get(name) ?? cache.get(String(name).toLowerCase())
+								if (!tex) continue
+								if (isBakedNodeMaterial(m)) {
+									if (k !== 'map') {
+										delete m.userData[pk]
+										continue
 									}
-								}
-								if (changed || cut) fixed++
-								continue
-							}
-							if (isPrimitiveNodeMaterial(m)) {
-								if (k === 'map') {
-									const changed = setPrimitiveMap(m, tex, String(name))
+									const changed = setBakedMap(m, tex, String(name))
 									delete m.userData[pk]
 									let cut = false
 									if (!(m.userData as any)?.__addBlend && !((m as any).alphaTest > 0)) {
@@ -1340,296 +1329,334 @@ export class Viewer {
 											cut = true
 										}
 									}
-									if (m.userData?.pendingEmissiveMap) delete m.userData.pendingEmissiveMap
 									if (changed || cut) fixed++
 									continue
 								}
-								if (k === 'normalMap' || k === 'envMap') {
-									if ((m as any)[k] === tex) {
+								if (isPrimitiveNodeMaterial(m)) {
+									if (k === 'map') {
+										const changed = setPrimitiveMap(m, tex, String(name))
 										delete m.userData[pk]
+										let cut = false
+										if (!(m.userData as any)?.__addBlend && !((m as any).alphaTest > 0)) {
+											const cutout =
+												(m.userData as any)?.__alphaTestValue ??
+												(tex as any)?.userData?.alphaTestValue ??
+												0
+											if (cutout > 0 && cutout <= 1) {
+												;(m as any).alphaTest = cutout
+												m.needsUpdate = true
+												cut = true
+											}
+										}
+										if (m.userData?.pendingEmissiveMap) delete m.userData.pendingEmissiveMap
+										if (changed || cut) fixed++
 										continue
 									}
-									// Attach (empty -> texture) changes the program; a
-									// texture -> texture swap only rebinds a uniform.
-									const attached = (m as any)[k] == null
-									m[k] = tex
-									tex.name = String(name)
-									if (k === 'envMap') m.envMapIntensity = 1
-									if (attached) m.needsUpdate = true
-									fixed++
+									if (k === 'normalMap' || k === 'envMap') {
+										if ((m as any)[k] === tex) {
+											delete m.userData[pk]
+											continue
+										}
+										// Attach (empty -> texture) changes the program; a
+										// texture -> texture swap only rebinds a uniform.
+										const attached = (m as any)[k] == null
+										m[k] = tex
+										tex.name = String(name)
+										if (k === 'envMap') m.envMapIntensity = 1
+										if (attached) m.needsUpdate = true
+										fixed++
+										continue
+									}
+									delete m.userData[pk]
+									if (m.userData?.pendingEmissiveMap) delete m.userData.pendingEmissiveMap
 									continue
 								}
-								delete m.userData[pk]
-								if (m.userData?.pendingEmissiveMap) delete m.userData.pendingEmissiveMap
-								continue
-							}
-							if ((m as any)[k] === tex) {
-								delete m.userData[pk]
-								if (k === 'map' && m.userData?.pendingEmissiveMap) {
-									delete (m.userData as any).pendingEmissiveMap
+								if ((m as any)[k] === tex) {
+									delete m.userData[pk]
+									if (k === 'map' && m.userData?.pendingEmissiveMap) {
+										delete (m.userData as any).pendingEmissiveMap
+									}
+									continue
 								}
-								continue
-							}
-							// Attach (empty -> texture) changes the program; a
-							// texture -> texture swap only rebinds a uniform.
-							const attached = (m as any)[k] == null
-							m[k] = tex
-							tex.name = name
-							delete m.userData[pk]
-							if (attached) m.needsUpdate = true
-							if (k === 'map' || k === 'emissiveMap') {
-								const info = isBakedMeshByNames(
-									o.name || '',
-									m.name || '',
-									tex.name || '',
-									!!m.userData?.__isBaked,
-									!!m.userData?.__addBlend,
-								)
-								if (info.isBaked) {
-									applyBakedMaterial(m, tex, info, o.name || '')
-									const nl = (o.name || '').toLowerCase()
-									const isBakedMeshName = nl.includes('playfield') || nl.includes('bm_')
-									if (info.isMainBake && isBakedMeshName) {
-										const makeVisible = obj => {
-											if (obj.visible === false) {
-												obj.visible = true
-												for (let pp = obj.parent; pp && pp !== this.tableGroup; pp = pp.parent)
-													if (pp.visible === false) pp.visible = true
+								// Attach (empty -> texture) changes the program; a
+								// texture -> texture swap only rebinds a uniform.
+								const attached = (m as any)[k] == null
+								m[k] = tex
+								tex.name = name
+								delete m.userData[pk]
+								if (attached) m.needsUpdate = true
+								if (k === 'map' || k === 'emissiveMap') {
+									const info = isBakedMeshByNames(
+										o.name || '',
+										m.name || '',
+										tex.name || '',
+										!!m.userData?.__isBaked,
+										!!m.userData?.__addBlend,
+									)
+									if (info.isBaked) {
+										applyBakedMaterial(m, tex, info, o.name || '')
+										const nl = (o.name || '').toLowerCase()
+										const isBakedMeshName = nl.includes('playfield') || nl.includes('bm_')
+										if (info.isMainBake && isBakedMeshName) {
+											const makeVisible = obj => {
+												if (obj.visible === false) {
+													obj.visible = true
+													for (
+														let pp = obj.parent;
+														pp && pp !== this.tableGroup;
+														pp = pp.parent
+													)
+														if (pp.visible === false) pp.visible = true
+												}
 											}
+											makeVisible(o)
+											this.tableGroup.traverse(obj2 => {
+												if (!obj2.isMesh || obj2 === o) return
+												const n2 = (obj2.name || '').toLowerCase()
+												if (obj2.material === m && n2.includes('bm_')) {
+													makeVisible(obj2)
+												}
+											})
 										}
-										makeVisible(o)
-										this.tableGroup.traverse(obj2 => {
-											if (!obj2.isMesh || obj2 === o) return
-											const n2 = (obj2.name || '').toLowerCase()
-											if (obj2.material === m && n2.includes('bm_')) {
-												makeVisible(obj2)
+									} else if (info.isVrCab) {
+										const nl = (o.name || '').toLowerCase()
+										if (
+											o.visible === false &&
+											(nl.includes('vrcab') ||
+												nl.includes('cabinet') ||
+												nl.includes('lockbar') ||
+												nl.includes('pincab'))
+										) {
+											o.visible = true
+											for (let p = o.parent; p && p !== this.tableGroup; p = p.parent)
+												if (p.visible === false) p.visible = true
+										}
+										m.polygonOffset = true
+										m.polygonOffsetFactor = 0
+										m.polygonOffsetUnits = -1
+										if (m.transparent && m.opacity === 0) {
+											m.transparent = false
+											m.opacity = 1
+											m.depthWrite = true
+											m.alphaTest = 0
+											m.blending = THREE.NormalBlending
+											if (tex) {
+												// Shared textures re-resolve per material: only
+												// touch (and re-upload) when samplers differ.
+												// A never-flagged texture (version 0) still
+												// needs its first upload even when the
+												// samplers already match — three.js only
+												// uploads version-bumped textures.
+												const aniso = isLowQuality() ? QUALITY_CAPS.low.aniso : 8
+												const samplerDiffers =
+													tex.wrapS !== THREE.ClampToEdgeWrapping ||
+													tex.wrapT !== THREE.ClampToEdgeWrapping ||
+													tex.generateMipmaps !== true ||
+													tex.minFilter !== THREE.LinearMipmapLinearFilter ||
+													tex.magFilter !== THREE.LinearFilter ||
+													tex.anisotropy !== aniso
+												if (samplerDiffers) {
+													tex.wrapS = THREE.ClampToEdgeWrapping
+													tex.wrapT = THREE.ClampToEdgeWrapping
+													tex.generateMipmaps = true
+													tex.minFilter = THREE.LinearMipmapLinearFilter
+													tex.magFilter = THREE.LinearFilter
+													tex.anisotropy = aniso
+												}
+												if (samplerDiffers || tex.version === 0) tex.needsUpdate = true
 											}
-										})
-									}
-								} else if (info.isVrCab) {
-									const nl = (o.name || '').toLowerCase()
-									if (
-										o.visible === false &&
-										(nl.includes('vrcab') ||
-											nl.includes('cabinet') ||
-											nl.includes('lockbar') ||
-											nl.includes('pincab'))
-									) {
-										o.visible = true
-										for (let p = o.parent; p && p !== this.tableGroup; p = p.parent)
-											if (p.visible === false) p.visible = true
-									}
-									m.polygonOffset = true
-									m.polygonOffsetFactor = 0
-									m.polygonOffsetUnits = -1
-									if (m.transparent && m.opacity === 0) {
-										m.transparent = false
-										m.opacity = 1
-										m.depthWrite = true
-										m.alphaTest = 0
-										m.blending = THREE.NormalBlending
-										if (tex) {
-											// Shared textures re-resolve per material: only
-											// touch (and re-upload) when samplers differ.
-											// A never-flagged texture (version 0) still
-											// needs its first upload even when the
-											// samplers already match — three.js only
-											// uploads version-bumped textures.
-											const aniso = isLowQuality() ? QUALITY_CAPS.low.aniso : 8
-											const samplerDiffers =
-												tex.wrapS !== THREE.ClampToEdgeWrapping ||
-												tex.wrapT !== THREE.ClampToEdgeWrapping ||
-												tex.generateMipmaps !== true ||
-												tex.minFilter !== THREE.LinearMipmapLinearFilter ||
-												tex.magFilter !== THREE.LinearFilter ||
-												tex.anisotropy !== aniso
-											if (samplerDiffers) {
-												tex.wrapS = THREE.ClampToEdgeWrapping
-												tex.wrapT = THREE.ClampToEdgeWrapping
-												tex.generateMipmaps = true
-												tex.minFilter = THREE.LinearMipmapLinearFilter
-												tex.magFilter = THREE.LinearFilter
-												tex.anisotropy = aniso
-											}
-											if (samplerDiffers || tex.version === 0) tex.needsUpdate = true
+											m.needsUpdate = true
 										}
 										m.needsUpdate = true
-									}
-									m.needsUpdate = true
-								} else {
-									const texName = String(tex?.name ?? name ?? '').toLowerCase()
-									const isRoundInsert = texName.includes('round') && !texName.includes('ground')
-									const isInsertTex =
-										texName.includes('insert') ||
-										texName.includes('rect') ||
-										isRoundInsert ||
-										texName.includes('dot') ||
-										texName.includes('triangle') ||
-										texName.includes('flasher') ||
-										texName.includes('vrlight')
-									if (isInsertTex && m.transparent && m.opacity === 0) {
-										m.transparent = false
-										m.opacity = 1
-										m.depthWrite = true
-										m.alphaTest = 0
-										m.blending = THREE.NormalBlending
-										m.needsUpdate = true
+									} else {
+										const texName = String(tex?.name ?? name ?? '').toLowerCase()
+										const isRoundInsert = texName.includes('round') && !texName.includes('ground')
+										const isInsertTex =
+											texName.includes('insert') ||
+											texName.includes('rect') ||
+											isRoundInsert ||
+											texName.includes('dot') ||
+											texName.includes('triangle') ||
+											texName.includes('flasher') ||
+											texName.includes('vrlight')
+										if (isInsertTex && m.transparent && m.opacity === 0) {
+											m.transparent = false
+											m.opacity = 1
+											m.depthWrite = true
+											m.alphaTest = 0
+											m.blending = THREE.NormalBlending
+											m.needsUpdate = true
+										}
 									}
 								}
+								fixed++
 							}
-							fixed++
-						}
-					}
-				})
-				if (fixed) {
-					// One pass: bake-detect, playfield hide, and playfield show
-					// share the per-mesh classify, but the hide needs the whole
-					// walk's verdict first, so decisions apply after the walk.
-					// classify() lowercases names itself, so one call covers
-					// the mixed original/lowercase callers above.
-					const effMap = (mm: any) => mm?.map ?? (mm?.userData?.__map as any) ?? null
-					let hasReadyBake = false
-					const hide: THREE.Mesh[] = []
-					const show: THREE.Mesh[] = []
-					this.tableGroup.traverse(o2 => {
-						if (!o2.isMesh) return
-						const rawName = o2.name || ''
-						const n2 = rawName.toLowerCase()
-						const inFamily = n2.includes('playfield') || n2.includes('bm_')
-						const m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
-						const map = m2 ? effMap(m2) : null
-						if (map && inFamily) {
-							const info = isBakedMeshByNames(
-								rawName,
-								m2.name || '',
-								map?.name || '',
-								!!m2.userData?.__isBaked,
-								!!m2.userData?.__addBlend,
-							)
-							if (info.isBaked) hasReadyBake = true
-							const isBaked = !!(m2.userData && (m2.userData.__isBaked || m2.userData.__bakedNode))
-							// Collect regardless of current visibility: the hide
-							// below runs first, and a hidden mesh that still
-							// qualifies must end up shown again.
-							const shouldShow = isBaked || info.isMainBake || (info.isVlmBake && !info.isMainBake)
-							if (shouldShow) show.push(o2)
-						}
-						if (m2 && o2.visible && n2.includes('playfield')) {
-							const info = isBakedMeshByNames(
-								rawName,
-								m2.name || '',
-								map?.name || '',
-								!!m2.userData?.__isBaked,
-								!!m2.userData?.__addBlend,
-							)
-							if (!info.isBaked && !info.isMainBake && !info.isVlmBake) hide.push(o2)
 						}
 					})
-					if (hasReadyBake)
-						for (const o2 of hide) {
-							o2.visible = false
-							o2.geometry?.dispose?.()
+					if (fixed) {
+						// One pass: bake-detect, playfield hide, and playfield show
+						// share the per-mesh classify, but the hide needs the whole
+						// walk's verdict first, so decisions apply after the walk.
+						// classify() lowercases names itself, so one call covers
+						// the mixed original/lowercase callers above.
+						const effMap = (mm: any) => mm?.map ?? (mm?.userData?.__map as any) ?? null
+						let hasReadyBake = false
+						const hide: THREE.Mesh[] = []
+						const show: THREE.Mesh[] = []
+						this.tableGroup.traverse(o2 => {
+							if (!o2.isMesh) return
+							const rawName = o2.name || ''
+							const n2 = rawName.toLowerCase()
+							const inFamily = n2.includes('playfield') || n2.includes('bm_')
+							const m2 = Array.isArray(o2.material) ? o2.material[0] : o2.material
+							const map = m2 ? effMap(m2) : null
+							if (map && inFamily) {
+								const info = isBakedMeshByNames(
+									rawName,
+									m2.name || '',
+									map?.name || '',
+									!!m2.userData?.__isBaked,
+									!!m2.userData?.__addBlend,
+								)
+								if (info.isBaked) hasReadyBake = true
+								const isBaked = !!(m2.userData && (m2.userData.__isBaked || m2.userData.__bakedNode))
+								// Collect regardless of current visibility: the hide
+								// below runs first, and a hidden mesh that still
+								// qualifies must end up shown again.
+								const shouldShow = isBaked || info.isMainBake || (info.isVlmBake && !info.isMainBake)
+								if (shouldShow) show.push(o2)
+							}
+							if (m2 && o2.visible && n2.includes('playfield')) {
+								const info = isBakedMeshByNames(
+									rawName,
+									m2.name || '',
+									map?.name || '',
+									!!m2.userData?.__isBaked,
+									!!m2.userData?.__addBlend,
+								)
+								if (!info.isBaked && !info.isMainBake && !info.isVlmBake) hide.push(o2)
+							}
+						})
+						if (hasReadyBake)
+							for (const o2 of hide) {
+								o2.visible = false
+								o2.geometry?.dispose?.()
+							}
+						for (const o2 of show) {
+							if (o2.visible === false) {
+								o2.visible = true
+								for (let p = o2.parent; p && p !== this.tableGroup; p = p.parent)
+									if (p.visible === false) p.visible = true
+							}
 						}
-					for (const o2 of show) {
-						if (o2.visible === false) {
-							o2.visible = true
-							for (let p = o2.parent; p && p !== this.tableGroup; p = p.parent)
-								if (p.visible === false) p.visible = true
+					}
+					return fixed
+				})
+				const schedulePatch = () => {
+					if (scheduled) return
+					scheduled = true
+					queueMicrotask(() => {
+						scheduled = false
+						if (this._streamId !== streamId) return
+						const matGen = this.renderApi.getMaterialGenerator?.()
+						if (this.tableGroup) matGen?.resolvePendingInScene(this.tableGroup)
+						matGen?.resolvePendingTextures?.()
+						patchCloned()
+					})
+				}
+				const onTexture = (_tex, _ok) => {
+					if (this._streamId !== streamId) return
+					done++
+					schedulePatch()
+					if (done % 2 === 0 || done === total) this._setStreamProgress(done, total)
+				}
+				await this.renderApi.preloadTextures(textures, table, onTexture)
+				if (this._streamId !== streamId) {
+					if (reader) {
+						await this._cleanupReader(reader)
+					}
+					return
+				}
+				const matGen = this.renderApi.getMaterialGenerator?.()
+				const fixedScene = this.tableGroup ? (matGen?.resolvePendingInScene(this.tableGroup) ?? 0) : 0
+				const fixed = fixedScene + (matGen?.resolvePendingTextures?.() ?? 0)
+				const fixed2 = patchCloned()
+				if (fixed || fixed2)
+					this.log(
+						`[stream] Patched ${fixed + fixed2} materials (${fixed} resolved + ${fixed2} cloned)`,
+						'debug',
+					)
+				// Demand pass: script-assigned images (set after the used-texture
+				// filter ran) reference textures that never streamed. Load + bind
+				// them now, before batching, so no material stays mapless.
+				if (this.tableGroup && table && isCurrent()) {
+					const mapGenerator = this.renderApi.getMapGenerator()
+					const { loaded, missing } = await mapGenerator.demandPendingMaps(this.tableGroup, table)
+					if (loaded.length) {
+						const demandMatGen = this.renderApi.getMaterialGenerator?.()
+						const fixed3 =
+							(this.tableGroup ? (demandMatGen?.resolvePendingInScene(this.tableGroup) ?? 0) : 0) +
+							(demandMatGen?.resolvePendingTextures?.() ?? 0)
+						const fixed4 = patchCloned()
+						this.log(
+							`[stream] Demand-loaded ${loaded.length} script-referenced textures (${loaded.join(', ')})`,
+							'debug',
+						)
+						if (fixed3 + fixed4 === 0)
+							this.log('[stream] Demand-loaded textures but no material took them', 'warn')
+					}
+					for (const name of missing)
+						this.log(
+							`[stream] Material references unloadable texture "${name}" (unknown name or cleared source)`,
+							'warn',
+						)
+				}
+				if (!isCurrent()) {
+					if (reader) {
+						await this._cleanupReader(reader)
+					}
+					return
+				}
+				if (this.tableGroup && table && this.renderApi) {
+					if (this.options.batched) {
+						const bakedRes = _batchStaticOpaques(this.tableGroup, table, this.renderApi)
+						if (bakedRes) {
+							this.log(`[batch] Post-stream baked ${bakedRes} BatchedMesh`, 'debug')
+							if (!isLowQuality()) buildBvhIdle(this.tableGroup)
+							else this.log('[bvh] low quality: skip post-batch BVH', 'debug')
+						} else {
+							setTimeout(() => {
+								if (!isCurrent()) return
+								const retry = _batchStaticOpaques(this.tableGroup, table, this.renderApi)
+								if (retry) {
+									this.log(`[batch] Post-stream retry baked ${retry} BatchedMesh`, 'debug')
+									if (!isLowQuality()) buildBvhIdle(this.tableGroup)
+								}
+							}, 600)
 						}
 					}
 				}
-				return fixed
-			})
-			const schedulePatch = () => {
-				if (scheduled) return
-				scheduled = true
-				queueMicrotask(() => {
-					scheduled = false
-					if (this._streamId !== streamId) return
-					const matGen = this.renderApi.getMaterialGenerator?.()
-					if (this.tableGroup) matGen?.resolvePendingInScene(this.tableGroup)
-					matGen?.resolvePendingTextures?.()
-					patchCloned()
-				})
-			}
-			const onTexture = (_tex, _ok) => {
-				if (this._streamId !== streamId) return
-				done++
-				schedulePatch()
-				if (done % 2 === 0 || done === total) this._setStreamProgress(done, total)
-			}
-			await this.renderApi.preloadTextures(textures, table, onTexture)
-			if (this._streamId !== streamId) {
+				const tm = computeTexMem(this.tableGroup)
+				this.log(
+					`[stream] Done ${done}/${total} in ${(performance.now() - t0) | 0}ms — now ${tm.texCount} ~${tm.texMemMB} MB`,
+				)
+				this._setStreamProgress(total, total)
+				if (this.dom.streamLabel) this.dom.streamLabel.textContent = 'Visuals ready'
+				setTimeout(() => this._hideStream(), 1200)
+				logMem(this.log, 'Stream ready')
+				await this._retainUnstreamedSources(table)
 				if (reader) {
 					await this._cleanupReader(reader)
 				}
-				return
+				// generic: free raw texture binaries after streaming regardless of mode; keeps GPU textures only
+				this._clearRawTextures?.()
+				if (typeof (globalThis as any).gc === 'function') (globalThis as any).gc()
+			} catch (error) {
+				this.log(
+					`[stream] Texture streaming failed: ${error instanceof Error ? error.message : String(error)}`,
+					'error',
+				)
 			}
-			const matGen = this.renderApi.getMaterialGenerator?.()
-			const fixedScene = this.tableGroup ? (matGen?.resolvePendingInScene(this.tableGroup) ?? 0) : 0
-			const fixed = fixedScene + (matGen?.resolvePendingTextures?.() ?? 0)
-			const fixed2 = patchCloned()
-			if (fixed || fixed2)
-				this.log(`[stream] Patched ${fixed + fixed2} materials (${fixed} resolved + ${fixed2} cloned)`, 'debug')
-			// Demand pass: script-assigned images (set after the used-texture
-			// filter ran) reference textures that never streamed. Load + bind
-			// them now, before batching, so no material stays mapless.
-			if (this.tableGroup && table && this._streamId === streamId) {
-				const mapGenerator = this.renderApi.getMapGenerator()
-				const { loaded, missing } = await mapGenerator.demandPendingMaps(this.tableGroup, table)
-				if (loaded.length) {
-					const demandMatGen = this.renderApi.getMaterialGenerator?.()
-					const fixed3 =
-						(this.tableGroup ? (demandMatGen?.resolvePendingInScene(this.tableGroup) ?? 0) : 0) +
-						(demandMatGen?.resolvePendingTextures?.() ?? 0)
-					const fixed4 = patchCloned()
-					this.log(
-						`[stream] Demand-loaded ${loaded.length} script-referenced textures (${loaded.join(', ')})`,
-						'debug',
-					)
-					if (fixed3 + fixed4 === 0)
-						this.log('[stream] Demand-loaded textures but no material took them', 'warn')
-				}
-				for (const name of missing)
-					this.log(
-						`[stream] Material references unloadable texture "${name}" (unknown name or cleared source)`,
-						'warn',
-					)
-			}
-			if (this.tableGroup && table && this.renderApi) {
-				if (this.options.batched) {
-					const bakedRes = _batchStaticOpaques(this.tableGroup, table, this.renderApi)
-					if (bakedRes) {
-						this.log(`[batch] Post-stream baked ${bakedRes} BatchedMesh`, 'debug')
-						if (!isLowQuality()) buildBvhIdle(this.tableGroup)
-						else this.log('[bvh] low quality: skip post-batch BVH', 'debug')
-					} else {
-						setTimeout(() => {
-							if (!this.tableGroup) return
-							const retry = _batchStaticOpaques(this.tableGroup, table, this.renderApi)
-							if (retry) {
-								this.log(`[batch] Post-stream retry baked ${retry} BatchedMesh`, 'debug')
-								if (!isLowQuality()) buildBvhIdle(this.tableGroup)
-							}
-						}, 600)
-					}
-				}
-			}
-			const tm = computeTexMem(this.tableGroup)
-			this.log(
-				`[stream] Done ${done}/${total} in ${(performance.now() - t0) | 0}ms — now ${tm.texCount} ~${tm.texMemMB} MB`,
-			)
-			this._setStreamProgress(total, total)
-			if (this.dom.streamLabel) this.dom.streamLabel.textContent = 'Visuals ready'
-			setTimeout(() => this._hideStream(), 1200)
-			logMem(this.log, 'Stream ready')
-			await this._retainUnstreamedSources(table)
-			if (reader) {
-				await this._cleanupReader(reader)
-			}
-			// generic: free raw texture binaries after streaming regardless of mode; keeps GPU textures only
-			this._clearRawTextures?.()
-			if (typeof (globalThis as any).gc === 'function') (globalThis as any).gc()
 		})()
 	}
 	async _fromReader(reader, source, _loadGen = this._loadId) {
@@ -1748,9 +1775,10 @@ export class Viewer {
 				const t0 = performance.now()
 				const bytes = await fetchWithProgress(
 					url,
-					p => {
-						const pct = Math.round(p * 100)
-						this._loading(5 + p * 60, `Downloading… ${pct}%`, `Downloading table… ${pct}%`)
+					progress => {
+						const known = progress.total ? progress.received / progress.total : 0
+						const label = progress.total ? `${Math.round(known * 100)}%` : fmtBytes(progress.received)
+						this._loading(5 + known * 60, `Downloading… ${label}`, `Downloading table… ${label}`)
 					},
 					{ signal },
 				)
@@ -1777,7 +1805,8 @@ export class Viewer {
 	/** Download a ROM and attach it (see `_attachRom`). */
 	preloadRom(url) {
 		this.log(`Downloading ROM ${url}…`, 'debug')
-		return this._attachRom(url.split('/').pop(), fetchWithProgress(url))
+		// Query strings are not part of the file name (signed URLs).
+		return this._attachRom(new URL(url, document.baseURI).pathname.split('/').pop(), fetchWithProgress(url))
 	}
 	/**
 	 * A ROM belongs to the table on screen or loading, whose engine reboots
@@ -1930,6 +1959,10 @@ export class Viewer {
 	}
 
 	togglePause() {
+		if (!this.wasmEngine?.ready) {
+			this.log('Pause ignored: engine not ready', 'debug')
+			return
+		}
 		this.isPaused = !this.isPaused
 		this.invalidate()
 		this.log(this.isPaused ? 'Paused (P to resume)' : 'Resumed', this.isPaused ? 'warn' : 'info')

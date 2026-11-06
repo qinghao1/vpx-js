@@ -14,9 +14,11 @@ export const resolveVpxCandidates = vpx => {
 }
 
 /**
- * Download a file's bytes, reporting 0..1 progress. Aborting `signal` aborts
- * the body stream too. An HTML page is rejected: dev servers and SPA hosts
- * answer a missing file with their index.html and a 200.
+ * Download a file's bytes, reporting `{ received, total }` per chunk.
+ * `total` is undefined when the server omits content-length: callers must
+ * show bytes, never a fake percent. Aborting `signal` aborts the body
+ * stream too. An HTML page is rejected: dev servers and SPA hosts answer a
+ * missing file with their index.html and a 200.
  */
 export const fetchWithProgress = async (url, onProgress, { signal } = {}) => {
 	const res = await fetch(url, { cache: 'no-store', signal })
@@ -24,22 +26,22 @@ export const fetchWithProgress = async (url, onProgress, { signal } = {}) => {
 	if (res.headers.get('content-type')?.includes('text/html')) throw new Error(`${url} is an HTML page, not a file`)
 	if (!res.body) {
 		const b = await res.arrayBuffer()
-		onProgress?.(1)
+		onProgress?.({ received: b.byteLength, total: b.byteLength })
 		return new Uint8Array(b)
 	}
-	const len = Number(res.headers.get('content-length') || 0)
+	const len = Number(res.headers.get('content-length') || 0) || undefined
 	const reader = res.body.getReader()
 	const chunks = []
 	let received = 0
+	const report = () => onProgress?.({ received, total: len })
 	while (true) {
 		const { done, value } = await reader.read()
 		if (done) break
 		chunks.push(value)
 		received += value.length
-		if (len) onProgress?.(Math.min(received / len, 1))
-		else onProgress?.(Math.min(received / (2 * 1024 * 1024), 0.99))
+		report()
 	}
-	onProgress?.(1)
+	report()
 	if (chunks.length === 1) return chunks[0]
 	const out = new Uint8Array(received)
 	let off = 0

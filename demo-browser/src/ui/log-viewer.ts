@@ -5,9 +5,11 @@ export function createLog(logEl: HTMLElement) {
 		const entry = document.createElement('div')
 		entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`
 		entry.className = `log-entry log-entry--${level}`
+		// Don't yank the scroll while the user reads back: only follow the tail.
+		const follow = logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 48
 		logEl.appendChild(entry)
 		while (logEl.children.length > 600) logEl.firstChild?.remove()
-		logEl.scrollTop = logEl.scrollHeight
+		if (follow) logEl.scrollTop = logEl.scrollHeight
 		if (level === 'error') console.error('[vpx:err]', msg)
 		else console.log('[vpx]', msg)
 	}

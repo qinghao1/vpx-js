@@ -154,6 +154,19 @@ export function attachKeyboard(host: InputHost, signal: AbortSignal): void {
 			host.enterPlayMode()
 		}
 
+		// Track held switches above the play-mode gate: mode exits that
+		// bypass Escape (Reset button, browser back, test API) must not
+		// strand a held key in `pressed` and eat the next press.
+		const dik = keyEventToDirectInputKey(e as any)
+		if (dik) {
+			if (down) {
+				if (pressed.has(dik)) return
+				pressed.add(dik)
+			} else {
+				pressed.delete(dik)
+			}
+		}
+
 		if (host.viewerMode !== 'play') return
 
 		if (e.code === 'Escape' && down) {
@@ -167,16 +180,6 @@ export function attachKeyboard(host: InputHost, signal: AbortSignal): void {
 			host.togglePause()
 			e.preventDefault()
 			return
-		}
-
-		const dik = keyEventToDirectInputKey(e as any)
-		if (dik) {
-			if (down) {
-				if (pressed.has(dik)) return
-				pressed.add(dik)
-			} else {
-				pressed.delete(dik)
-			}
 		}
 
 		const ev = {
@@ -382,6 +385,8 @@ export function attachPointer(host: InputHost, signal: AbortSignal): void {
 					return
 				}
 			}
+			// Right button never drives a switch: it reserves the gesture for
+			// swipe-nudge (see end()) while suspending orbit controls.
 			const code = isRightClick ? '__nudge' : zoneFor(e.clientX, e.clientY)
 			const already = active.has(e.pointerId)
 			active.set(e.pointerId, code)

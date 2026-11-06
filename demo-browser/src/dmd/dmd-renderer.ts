@@ -412,17 +412,6 @@ export class DmdRenderer implements DirtyOverlay {
 	}
 
 	/**
-	 * True when the DMD visibly changed. Manual present sharing
-	 * _presentFrame; the rAF loop never calls this (update() owns the poll
-	 * cadence), so it feeds no dirty gate.
-	 */
-	render() {
-		const dmd = this.viewer.wasmEngine?.dmdFrame
-		if (!dmd) return false
-		return this._presentFrame(dmd.frame, dmd.width, dmd.height)
-	}
-
-	/**
 	 * @implements DirtyOverlay.update.
 	 * The poll rides the engine's DMD frame counter, not a clock: a new
 	 * `frameId` means the emulator produced a frame, so presents stay

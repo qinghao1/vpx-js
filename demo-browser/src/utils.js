@@ -12,10 +12,22 @@ export const computeTexMem = root => {
 	let bytes = 0,
 		count = 0
 	const seen = new Set()
+	// Decoded RGBA estimate across every map a material can carry.
+	const MAP_KEYS = [
+		'map',
+		'emissiveMap',
+		'normalMap',
+		'roughnessMap',
+		'metalnessMap',
+		'aoMap',
+		'alphaMap',
+		'lightMap',
+		'envMap',
+	]
 	root.traverse(o => {
 		if (!o.isMesh || !o.material) return
 		for (const m of Array.isArray(o.material) ? o.material : [o.material])
-			for (const k of ['map', 'emissiveMap']) {
+			for (const k of MAP_KEYS) {
 				const t = m[k]
 				if (!t?.image || seen.has(t)) continue
 				seen.add(t)
