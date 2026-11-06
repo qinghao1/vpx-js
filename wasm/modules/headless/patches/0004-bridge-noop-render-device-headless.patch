@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
 Date: Sun, 1 Nov 2026 00:00:00 -0400
-Subject: [PATCH 4/9] bridge: run Noop renderer synchronously without canvas
+Subject: [PATCH 4/17] bridge: run Noop renderer synchronously without canvas
 
 RenderDevice: select the Noop backend instead of coercing it away, no
 #canvas swapchain, and run the render thread function synchronously on

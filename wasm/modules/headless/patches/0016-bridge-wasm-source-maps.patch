@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
 Date: Fri, 6 Nov 2026 00:00:00 -0400
-Subject: [PATCH 16/16] bridge: emit source maps for the headless WASM target
+Subject: [PATCH 16/17] bridge: emit source maps for the headless WASM target
 
 Sidecar .wasm.map for vpinball-headless in every build type so a SIGILL
 (or any trap) in the deployed engine maps back to C++ sources in browser

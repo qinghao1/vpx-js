@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 -0400
 From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
 Date: Wed, 4 Nov 2026 00:00:00 -0400
-Subject: [PATCH 14/14] bridge: mute/volume for the engine SDL audio path
+Subject: [PATCH 14/17] bridge: mute/volume for the engine SDL audio path
 
 The GetAudio ring carries PinMAME ROM sound only; table script sounds
 (sound effects) play through the engine's own SDL audio devices and

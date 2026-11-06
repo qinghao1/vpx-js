@@ -36,7 +36,7 @@ export const MoverType = {
 	Trigger: 6,
 } as const
 
-/** DMD frame formats (`ControllerPlugin.h:193-196`). LUM32F is linear float luminance, 4 bytes/dot. */
+/** DMD frame formats (`ControllerPlugin.h:193-196`). LUM32F is linear float luminance, 4 bytes/dot. Srgb565 mirrors the header but the bridge never emits it. */
 export const DmdFrameFormat = {
 	Lum32F: 1,
 	Srgb888: 2,
@@ -472,7 +472,7 @@ export function wrapHeadlessEngine(raw: RawHeadlessModule, url: string): Headles
 			// else is a future format (e.g. Srgb565): reject, don't misdecode.
 			let pixels: Uint8Array | Float32Array
 			if (format === DmdFrameFormat.Srgb888) {
-				// SRGB triplets: 3 bytes per dot (planar R, G, B).
+				// SRGB triplets: 3 interleaved bytes per dot (R, G, B).
 				assertInHeap(bytePtr, width * height * 3, 1, 1 << 24)
 				pixels = new Uint8Array(raw.HEAPU8.buffer, bytePtr, width * height * 3).slice()
 			} else if (format === DmdFrameFormat.Lum32F) {

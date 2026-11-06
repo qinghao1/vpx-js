@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 -0400
 From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
 Date: Thu, 5 Nov 2026 00:00:00 -0500
-Subject: [PATCH 15/15] bridge: play in VR player mode
+Subject: [PATCH 15/17] bridge: play in VR player mode
 
 The vpx-js host shows the table in its VR room and cabinet, so play in
 VR mode: default the standalone RenderingModeOverride to VR, letting

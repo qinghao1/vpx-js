@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
 Date: Mon, 3 Nov 2026 00:00:00 -0400
-Subject: [PATCH 10/10] bridge: drop SDL echo of ring-forwarded audio
+Subject: [PATCH 10/17] bridge: drop SDL echo of ring-forwarded audio
 
 The bridge PCM ring (0009) carries int16 mono/stereo controller audio to
 JS. Feeding the SDL stream too doubles those sounds, so skip exactly the

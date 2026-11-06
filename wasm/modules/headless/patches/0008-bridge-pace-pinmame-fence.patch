@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
 Date: Sun, 2 Nov 2026 00:00:00 -0400
-Subject: [PATCH 8/9] bridge: pace PinMAME with the host game clock
+Subject: [PATCH 8/17] bridge: pace PinMAME with the host game clock
 
 Pace the VPM emulation with the host-driven game clock each frame. The
 time fence is otherwise set once at table init (core.vbs) and the libpinmame

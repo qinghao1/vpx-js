@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
 Date: Sun, 1 Nov 2026 00:00:00 -0400
-Subject: [PATCH 3/9] bridge: add headless step entry and script-error record
+Subject: [PATCH 3/17] bridge: add headless step entry and script-error record
 
 Player::StepHeadlessFrame sets the frame time and runs UpdateGameLogic/
 FinishFrame/PrepareFrame (the render tail is compiled out by the 0004

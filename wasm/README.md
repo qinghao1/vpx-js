@@ -17,8 +17,9 @@ npm run build:wasm:headless          # release
 npm run build:wasm:headless:debug    # -O0, assertions
 ```
 
-Needs emsdk 6.0.13 (`$EMSDK`, `~/projects/emsdk`, or `emcc` on `PATH`). The
-first run builds the third-party wasm libraries (`external.sh`, one-time).
+Needs emsdk 6.0.13 (`$EMSDK`, `~/projects/emsdk`, `/tmp/emsdk-6.0.13`, or
+`emcc` on `PATH`). The first run builds the third-party wasm libraries
+(`external.sh`, one-time).
 
 ## Patches
 

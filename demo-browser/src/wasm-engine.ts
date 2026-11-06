@@ -45,17 +45,14 @@ let session: WasmEngine | undefined
 const EMPTY_VIEW = new Float32Array(0)
 
 /**
- * Packed DMD bytes to dots-per-byte. Gray frames pass through; packed RGB
- * (3 bytes/dot) and RGBA (4 bytes/dot) triplets average to one dot, alpha
- * ignored. Anything else is a future layout: reject, don't misdecode.
+ * Packed DMD bytes to dots. The facade only yields interleaved SRGB triplets
+ * (3 bytes/dot); anything else is a future layout: reject, don't misdecode.
  */
 function toDots(bytes: Uint8Array, width: number, height: number): Uint8Array | undefined {
 	const dots = width * height
-	if (bytes.length === dots) return bytes
-	const per = bytes.length === dots * 3 ? 3 : bytes.length === dots * 4 ? 4 : 0
-	if (!per) return undefined
+	if (bytes.length !== dots * 3) return undefined
 	const out = new Uint8Array(dots)
-	for (let i = 0; i < dots; i++) out[i] = Math.round((bytes[i * per] + bytes[i * per + 1] + bytes[i * per + 2]) / 3)
+	for (let i = 0; i < dots; i++) out[i] = Math.round((bytes[i * 3] + bytes[i * 3 + 1] + bytes[i * 3 + 2]) / 3)
 	return out
 }
 
@@ -132,7 +129,9 @@ export class WasmEngine {
 		this.resetAudioFormat()
 		this.sync = undefined
 		// Without isolation the threaded engine aborts deep inside wasm: say why.
-		if (!crossOriginIsolated)
+		// Same predicate as the facade's environment gate (`=== false`;
+		// undefined only occurs off-browser, where this adapter never runs).
+		if (crossOriginIsolated === false)
 			throw new WasmEngineStartError(
 				'The engine needs a cross-origin-isolated page: serve COOP/COEP headers, or build with VITE_COI_SW=1 for static hosts',
 			)
@@ -146,7 +145,6 @@ export class WasmEngine {
 		// against the page, unlike a module-relative URL under `/@fs/`. The
 		// module is shared page-wide; this instance owns its table from here.
 		this.engine = await loadHeadlessEngine(new URL('wasm/vpinball-headless.js', document.baseURI).href)
-		session = this
 		const pending = window as unknown as { __pendingRom?: Uint8Array; __pendingRomName?: string }
 		// PinMAME resolves the zip by the script's game name, not the file basename.
 		const script = this.host.table.tableScript
@@ -156,6 +154,9 @@ export class WasmEngine {
 			this.engine.mountRom(romMountFileName(script, pending.__pendingRomName), pending.__pendingRom)
 		}
 		await this.engine.loadTable(vpxBytes)
+		// Claim the session only once a table is actually loaded: a failed
+		// load must not leave a dead instance owning the shared module.
+		session = this
 		for (const part of this.readCatalog()) {
 			if (typeof part.idx === 'number' && typeof part.name === 'string') this.partNames.set(part.idx, part.name)
 		}
@@ -550,5 +551,3 @@ export class WasmEngine {
 		}
 	}
 }
-
-export { HeadlessEngineMissingError, WASM_STRIDES }

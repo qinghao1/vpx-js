@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
 Date: Sun, 2 Nov 2026 00:00:00 -0400
-Subject: [PATCH 9/9] bridge: capture PinMAME ROM audio to PCM ring
+Subject: [PATCH 9/17] bridge: capture PinMAME ROM audio to PCM ring
 
 diff --git a/plugins/pinmame/PinMAMEPlugin.cpp b/plugins/pinmame/PinMAMEPlugin.cpp
 index 8311f38..878eda7 100644

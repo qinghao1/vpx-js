@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 -0400
 From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
 Date: Wed, 4 Nov 2026 00:00:00 -0400
-Subject: [PATCH 12/12] bridge: mirror live FlexDMD display into m_dmdFrame
+Subject: [PATCH 12/17] bridge: mirror live FlexDMD display into m_dmdFrame
 
 FlexDMD-driven tables (no PinMAME ROM, e.g. JP's Space Cadet) render score
 and mission state through the script's FlexDMD stage, so GetDmdFrame stayed

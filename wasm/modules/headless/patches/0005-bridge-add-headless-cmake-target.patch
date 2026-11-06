@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
 Date: Sun, 1 Nov 2026 00:00:00 -0400
-Subject: [PATCH 5/9] bridge: add vpinball-headless CMake target
+Subject: [PATCH 5/17] bridge: add vpinball-headless CMake target
 
 Self-contained vpinball-headless target (standalone sources minus
 main.cpp plus the bridge). Kept decoupled from the app target on
@@ -16,7 +16,7 @@ diff --git a/make/CMakeLists_app.txt b/make/CMakeLists_app.txt
 index 23f777cc7..9e815236d 100644
 --- a/make/CMakeLists_app.txt
 +++ b/make/CMakeLists_app.txt
-@@ -1012,4 +1012,123 @@ elseif(PLATFORM STREQUAL "wasm")
+@@ -1012,4 +1012,121 @@ elseif(PLATFORM STREQUAL "wasm")
        SUFFIX ".html"
     )
  
@@ -117,19 +117,17 @@ index 23f777cc7..9e815236d 100644
 +   target_link_options(vpinball-headless PUBLIC
 +      --use-port=emdawnwebgpu
 +      -sJSPI
-+      -sOFFSCREENCANVAS_SUPPORT
 +      -sALLOW_MEMORY_GROWTH=1
 +      -sMAXIMUM_MEMORY=4GB
 +      -sINITIAL_MEMORY=512MB
 +      -sSTACK_SIZE=8MB
 +      -sDEFAULT_PTHREAD_STACK_SIZE=2MB
 +      -sPTHREAD_POOL_SIZE=32
-+      -lidbfs.js
 +      -sMODULARIZE=1
 +      -sEXPORT_ES6=1
 +      -sEXPORT_NAME=createVpinballHeadless
 +      -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_VpxWasm_Init,_VpxWasm_MountRom,_VpxWasm_LoadTable,_VpxWasm_StepFrame,_VpxWasm_GetPartCatalogJson,_VpxWasm_GetBuffer,_VpxWasm_GetDmdFrame,_VpxWasm_PushKey,_VpxWasm_Nudge,_VpxWasm_DestroyTable,_VpxWasm_GetScriptErrorCount,_VpxWasm_GetScriptError
-+      -sEXPORTED_RUNTIME_METHODS=FS,UTF8ToString,HEAPU8,HEAPU32,HEAPF32
++      -sEXPORTED_RUNTIME_METHODS=UTF8ToString,HEAPU8,HEAPU32,HEAPF32
 +      -Wl,--allow-multiple-definition
 +      "--preload-file=${CMAKE_SOURCE_DIR}/src/assets@/assets"
 +      "--preload-file=${CMAKE_SOURCE_DIR}/src/scripts@/scripts"

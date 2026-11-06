@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
 Date: Tue, 3 Nov 2026 00:00:00 -0400
-Subject: [PATCH 11/11] bridge: silence refresh-rate probe error in headless
+Subject: [PATCH 11/17] bridge: silence refresh-rate probe error in headless
 
 The headless WASM build has no display by design (Noop renderer, input
 via VpxWasm_PushKey, host-driven via VpxWasm_StepFrame), so the SDL

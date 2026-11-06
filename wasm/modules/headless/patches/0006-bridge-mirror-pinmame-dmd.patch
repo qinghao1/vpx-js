@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 -0400
 From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
 Date: Sun, 2 Nov 2026 00:00:00 -0400
-Subject: [PATCH 6/9] bridge: mirror live PinMAME DMD into m_dmdFrame
+Subject: [PATCH 6/17] bridge: mirror live PinMAME DMD into m_dmdFrame
 
 VPM tables never push DMDPixels from script, so GetDmdFrame stayed empty
 even with the script and PinMAME running. Pull the live dot-matrix frame
