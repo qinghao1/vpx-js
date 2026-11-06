@@ -1,15 +1,16 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 /**
- * Headless-engine bridge smoke test (plan §6.2.5): loads `vpinball-headless`
- * in headless Chrome (real DOM/canvas for SDL video init) through the real
+ * Headless-engine bridge smoke test: loads `vpinball-headless` in headless
+ * Chrome (real DOM/canvas for SDL video init) through the real
  * `loadHeadlessEngine`/`HeadlessEngine` facade, runs `LoadTable` on fixtures,
- * steps frames, and asserts Stage-1 engine state (catalog, mover/lamp rows,
- * script-error observability, clean teardown).
+ * steps frames on a fixed schedule (no wall clock), and asserts engine state
+ * (catalog, mover/lamp rows, nudge wiring, script-error observability,
+ * clean teardown).
  *
  * Keys fire script KeyDown/KeyUp events, so solenoid motion and PinMAME DMD
- * need a scripted table plus VPinMAME.Controller (plan Stage 2): those legs
- * assert correct no-op semantics and skip with reason until then.
+ * need a scripted table plus VPinMAME.Controller: those legs assert correct
+ * no-op semantics and skip with reason.
  *
  * Run: node test/harness/verify-headless.mjs [--rom=<zip>]
  * Exit: 0 pass, 77 skip (artifact absent), 1 fail.
@@ -22,13 +23,15 @@ const ROM_ZIP = process.argv.find(a => a.startsWith('--rom='))?.slice(6) || ''
 const romPath = ROM_ZIP || findWalkingDeadRom() || ''
 const twdPath = findWalkingDead() ?? ''
 
-const BASE = new URL((await ensureVite('https://localhost/', { label: 'verify-headless' })).url).origin
+const vite = await ensureVite('https://localhost/', { label: 'verify-headless' })
+const BASE = new URL(vite.url).origin
 const puppeteer = await loadPuppeteer()
 let browser
 try {
 	browser = await launchBrowser(puppeteer, {})
 } catch (error) {
 	console.log(`FATAL: browser launch failed: ${String(error?.message ?? error).slice(0, 200)}`)
+	await vite.close().catch(() => {})
 	process.exit(1)
 }
 
@@ -86,14 +89,30 @@ const summary = await (async () => {
 				const after = angleAt()
 				// Keys fire script KeyDown/KeyUp events; a scriptless fixture has no
 				// solenoid handler, so rest angles must be unchanged (desktop VPX agrees:
-				// unhandled keys never move a flipper). Solenoid motion waits on a
-				// scripted fixture (plan Stage 2).
+				// unhandled keys never move a flipper).
 				check(
 					before !== undefined && after !== undefined && Math.abs(after - before) < 1e-9,
 					'scriptless flipper holds rest angle under key input',
 					`angle ${before} -> ${after}`,
 				)
 				check(engine.getScriptErrorCount() === 0, 'no script errors on scriptless table')
+				// Deterministic nudge gate (fixed schedule, no wall clock, no
+				// movement thresholds): no fixture stages a ball from script, so a
+				// deflection assertion is unobservable headless. Pin what is
+				// deterministic instead — engine.nudge routes without throwing and
+				// leaves every exposed row finite with zero script errors.
+				engine.nudge(90, 2.6)
+				for (let f = 110; f < 230; f++) engine.stepFrame(f * 16.7)
+				const rowsFinite = kind => {
+					const b = engine.getBuffer(kind)
+					if (!b) return true
+					for (let i = 0; i < b.count * b.stride; i++) if (!Number.isFinite(b.view[i])) return false
+					return true
+				}
+				check(rowsFinite('balls'), 'ball rows finite after engine.nudge + fixed steps')
+				check(rowsFinite('movers'), 'mover rows finite after engine.nudge + fixed steps')
+				check(angleAt() !== undefined, 'flipper mover row survives engine.nudge')
+				check(engine.getScriptErrorCount() === 0, 'no script errors after engine.nudge')
 				await engine.destroyTable()
 				check((await loads(vpxLight)) === 'ok', 'light table loads')
 				for (let f = 0; f < 30; f++) engine.stepFrame(f * 16.7)
@@ -111,9 +130,10 @@ const summary = await (async () => {
 					const zipBytes = new Uint8Array(await (await fetch(romName)).arrayBuffer())
 					engine.mountRom('twd_160h.zip', zipBytes)
 					check(true, 'ROM zip mounts for PinMAME')
-					const vpxTwd = new Uint8Array(
-						await (await fetch(twdUrl)).arrayBuffer().catch(() => new ArrayBuffer(0)),
-					)
+					const vpxTwd =
+						twdUrl.length > 0
+							? new Uint8Array(await (await fetch(twdUrl)).arrayBuffer().catch(() => new ArrayBuffer(0)))
+							: new Uint8Array(0)
 					if (vpxTwd.length > 0) {
 						check((await loads(vpxTwd)) === 'ok', 'walking-dead table loads')
 						const scriptErrors = engine.getScriptErrorCount()
@@ -140,8 +160,8 @@ const summary = await (async () => {
 							check(firstId >= 0, 'DMD descriptor appears after ROM boot', `frameId=${firstId}`)
 							check(luma > 0, 'booted DMD carries lit dots', `luma=${luma}`)
 						} else {
-							// TWD's script needs VPinMAME.Controller (plan Stage 2); until then
-							// the leg asserts the failure is observable, not silent.
+							// TWD's script needs VPinMAME.Controller; until then the
+							// leg asserts the failure is observable, not silent.
 							check(
 								true,
 								'dmd leg skipped (table script needs VPinMAME.Controller)',
@@ -168,10 +188,13 @@ const summary = await (async () => {
 		{
 			repoRoot: process.cwd(),
 			romName: romPath ? `/pinmame/roms/${romPath.split('/').pop()}` : '',
-			twdUrl: twdPath ? `/@fs${twdPath}` : '/test/fixtures/table-walking-dead.vpx',
+			twdUrl: twdPath ? `/@fs${twdPath}` : '',
 		},
 	)
-})().finally(() => browser.close())
+})().finally(async () => {
+	await browser.close().catch(() => {})
+	await vite.close().catch(() => {})
+})
 
 if (summary.fatal === 'missing-artifact') {
 	console.log('SKIP: demo-browser/public/wasm/vpinball-headless.js not built')

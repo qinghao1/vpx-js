@@ -23,7 +23,8 @@ const warmup = Number(getArg(args, 'warmup', '2000'))
 const vpxParam = path.isAbsolute(vpxArg) ? `/@fs${vpxArg}` : vpxArg
 const legs = ['viewer', 'play']
 
-const BASE = new URL((await ensureVite('https://localhost/', { label: 'fps-gpu' })).url).origin
+const vite = await ensureVite('https://localhost/', { label: 'fps-gpu' })
+const BASE = new URL(vite.url).origin
 const puppeteer = await loadPuppeteer()
 const browser = await launchBrowser(puppeteer, { ...(gpu ? { gpu } : {}), timeout: 300_000 })
 
@@ -141,6 +142,7 @@ for (const mode of legs) {
 	results.push(r)
 }
 await browser.close().catch(() => {})
+await vite.close().catch(() => {})
 const ok = results.every(r => r.ok)
 console.log(
 	`\n# fps-gpu ${ok ? 'PASS' : 'FAIL'} ${JSON.stringify(results.map(r => ({ mode: r.mode, fps: r.fpsRaf ?? null })))}`,

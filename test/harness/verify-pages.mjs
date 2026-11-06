@@ -13,7 +13,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, statSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
-import { extname, join, resolve } from 'node:path'
+import { extname, join, resolve, sep } from 'node:path'
 import { launchBrowser, loadPuppeteer, newPage, waitFor } from './utils.mjs'
 
 const demo = resolve('demo-browser')
@@ -36,7 +36,7 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 const server = createServer((req, res) => {
 	const path = decodeURIComponent(new URL(req.url, 'http://x').pathname)
 	const file = path.startsWith(BASE_PATH) ? join(dist, path.slice(BASE_PATH.length) || 'index.html') : ''
-	if (!file.startsWith(dist) || !existsSync(file) || !statSync(file).isFile()) {
+	if (!file.startsWith(dist + sep) || !existsSync(file) || !statSync(file).isFile()) {
 		res.writeHead(404).end()
 		return
 	}

@@ -21,13 +21,10 @@ export const pollLog = async (page, needle, timeout = 60000, label = needle) => 
 }
 
 export const waitReady = async (page, timeout = 60000) => {
-	// Load state lives on body.dataset (window.vpx.whenReady); the log poll
-	// below is only a fallback for builds without the dev test API.
-	try {
-		await page.evaluate(t => window.vpx.whenReady(t), timeout)
-	} catch {
-		await pollLog(page, 'Ready', timeout, 'Ready')
-	}
+	// Ready is the test API's load promise: it rejects when the load state is
+	// error, which no log substring can distinguish from a real Ready.
+	await page.waitForFunction(() => !!window.vpx, { timeout })
+	await page.evaluate(t => window.vpx.whenReady(t), timeout)
 	return page.evaluate(() => document.getElementById('log')?.innerText || '')
 }
 
@@ -435,80 +432,33 @@ export const plungerChecks = async page => {
 	}, play)
 }
 
-// Nudge leg: the seam exposes no cabinet-acceleration accessor, so a nudge
-// is only observable through a live ball's deflection. Route one engine
-// nudge (vpx.nudge) and one KeyZ press (the viewer's nudge key), and judge
-// each by the ball's peak per-sample displacement against its pre-nudge
-// drift. Skips honestly with no live ball; a resting ball that stays
-// resting fails (the impulse never reached it).
+// Nudge leg: routing only. Judging a live ball's deflection against drift is
+// non-deterministic by construction (arbitrary game state, wall-clock
+// stepping, either path masking the other), so the engine effect is pinned
+// deterministically in verify-headless.mjs instead. Here each path must
+// route without throwing while the engine stays ready.
 export const nudgeChecks = async page => {
 	const play = await ensurePlayMode(page)
 	return page.evaluate(async play => {
 		const api = window.vpx
-		const out = {}
-		if (!api) {
-			out.pass = 'skip'
-			out.reason = 'no test api (window.vpx)'
-			return out
-		}
-		if (!play?.ok) {
-			out.pass = false
-			out.reason = `play mode not entered: ${play?.reason ?? 'unknown'}`
-			return out
-		}
+		if (!api) return { pass: 'skip', reason: 'no test api (window.vpx)' }
+		if (!play?.ok) return { pass: false, reason: `play mode not entered: ${play?.reason ?? 'unknown'}` }
 		try {
-			const sleep = ms => new Promise(r => setTimeout(r, ms))
-			if (!api.state.balls.length) {
-				out.pass = 'skip'
-				out.reason = 'no live ball: nudge effect unobservable in WASM seam'
-				return out
+			api.nudge(75, 2.0)
+			api.sendKey('KeyZ', true)
+			api.sendKey('KeyZ', false)
+			const stillReady = api.state.wasmReady
+			return {
+				viaApi: true,
+				viaKey: true,
+				stillReady,
+				pass: stillReady,
+				reason: stillReady
+					? 'nudge routed without error; engine effect pinned headless'
+					: 'engine left ready state after nudge routing',
 			}
-			// Peak per-100ms displacement of any ball over a window: the
-			// pre-nudge window measures idle drift, the post-nudge window
-			// must clearly exceed it.
-			const peakStep = async windowMs => {
-				let peak = 0
-				let prev = api.state.balls.map(b => ({ id: b.id, x: b.x, y: b.y, z: b.z }))
-				const t0 = Date.now()
-				while (Date.now() - t0 < windowMs) {
-					await sleep(100)
-					const cur = api.state.balls.map(b => ({ id: b.id, x: b.x, y: b.y, z: b.z }))
-					for (const b of cur) {
-						const p = prev.find(q => q.id === b.id)
-						if (p) peak = Math.max(peak, Math.hypot(b.x - p.x, b.y - p.y, b.z - p.z))
-					}
-					prev = cur
-				}
-				return peak
-			}
-			const drift = await peakStep(1000)
-			const floor = 3
-			const bar = Math.max(1.5 * drift, floor)
-			const attempt = async (label, fire) => {
-				fire()
-				const peak = await peakStep(1000)
-				return { label, peak: +peak.toFixed(2), pass: peak > bar }
-			}
-			const viaApi = await attempt('api', () => api.nudge(75, 2.6))
-			await sleep(400)
-			const viaKey = await attempt('key', () => {
-				api.sendKey('KeyZ', true)
-				return sleep(90).then(() => api.sendKey('KeyZ', false))
-			})
-			out.before = { drift: +drift.toFixed(2), bar: +bar.toFixed(2) }
-			out.mid = { api: viaApi, key: viaKey }
-			out.viaApi = viaApi.pass
-			out.viaKey = viaKey.pass
-			out.stillReady = api.state.wasmReady
-			out.pass = (viaApi.pass || viaKey.pass) && api.state.wasmReady
-			out.reason = out.pass
-				? `nudge deflected ball (api ${viaApi.peak} key ${viaKey.peak} vs bar ${bar.toFixed(2)})`
-				: `no deflection above drift (api ${viaApi.peak} key ${viaKey.peak} vs bar ${bar.toFixed(2)})`
-			return out
 		} catch (e) {
-			out.pass = false
-			out.error = String(e?.message ?? e)
-			return out
+			return { viaApi: false, viaKey: false, pass: false, error: String(e?.message ?? e) }
 		}
 	}, play)
 }

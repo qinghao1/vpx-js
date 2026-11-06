@@ -16,7 +16,7 @@ Fork of [`vpdb/vpx-js`](https://github.com/vpdb/vpx-js) by [freezy](https://gith
 
 - Node `>=24`
 - A browser with WebGPU support for the demo
-- emsdk 6.0.13 only to rebuild the headless engine (`npm run build:wasm:headless`, see `wasm/README.md`)
+- emsdk 6.0.13 and CMake, to build the headless engine (required for play mode; see `wasm/README.md`)
 
 ## Quickstart
 
@@ -28,7 +28,16 @@ npm ci
 npm run dev
 ```
 
-Open the printed localhost URL and load a `.vpx` file. For the production build, run `npm run build` then `npm run preview` inside `demo-browser`.
+Play mode needs the engine artifact (gitignored): `git submodule update --init external/vpinball && npm run build:wasm:headless`. Without it the demo runs as a viewer only. The dev server uses a self-signed certificate.
+
+Open the printed localhost URL and load a `.vpx` file. For the production build, inside `demo-browser`, run `npm run build` then `npm run preview`.
+
+## Deploy
+
+The demo is a static bundle (`cd demo-browser && npm run build` → `dist/`). The engine needs a cross-origin-isolated page.
+
+- Self-hosting: serve `dist/` with `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` (`npm run preview` does).
+- Static hosts that cannot set headers (GitHub Pages): build with `VITE_COI_SW=1`, which ships `coi-sw.js` to add them (one reload on first visit). `.github/workflows/pages.yml` does this on push to `master`.
 
 ## Usage
 
@@ -68,10 +77,12 @@ const scene = await table.generateTableNode(new ThreeRenderApi({ applyMaterials:
 
 ```bash
 npm run build        # tsc → dist-esm/ (required before demo-browser)
+npm run check        # lint + typecheck + typecheck:tests + test
 npm run typecheck    # tsc --noEmit
-npm run lint         # biome check
-npm test             # vitest with coverage
-npm run verify:all   # end-to-end harness (table, twd-render, ab, cadet, browser)
+npm run typecheck:tests  # tsc --noEmit on tests
+npm run lint         # biome check + copyright headers
+npm test             # vitest
+npm run verify:all   # end-to-end harness (table, twd-render, cadet, pages, browser)
 ```
 
 ## License
