@@ -58,11 +58,14 @@ const summary = await (async () => {
 					return out
 				}
 				const seam = await import(`/@fs${repoRoot}/dist-esm/lib/wasm/vpinball-wasm.js`)
-				const { engine } = await seam.loadHeadlessEngine('/wasm/vpinball-headless.js')
+				const engine = await seam.loadHeadlessEngine('/wasm/vpinball-headless.js')
 				check(true, 'loadHeadlessEngine wraps the built artifact')
 				const vpxFlipper = new Uint8Array(await (await fetch('/test/fixtures/table-flipper.vpx')).arrayBuffer())
 				const vpxLight = new Uint8Array(await (await fetch('/test/fixtures/table-light.vpx')).arrayBuffer())
-				check(engine.init() === 0, 'engine inits once')
+				check(
+					(await seam.loadHeadlessEngine('/wasm/vpinball-headless.js')) === engine,
+					'engine module is shared per URL',
+				)
 				// The facade rejects with a typed HeadlessEngineError on failure.
 				const loads = bytes =>
 					engine.loadTable(bytes).then(

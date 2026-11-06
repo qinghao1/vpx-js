@@ -538,7 +538,6 @@ describe('WASM scene sync', () => {
 			HEAPF32: f32,
 		} as unknown as RawHeadlessModule
 		const engine = wrapHeadlessEngine(raw, 'test')
-		expect(engine.init()).toBe(0)
 		engine.mountRom('twd_160h.zip', new Uint8Array([9, 9]))
 		await engine.loadTable(new Uint8Array([7, 7, 7]))
 		expect(u8[200]).toBe(7)
@@ -560,7 +559,6 @@ describe('WASM scene sync', () => {
 		expect(engine.getScriptError()).toBeUndefined()
 		await engine.destroyTable()
 		expect(calls).toEqual([
-			'Init',
 			'malloc:13',
 			'malloc:2',
 			'MountRom',

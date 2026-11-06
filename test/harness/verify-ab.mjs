@@ -606,7 +606,7 @@ async function abNewSetup(page, repoRoot, mountName) {
 			try {
 				globalThis.__mountName = mountName
 				const seam = await import(`/@fs${repoRoot}/dist-esm/lib/wasm/vpinball-wasm.js`)
-				const { engine } = await seam.loadHeadlessEngine('/wasm/vpinball-headless.js')
+				const engine = await seam.loadHeadlessEngine('/wasm/vpinball-headless.js')
 				const get = async u => {
 					const r = await fetch(u)
 					if (!r.ok) throw new Error(`fetch ${u}: ${r.status}`)
@@ -615,7 +615,6 @@ async function abNewSetup(page, repoRoot, mountName) {
 				globalThis.__seam = seam
 				globalThis.__eng = engine
 				globalThis.__nowMs = 0
-				engine.init()
 				const rom = await get(romUrl)
 				const vpx = await get(vpxUrl)
 				o.vpxBytes = vpx.length

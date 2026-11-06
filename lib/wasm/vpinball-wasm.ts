@@ -326,7 +326,6 @@ function checkBridgeCode(op: 'mountRom' | 'loadTable', code: number): void {
 /** Byte-array facade over a raw bridge module; views stay valid until the next `StepFrame`. */
 export interface HeadlessEngine {
 	readonly url: string
-	init(): number
 	/** Throws {@link HeadlessEngineError} when the bridge cannot store the ROM. */
 	mountRom(fileName: string, zip: Uint8Array): void
 	/** Rejects with {@link HeadlessEngineError} when the table does not load. */
@@ -389,6 +388,14 @@ export function wrapHeadlessEngine(raw: RawHeadlessModule, url: string): Headles
 	// enter through the genuine export, applied on that receiver).
 	const loadTableAsync = suspendable(raw._VpxWasm_LoadTable, raw)
 	const destroyTableAsync = suspendable(raw._VpxWasm_DestroyTable, raw)
+	// One module serves table after table. Load and teardown may suspend
+	// (JSPI), so queue them: a teardown never interleaves with the next load.
+	let queue: Promise<unknown> = Promise.resolve()
+	const serialized = <T>(op: () => Promise<T>): Promise<T> => {
+		const run = queue.then(op)
+		queue = run.catch(() => {})
+		return run
+	}
 	const word = (index: number): number => raw.HEAPU32[index] ?? 0
 	// Last published DMD frame: frameId is the bridge change counter.
 	let dmdMemo: { width: number; height: number; format: number; frameId: number; desc: DmdFrameDesc } | undefined
@@ -410,7 +417,6 @@ export function wrapHeadlessEngine(raw: RawHeadlessModule, url: string): Headles
 	}
 	return {
 		url,
-		init: () => raw._VpxWasm_Init(),
 		mountRom: (fileName, zip) => {
 			const name = copyIn(new TextEncoder().encode(`${fileName}\0`))
 			const { ptr, len } = copyIn(zip)
@@ -421,22 +427,17 @@ export function wrapHeadlessEngine(raw: RawHeadlessModule, url: string): Headles
 				raw._free(name.ptr)
 			}
 		},
-		loadTable: vpx => {
-			const { ptr, len } = copyIn(vpx)
-			const release = (rc: number): void => {
-				raw._free(ptr)
-				checkBridgeCode('loadTable', rc)
-			}
-			try {
-				return loadTableAsync(ptr, len).then(release, err => {
+		loadTable: vpx =>
+			serialized(async () => {
+				// A new table restarts the bridge's frameId counter.
+				dmdMemo = undefined
+				const { ptr, len } = copyIn(vpx)
+				try {
+					checkBridgeCode('loadTable', await loadTableAsync(ptr, len))
+				} finally {
 					raw._free(ptr)
-					throw err
-				})
-			} catch (err) {
-				raw._free(ptr)
-				throw err
-			}
-		},
+				}
+			}),
 		stepFrame: nowMs => raw._VpxWasm_StepFrame(nowMs),
 		getPartCatalogJson: () => {
 			const ptr = raw._VpxWasm_GetPartCatalogJson()
@@ -513,7 +514,11 @@ export function wrapHeadlessEngine(raw: RawHeadlessModule, url: string): Headles
 			const ptr = raw._VpxWasm_GetFlasherImage(partIdx)
 			return ptr ? raw.UTF8ToString(ptr) : undefined
 		},
-		destroyTable: () => destroyTableAsync(),
+		destroyTable: () =>
+			serialized(async () => {
+				dmdMemo = undefined
+				await destroyTableAsync()
+			}),
 	}
 }
 
@@ -526,11 +531,6 @@ export class HeadlessEngineMissingError extends Error {
 		)
 		this.name = 'HeadlessEngineMissingError'
 	}
-}
-
-export interface HeadlessEngineHandle {
-	readonly engine: HeadlessEngine
-	readonly url: string
 }
 
 /**
@@ -547,12 +547,27 @@ export function wasmLocateFile(artifactUrl: string, pageBase?: string): (path: s
 	return (path: string) => new URL(path, base).href
 }
 
+const engines = new Map<string, Promise<HeadlessEngine>>()
+
 /**
- * Loads the headless-engine ES module (`-sMODULARIZE=1 -sEXPORT_ES6=1`) and
- * wraps it in the byte-array facade. Rejects with
- * {@link HeadlessEngineMissingError} when the artifact is absent.
+ * Loads the headless-engine ES module (`-sMODULARIZE=1 -sEXPORT_ES6=1`) once
+ * per URL, wraps it in the byte-array facade and initializes the bridge.
+ * Every caller shares that module (one heap and one pthread pool per page) and
+ * loads its table into it in turn. Rejects with {@link HeadlessEngineMissingError}
+ * when the artifact is absent and with {@link HeadlessEngineError} on an ABI
+ * mismatch; a failed load is not cached.
  */
-export async function loadHeadlessEngine(url = 'wasm/vpinball-headless.js'): Promise<HeadlessEngineHandle> {
+export function loadHeadlessEngine(url = 'wasm/vpinball-headless.js'): Promise<HeadlessEngine> {
+	let engine = engines.get(url)
+	if (!engine) {
+		engine = instantiateHeadlessEngine(url)
+		engines.set(url, engine)
+		engine.catch(() => engines.delete(url))
+	}
+	return engine
+}
+
+async function instantiateHeadlessEngine(url: string): Promise<HeadlessEngine> {
 	let factory: unknown
 	try {
 		const imported = (await import(/* @vite-ignore */ url)) as { default?: unknown }
@@ -565,7 +580,9 @@ export async function loadHeadlessEngine(url = 'wasm/vpinball-headless.js'): Pro
 	const raw = (await (factory as (module?: { locateFile?: (path: string) => string }) => Promise<RawHeadlessModule>)({
 		locateFile,
 	})) as RawHeadlessModule
-	return { engine: wrapHeadlessEngine(raw, url), url }
+	const engine = wrapHeadlessEngine(raw, url)
+	raw._VpxWasm_Init()
+	return engine
 }
 
 /**

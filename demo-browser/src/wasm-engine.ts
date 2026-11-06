@@ -39,6 +39,9 @@ export interface WasmEngineLoad {
 /** Error thrown when the caller forced `?engine=wasm` but the WASM engine failed to start. */
 export class WasmEngineStartError extends Error {}
 
+/** The instance whose table is loaded in the shared engine module. */
+let session: WasmEngine | undefined
+
 /** Shared empty view for missing engine buffers (avoids per-frame garbage). */
 const EMPTY_VIEW = new Float32Array(0)
 
@@ -116,7 +119,8 @@ export class WasmEngine {
 	/** Load WASM bytes, mount the ROM (if any), and load the table. */
 	async load({ vpxBytes, rom }: WasmEngineLoad): Promise<void> {
 		// Fresh table, fresh game epoch (also covers instance reuse: drop the
-		// previous table's part names, cached DMD frame, and engine).
+		// previous table's part names, cached DMD frame, and scene sync; the
+		// bridge's LoadTable replaces the previous table itself).
 		this.gameMs = 0
 		this.debtMs = 0
 		this.lastStepWallMs = 0
@@ -124,15 +128,12 @@ export class WasmEngine {
 		this.dmdCache = undefined
 		this.liveBalls.clear()
 		this.resetAudioFormat()
-		if (this.engine) {
-			await this.engine.destroyTable().catch(() => {})
-			this.engine = undefined
-			this.sync = undefined
-		}
+		this.sync = undefined
 		// Page-relative so subpath deploys work: document.baseURI resolves
-		// against the page, unlike a module-relative URL under `/@fs/`.
-		this.engine = (await loadHeadlessEngine(new URL('wasm/vpinball-headless.js', document.baseURI).href)).engine
-		if (this.engine.init() !== 0) throw new WasmEngineStartError('VpxWasm_Init failed')
+		// against the page, unlike a module-relative URL under `/@fs/`. The
+		// module is shared page-wide; this instance owns its table from here.
+		this.engine = await loadHeadlessEngine(new URL('wasm/vpinball-headless.js', document.baseURI).href)
+		session = this
 		const pending = window as unknown as { __pendingRom?: Uint8Array; __pendingRomName?: string }
 		// PinMAME resolves the zip by the script's game name, not the file basename.
 		const script = this.host.table.tableScript
@@ -456,7 +457,11 @@ export class WasmEngine {
 		this.liveBalls.clear()
 		this.partNames.clear()
 		this.sync = undefined
-		await this.engine?.destroyTable()
+		// A superseded instance must not tear down its successor's table.
+		if (session === this) {
+			session = undefined
+			await this.engine?.destroyTable()
+		}
 		this.engine = undefined
 	}
 

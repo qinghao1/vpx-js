@@ -7,6 +7,7 @@ import {
 	DmdFrameFormat,
 	HEADLESS_ABI_VERSION,
 	HeadlessEngineError,
+	loadHeadlessEngine,
 	type RawHeadlessModule,
 	resolveFlipperKey,
 	romMountFileName,
@@ -455,6 +456,68 @@ describe('suspendable receiver', () => {
 		} finally {
 			if (prior === undefined) delete (WebAssembly as Record<string, unknown>).promising
 			else (WebAssembly as Record<string, unknown>).promising = prior
+		}
+	})
+})
+
+describe('loadHeadlessEngine', () => {
+	/** An ES module URL whose factory counts its runs and the bridge inits on `globalThis[key]`. */
+	const fakeModuleUrl = (key: string, abi: number): string =>
+		`data:text/javascript,${encodeURIComponent(`
+			const c = (globalThis[${JSON.stringify(key)}] ??= { factory: 0, init: 0 })
+			export default async () => {
+				c.factory++
+				return { _VpxWasm_GetAbiVersion: () => ${abi}, _VpxWasm_Init: () => (c.init++, 0) }
+			}`)}`
+	const counts = (key: string): { factory: number; init: number } =>
+		(globalThis as unknown as Record<string, { factory: number; init: number }>)[key]
+
+	it('shares one initialized module per URL', async () => {
+		const url = fakeModuleUrl('__vpxShared', HEADLESS_ABI_VERSION)
+		const [first, second] = await Promise.all([loadHeadlessEngine(url), loadHeadlessEngine(url)])
+		expect(second).toBe(first)
+		expect(await loadHeadlessEngine(url)).toBe(first)
+		expect(counts('__vpxShared')).toEqual({ factory: 1, init: 1 })
+	})
+	it('rejects an ABI mismatch without initializing or caching it', async () => {
+		const url = fakeModuleUrl('__vpxStale', HEADLESS_ABI_VERSION + 1)
+		await expect(loadHeadlessEngine(url)).rejects.toMatchObject({ op: 'abi' })
+		await expect(loadHeadlessEngine(url)).rejects.toBeInstanceOf(HeadlessEngineError)
+		expect(counts('__vpxStale')).toEqual({ factory: 2, init: 0 })
+	})
+})
+
+describe('table session queue', () => {
+	it('never enters LoadTable while a teardown is still suspended', async () => {
+		const prior = (WebAssembly as Record<string, unknown>).promising
+		const fake = fakeRaw()
+		const entered: string[] = []
+		fake.raw._VpxWasm_DestroyTable = () => void entered.push('destroy')
+		fake.raw._VpxWasm_LoadTable = () => {
+			entered.push('load')
+			return 0
+		}
+		let resume = (): void => {}
+		// Teardown suspends until `resume`; everything else returns at once.
+		;(WebAssembly as Record<string, unknown>).promising =
+			(fn: (...args: unknown[]) => unknown) =>
+			(...args: unknown[]) =>
+				fn === fake.raw._VpxWasm_DestroyTable
+					? new Promise(done => {
+							resume = () => done(fn(...args))
+						})
+					: Promise.resolve(fn(...args))
+		try {
+			const engine = wrapHeadlessEngine(fake.raw, 'test')
+			const destroyed = engine.destroyTable()
+			const loaded = engine.loadTable(new Uint8Array([1]))
+			await new Promise(done => setTimeout(done, 0))
+			expect(entered).toEqual([])
+			resume()
+			await Promise.all([destroyed, loaded])
+			expect(entered).toEqual(['destroy', 'load'])
+		} finally {
+			;(WebAssembly as Record<string, unknown>).promising = prior
 		}
 	})
 })
