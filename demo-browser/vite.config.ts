@@ -143,6 +143,7 @@ export default defineConfig({
 					if (url.startsWith('/wasm/')) {
 						const rel = url.slice('/wasm/'.length)
 						const tries = [
+							resolve(__dirname, `public/wasm/${rel}`),
 							resolve(repoRoot, `wasm/${rel}`),
 							resolve(repoRoot, `wasm/kernels/dist/${rel}`),
 							resolve(repoRoot, `wasm/dist/${rel}`),

@@ -12,7 +12,7 @@ ESM TypeScript source for `vpx-js` (Node `>=24`, `ES2024`, `type: module`). Buil
 "./lib/refs.browser.js": "dist/lib/refs.browser.js"
 ```
 
-- `lib/index.ts` — public surface (`VP_VERSION_*`, `Table`, `Player`, `ThreeRenderApi`, `Ball`, `OleCompoundDoc`, etc.).
+- `lib/index.ts` — public surface (`Table`, `WasmSceneSync`, `HeadlessEngine`/`loadHeadlessEngine`, `ThreeRenderApi`, `OleCompoundDoc`, etc.).
 - `lib/refs.node.ts` / `lib/refs.browser.ts` — platform-specific surface:
 
 ```ts
@@ -34,7 +34,7 @@ I/O uses `Uint8Array`/`DataView` for both Node and browser.
 
 ## Three.js
 
-`three@0.185` + `three-mesh-bvh` as ESM:
+`three@0.186` + `three-mesh-bvh` as ESM:
 
 ```ts
 // core — via refs
@@ -49,16 +49,16 @@ import { HDRLoader } from 'three/addons/loaders/HDRLoader.js'
 
 ```
 lib/
-├── index.ts          public entry
+├── index.ts          public entry (wasm seam: WasmSceneSync, HeadlessEngine)
 ├── refs-*.ts         platform and three shims
 ├── io/               OLE / BIFF / BinaryReader (node+browser)
-├── vpt/              VPX table + 22 item types + mesh/material/texture
-├── game/             Player, PlayerPhysics, PinInput, interfaces
-├── physics/          hit shapes, HitKD/Quadtree, constants
+├── math/             vectors, quadtree, misc numerics
+├── vpt/              VPX table + item types + mesh/material/texture
 ├── render/threejs/   ThreeRenderApi, mesh/material/light generators
-├── scripting/        VBScript grammar, Transpiler, stdlib, VBS scripts
-├── emu/              wpc-emu + pinmame WASM wrapper
+├── wasm/             headless-engine ABI (VpxWasm_*), scene sync, no three.js
+├── emu/              ROM fetcher for viewer `?rom=` preload
+├── types/            shared type declarations
 └── util/             logger, vectors, storage helpers
 ```
 
-Build: `npm run build` generates `lib/scripting/grammar/rules.ts` from `grammar.bnf` and runs `tsup` (`.vbs`/`.bnf` handled as text).
+Build: `npm run build` (`tsup` + `tsc` → `dist/` + `dist-esm/`); `build:esm` alone suffices before `demo-browser`. Headless WASM is built separately: `npm run build:wasm:headless` (emscripten; patches under `wasm/modules/headless/patches/`, never hand-edit `external/vpinball`).

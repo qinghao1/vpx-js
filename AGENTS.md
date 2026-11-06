@@ -1,38 +1,31 @@
 # vpx-js — Agent Guide (repo root)
 
-ESM-only Visual Pinball port (Node `>=24`, TypeScript 6, `tsup`/`Biome`/`Vitest`, `three@0.185`, PinMAME WASM).
+ESM-only Visual Pinball headless-WASM port (Node `>=24`, TypeScript 7, `tsup`/`Biome`/`Vitest`, `three@0.186`, PinMAME WASM). Never hand-edit `external/vpinball` — change it via numbered patches under `wasm/modules/headless/patches/` (idempotent build, pristine series).
 
 ## Commands
 
 ```bash
 npm ci
-npm run build              # tsup + tsc → dist + dist-esm (copies res + grammar)
+npm run build              # tsup + tsc → dist + dist-esm
 npm run build:esm          # tsc → dist-esm only (required before demo-browser)
+npm run build:wasm:headless # emscripten headless build (needs emsdk; artifact → demo-browser/public/wasm/)
 npx tsc --noEmit           # typecheck
 npx biome check .          # lint/format (tabs, width 120)
 npm test                   # vitest --coverage
-npx tsx test/harness/verify-all.ts   # E2E 1..10: wasm → table → pinmame → player → gameplay → play-room → browser → vpinball-compat → discrepancies → twd-render
-
-# Native VPinball debugging (requires VPinballX standalone)
-npm run vpinball:setup     # Tier A build or Tier B prebuilt → ~/.cache/vpinball/
-npm run compare -- --vpx=table-flipper   # dual window: browser left 0,0 + native right 1280,0
-npm run verify:vpinball -- --all-fixtures   # script & table structure parity across 25 fixtures
-npm run verify:audit       # table structure & physics constants audit across 25 fixtures
-npm run verify:discrepancies # web vs native gap report → ~/docs/vpx-js-web-vs-native-discrepancies.md (20 checks, TAP + markdown)
+npx tsx test/harness/verify-all.ts   # E2E TAP 1..4: table → twd-render → ab → browser
+npm run verify:ab          # A/B + regression vs OLD worktree (needs VPX/ROM + /tmp/vpx-js-old)
 ```
 
 Node via `fnm` — `.nvmrc` `24`, `.node-version` `24.19.0`. Activate with `eval "$(fnm env --use-on-cd --shell bash)"`.
 
 ## Layout
 
-- `lib/` — core: `vpt/` table/items, `io/` OLE/BIFF readers, `render/threejs/`, `game/` Player+physics, `scripting/` VBScript→JS, `emu/` wpc-emu/pinmame/wasm
+- `lib/` — core: `vpt/` table/items, `io/` OLE/BIFF readers, `math/` numerics, `render/threejs/` scene pipeline, `wasm/` headless-engine seam (ABI types + scene sync; no three.js), `emu/` ROM fetcher
 - `lib/refs.node.ts` / `lib/refs.browser.ts` — explicit env split; demo-browser aliases `refs.node` → `refs.browser`
 - `test/fixtures/*.vpx` + `test/harness/` + `lib/**/*.spec.ts`
-- `wasm/` + `external/pinmame` (submodule) → `wasm/dist/` (`wasm/build.sh`, `--mock` fallback)
-- `external/vpinball` (submodule, `https://github.com/vpinball/vpinball.git`) → native `VPinballX_GL`/`VPinballX_BGFX` + `libSDL3.so` + `shaders-10.8.1/` + `plugins/`
-- `test/harness/vpinball-resolver.ts` + `test/harness/compare-side-by-side.ts` + `test/harness/verify-vpinball-compat.ts` — vpinball debugging & parity
-- `demo-browser/` — local browser demo (tracked; only `dist/`, `node_modules/`, `.vite/` ignored)
-- `dist/`, `dist-esm/`, `coverage/`, `node_modules/`, `*.vpx`, `lib/scripting/grammar/rules.ts`, `external/vpinball/build/`, `.cache/vpinball/` — ignored, do not commit
+- `wasm/modules/headless/` (patches 0001-0011) + `external/vpinball` (pinned submodule) → `npm run build:wasm:headless` → `demo-browser/public/wasm/`; `external/pinmame` (pinned submodule) mounted as ROM source
+- `demo-browser/` — local static Three.js WebGPU viewer + E2E (`demo-browser/e2e/`)
+- `dist/`, `dist-esm/`, `coverage/`, `node_modules/`, `*.vpx` — ignored, do not commit
 
 ## Conventions
 
@@ -43,11 +36,9 @@ Node via `fnm` — `.nvmrc` `24`, `.node-version` `24.19.0`. Activate with `eval
 ## Testing
 
 - `vitest` on `lib/**/*.spec.ts` + `test/harness/*.spec.ts` (`pool:forks`, 10s timeout).
-- `test/harness/` is the single E2E entry: `verify-all.ts` (TAP 1..10) → `verify-browser.ts` → `demo-browser/e2e/integration.mjs` (+ `verify-vpinball-compat.ts` + `capture-discrepancies.ts` optional # SKIP if native missing). Keep it unified.
+- `test/harness/` is the single E2E entry: `verify-all.ts` (TAP 1..4: table → twd-render → ab → browser). `verify-ab.mjs` needs a VPX/ROM plus the OLD worktree (`git worktree add /tmp/vpx-js-old HEAD` with built `dist-esm`); without them it SKIPs honestly. Keep it unified.
 
 ## Gotchas
 
 - `Failed to resolve import ../dist-esm/...` → run `npm run build:esm`.
-- `external/pinmame` showing dirty after build is normal — `git submodule foreach 'git reset --hard'` to clean.
-- `external/vpinball` showing dirty after `npm run vpinball:setup` is normal; `VPINBALL_BIN` overrides discovery.
-- `verify-vpinball-compat` requires native `VPinballX` — CI emits `ok 7 # SKIP` when not provisioned.
+- Submodules must stay pristine — never hand-edit; if dirty, `git submodule foreach 'git reset --hard'` to clean.
