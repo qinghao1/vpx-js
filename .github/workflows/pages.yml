@@ -50,14 +50,16 @@ jobs:
         id: sub
         run: |
           echo "vpinball=$(git rev-parse HEAD:external/vpinball)" >> "$GITHUB_OUTPUT"
-          echo "pinmame=$(git rev-parse HEAD:external/pinmame)" >> "$GITHUB_OUTPUT"
+      # Libs and their generated headers travel together: build-headless.sh
+      # skips external.sh only when both are present. Exact key only — a
+      # partial restore would mix libs from another submodule revision.
       - name: Cache third-party wasm libs
         uses: actions/cache@v4
         with:
-          path: external/vpinball/third-party/build-libs
-          key: wasm-libs-${{ runner.os }}-emsdk-6.0.13-vp-${{ steps.sub.outputs.vpinball }}-pm-${{ steps.sub.outputs.pinmame }}-${{ hashFiles('wasm/modules/headless/patches/*') }}
-          restore-keys: |
-            wasm-libs-${{ runner.os }}-emsdk-6.0.13-
+          path: |
+            external/vpinball/third-party/build-libs
+            external/vpinball/third-party/include
+          key: wasm-libs-${{ runner.os }}-emsdk-6.0.13-vp-${{ steps.sub.outputs.vpinball }}-${{ hashFiles('wasm/modules/headless/patches/*') }}
       - name: Install root dependencies
         run: npm ci
       - name: Build dist-esm

@@ -121,8 +121,10 @@ if (( CLEAN )); then
   rm -rf "$BUILD_DIR"
 fi
 
-# Third-party wasm libs + shaderc (cached per lib; re-runs are cheap).
-if ! ls "$VPINBALL/third-party/build-libs/wasm-wasm32"/libbgfx.a >/dev/null 2>&1; then
+# Third-party wasm libs + their headers (cached per lib; re-runs are cheap).
+# external.sh copies this header last, so its presence means both the
+# build-libs and the generated (untracked) third-party/include are complete.
+if [[ ! -f "$VPINBALL/third-party/include/spatialaudio/SpatialaudioConfig.h" ]]; then
   log "building third-party wasm libs (one-time; cached per lib)"
   (cd "$VPINBALL" && BUILD_TYPE="$BUILD_TYPE" bash platforms/wasm-wasm32/external.sh)
 fi
