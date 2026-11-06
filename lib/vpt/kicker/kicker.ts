@@ -5,7 +5,7 @@ import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { Matrix3D } from '../../math/matrix.js'
 import { Vertex2D } from '../../math/vector.js'
-import { handleBiffTag } from '../biff-helper.js'
+import { type BiffFieldMap, handleBiffTag } from '../biff-helper.js'
 import { Enums } from '../enums.js'
 import { Item } from '../item.js'
 import { ItemData } from '../item-data.js'
@@ -16,15 +16,15 @@ import type { Table } from '../table/table.js'
 import { Texture } from '../texture.js'
 import { KickerMeshGenerator, KickerUpdater } from './kicker-view.js'
 
-const FLOAT_MAP: Record<string, string> = {
+const FLOAT_MAP: BiffFieldMap<KickerData> = {
 	RADI: 'radius',
 	KSCT: 'scatter',
 	KHAC: 'hitAccuracy',
 	KHHI: 'hitHeight',
 	KORI: 'orientation',
 }
-const BOOL_MAP: Record<string, string> = { EBLD: 'isEnabled', FATH: 'fallThrough', LEMO: 'legacyMode' }
-const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', SURF: 'szSurface' }
+const BOOL_MAP: BiffFieldMap<KickerData> = { EBLD: 'isEnabled', FATH: 'fallThrough', LEMO: 'legacyMode' }
+const STRING_MAP: BiffFieldMap<KickerData> = { MATR: 'szMaterial', SURF: 'szSurface' }
 
 /** @see https://github.com/vpinball/vpinball/blob/master/kicker.cpp */
 export class KickerData extends ItemData {

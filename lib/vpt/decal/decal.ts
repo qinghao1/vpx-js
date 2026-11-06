@@ -4,15 +4,15 @@
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { Vertex2D } from '../../math/vector.js'
-import { handleBiffTag } from '../biff-helper.js'
+import { type BiffFieldMap, handleBiffTag } from '../biff-helper.js'
 import { Enums } from '../enums.js'
 import { Item } from '../item.js'
 import { ItemData } from '../item-data.js'
 
-const FLOAT_MAP: Record<string, string> = { WDTH: 'width', HIGH: 'height', ROTA: 'rotation' }
-const INT_MAP: Record<string, string> = { TYPE: 'decalType', SIZE: 'sizingType' }
-const BOOL_MAP: Record<string, string> = { VERT: 'verticalText', BGLS: 'isBackglass' }
-const STRING_MAP: Record<string, string> = { IMAG: 'szImage', SURF: 'szSurface', TEXT: 'text', MATR: 'szMaterial' }
+const FLOAT_MAP: BiffFieldMap<DecalData> = { WDTH: 'width', HIGH: 'height', ROTA: 'rotation' }
+const INT_MAP: BiffFieldMap<DecalData> = { TYPE: 'decalType', SIZE: 'sizingType' }
+const BOOL_MAP: BiffFieldMap<DecalData> = { VERT: 'verticalText', BGLS: 'isBackglass' }
+const STRING_MAP: BiffFieldMap<DecalData> = { IMAG: 'szImage', SURF: 'szSurface', TEXT: 'text', MATR: 'szMaterial' }
 
 /** @see https://github.com/vpinball/vpinball/blob/master/src/parts/decal.cpp */
 export class DecalData extends ItemData {

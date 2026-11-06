@@ -6,7 +6,7 @@ import type { Storage } from '../../io/ole-doc.js'
 import { Matrix3D } from '../../math/matrix.js'
 import { Vertex2D } from '../../math/vector.js'
 import type { Meshes, RenderInfo } from '../../render/irender-api.js'
-import { handleBiffTag } from '../biff-helper.js'
+import { type BiffFieldMap, handleBiffTag } from '../biff-helper.js'
 import { Item } from '../item.js'
 import { ItemData } from '../item-data.js'
 import { ItemState } from '../item-state.js'
@@ -16,7 +16,7 @@ import type { Table } from '../table/table.js'
 import { Texture } from '../texture.js'
 import { BumperMeshGenerator, BumperUpdater } from './bumper-view.js'
 
-const FLOAT_TAGS: Record<string, string> = {
+const FLOAT_TAGS: BiffFieldMap<BumperData> = {
 	RADI: 'radius',
 	THRS: 'threshold',
 	FORC: 'force',
@@ -26,14 +26,14 @@ const FLOAT_TAGS: Record<string, string> = {
 	ORIN: 'orientation',
 	RDLI: 'ringDropOffset',
 }
-const STRING_TAGS: Record<string, string> = {
+const STRING_TAGS: BiffFieldMap<BumperData> = {
 	MATR: 'szCapMaterial',
 	RIMA: 'szRingMaterial',
 	BAMA: 'szBaseMaterial',
 	SKMA: 'szSkirtMaterial',
 	SURF: 'szSurface',
 }
-const BOOL_TAGS: Record<string, string> = {
+const BOOL_TAGS: BiffFieldMap<BumperData> = {
 	CAVI: 'isCapVisible',
 	HAHE: 'hitEvent',
 	COLI: 'isCollidable',

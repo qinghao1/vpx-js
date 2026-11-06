@@ -16,7 +16,7 @@ const DEFAULT_TABLE_PFSCATTERANGLE = 0
 /** VP units: 1U = 0.53975mm, 1T = 10ms, Earth g ≈ 1.81751 U/T². */
 const GRAVITYCONST = 1.81751
 
-import { handleBiffTag } from '../biff-helper.js'
+import { type BiffFieldMap, handleBiffTag } from '../biff-helper.js'
 import { ItemData } from '../item-data.js'
 import { Material, SaveMaterial, SavePhysicsMaterial } from '../material.js'
 
@@ -25,13 +25,16 @@ export const BG_DESKTOP = 0
 export const BG_FULLSCREEN = 1
 export const BG_FSS = 2
 
+/** Per-view backglass array field of TableData. */
+type BgField = keyof TableData & string
+
 function bgMaps(): {
-	BG_FLOAT_MAP: Record<string, [string, number]>
-	BG_INT_MAP: Record<string, [string, number]>
+	BG_FLOAT_MAP: Record<string, [BgField, number]>
+	BG_INT_MAP: Record<string, [BgField, number]>
 	BG_IMAGE_MAP: Record<string, number>
 } {
 	const views = [BG_DESKTOP, BG_FULLSCREEN, BG_FSS] as const
-	const floatDefs: [string[], string][] = [
+	const floatDefs: [string[], BgField][] = [
 		[['ROTA', 'ROTF', 'ROFS'], 'bgRotation'],
 		[['LAYB', 'LAYF', 'LAFS'], 'bgLayback'],
 		[['INCL', 'INCF', 'INFS'], 'bgInclination'],
@@ -47,13 +50,13 @@ function bgMaps(): {
 		[['WTZ0', 'WTZ1', 'WTZ2'], 'bgWindowTopZOfs'],
 		[['WBZ0', 'WBZ1', 'WBZ2'], 'bgWindowBottomZOfs'],
 	]
-	const BG_FLOAT_MAP: Record<string, [string, number]> = {}
+	const BG_FLOAT_MAP: Record<string, [BgField, number]> = {}
 	for (const [tags, field] of floatDefs) {
 		tags.forEach((tag, i) => {
 			BG_FLOAT_MAP[tag] = [field, views[i]!]
 		})
 	}
-	const BG_INT_MAP: Record<string, [string, number]> = {
+	const BG_INT_MAP: Record<string, [BgField, number]> = {
 		VSM0: ['bgViewMode', BG_DESKTOP],
 		VSM1: ['bgViewMode', BG_FULLSCREEN],
 		VSM2: ['bgViewMode', BG_FSS],
@@ -75,7 +78,7 @@ const CM_TO_VPU = 50 / (2.54 * 1.0625)
 const DISABLE_SCRIPT_EDITING = 0x00000002
 const DISABLE_EVERYTHING = 0x80000000
 
-const FLOAT_MAP: Record<string, string> = {
+const FLOAT_MAP: BiffFieldMap<TableData> = {
 	LEFT: 'left',
 	TOPX: 'top',
 	RGHT: 'right',
@@ -112,7 +115,7 @@ const FLOAT_MAP: Record<string, string> = {
 	EXPO: 'exposure',
 }
 
-const INT_MAP: Record<string, string> = {
+const INT_MAP: BiffFieldMap<TableData> = {
 	ORRP: 'overridePhysics',
 	SEDT: 'numGameItems',
 	SSND: 'numSounds',
@@ -130,7 +133,7 @@ const INT_MAP: Record<string, string> = {
 	UFXA: 'useFXAA',
 }
 
-const BOOL_MAP: Record<string, string> = {
+const BOOL_MAP: BiffFieldMap<TableData> = {
 	ORPF: 'overridePhysicsFlipper',
 	DECL: 'renderDecals',
 	REEL: 'renderEMReels',
@@ -147,7 +150,7 @@ const BOOL_MAP: Record<string, string> = {
 	USSR: 'useSSR',
 }
 
-const STRING_MAP: Record<string, string> = {
+const STRING_MAP: BiffFieldMap<TableData> = {
 	IMAG: 'szImage',
 	BLIM: 'szBallImage',
 	BLIF: 'szBallImageFront',

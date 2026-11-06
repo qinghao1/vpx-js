@@ -4,11 +4,11 @@
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { Vertex2D } from '../../math/vector.js'
-import { handleBiffTag } from '../biff-helper.js'
+import { type BiffFieldMap, handleBiffTag } from '../biff-helper.js'
 import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 
-const FLOAT_MAP: Record<string, string> = {
+const FLOAT_MAP: BiffFieldMap<GateData> = {
 	LGTH: 'length',
 	HGTH: 'height',
 	ROTA: 'rotation',
@@ -19,14 +19,14 @@ const FLOAT_MAP: Record<string, string> = {
 	AFRC: 'damping',
 	GGFC: 'gravityFactor',
 }
-const BOOL_MAP: Record<string, string> = {
+const BOOL_MAP: BiffFieldMap<GateData> = {
 	GSUP: 'showBracket',
 	GCOL: 'isCollidable',
 	TWWA: 'twoWay',
 	GVSB: 'isVisible',
 	REEN: 'isReflectionEnabled',
 }
-const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', SURF: 'szSurface' }
+const STRING_MAP: BiffFieldMap<GateData> = { MATR: 'szMaterial', SURF: 'szSurface' }
 
 /** @see https://github.com/vpinball/vpinball/blob/master/gate.cpp */
 export class GateData extends ItemData {

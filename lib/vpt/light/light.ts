@@ -6,7 +6,7 @@ import type { Storage } from '../../io/ole-doc.js'
 import { Matrix3D } from '../../math/matrix.js'
 import { Vertex2D } from '../../math/vector.js'
 import type { IRenderApi } from '../../render/irender-api.js'
-import { handleBiffTag } from '../biff-helper.js'
+import { type BiffFieldMap, handleBiffTag } from '../biff-helper.js'
 import { DragPoint } from '../dragpoint.js'
 import { Enums } from '../enums.js'
 import { Item } from '../item.js'
@@ -18,7 +18,7 @@ import type { Table } from '../table/table.js'
 import type { Texture } from '../texture.js'
 import { LightMeshGenerator, LightUpdater } from './light-view.js'
 
-const FLOAT_MAP: Record<string, string> = {
+const FLOAT_MAP: BiffFieldMap<LightData> = {
 	HGHT: 'height',
 	RADI: 'falloff',
 	FAPO: 'falloffPower',
@@ -31,8 +31,8 @@ const FLOAT_MAP: Record<string, string> = {
 	BMVA: 'bulbModulateVsAdd',
 	BHHI: 'bulbHaloHeight',
 }
-const INT_MAP: Record<string, string> = { BINT: 'blinkInterval', SHDW: 'shadows', FADE: 'fader' }
-const BOOL_MAP: Record<string, string> = {
+const INT_MAP: BiffFieldMap<LightData> = { BINT: 'blinkInterval', SHDW: 'shadows', FADE: 'fader' }
+const BOOL_MAP: BiffFieldMap<LightData> = {
 	SHAP: 'roundLight',
 	BGLS: 'isBackglass',
 	BULT: 'bulbLight',
@@ -42,7 +42,7 @@ const BOOL_MAP: Record<string, string> = {
 	SHRB: 'showReflectionOnBall',
 	VSBL: 'isVisible',
 }
-const STRING_MAP: Record<string, string> = {
+const STRING_MAP: BiffFieldMap<LightData> = {
 	IMG1: 'szOffImage',
 	BPAT: 'rgBlinkPattern',
 	SURF: 'szSurface',
