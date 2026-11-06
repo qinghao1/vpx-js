@@ -5,7 +5,7 @@ import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { Vertex2D } from '../../math/vector.js'
 import type { Meshes } from '../../render/irender-api.js'
-import { handleBiffTag } from '../biff-helper.js'
+import { type BiffFieldMap, handleBiffTag } from '../biff-helper.js'
 import { type DragPoint, dragPointNestedTag } from '../dragpoint.js'
 import { Enums } from '../enums.js'
 import { Item } from '../item.js'
@@ -15,7 +15,7 @@ import { Mesh } from '../mesh.js'
 import type { Table } from '../table/table.js'
 import { isTransparentRampMaterial, RampMeshGenerator, RampUpdater } from './ramp-view.js'
 
-const FLOAT_MAP: Record<string, string> = {
+const FLOAT_MAP: BiffFieldMap<RampData> = {
 	HTBT: 'heightBottom',
 	HTTP: 'heightTop',
 	WDBT: 'widthBottom',
@@ -33,8 +33,8 @@ const FLOAT_MAP: Record<string, string> = {
 	RADX: 'wireDistanceX',
 	RADY: 'wireDistanceY',
 }
-const INT_MAP: Record<string, string> = { TYPE: 'rampType', ALGN: 'imageAlignment' }
-const BOOL_MAP: Record<string, string> = {
+const INT_MAP: BiffFieldMap<RampData> = { TYPE: 'rampType', ALGN: 'imageAlignment' }
+const BOOL_MAP: BiffFieldMap<RampData> = {
 	IMGW: 'imageWalls',
 	HTEV: 'hitEvent',
 	CLDR: 'isCollidable',
@@ -42,7 +42,7 @@ const BOOL_MAP: Record<string, string> = {
 	REEN: 'isReflectionEnabled',
 	OVPH: 'overwritePhysics',
 }
-const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', IMAG: 'szImage', MAPH: 'szPhysicsMaterial' }
+const STRING_MAP: BiffFieldMap<RampData> = { MATR: 'szMaterial', IMAG: 'szImage', MAPH: 'szPhysicsMaterial' }
 
 /** @see https://github.com/vpinball/vpinball/blob/master/ramp.cpp */
 export class RampData extends ItemData {

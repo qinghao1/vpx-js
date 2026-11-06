@@ -1,5 +1,6 @@
 import { Color, DoubleSide, EquirectangularReflectionMapping, type Texture as ThreeTexture } from 'three'
 import { MeshStandardNodeMaterial } from 'three/webgpu'
+import { BALL_BASE_COLOR } from '../../../vpt/ball/ball-data.js'
 import { BALL_METALNESS, BALL_ROUGHNESS } from '../material-shared.js'
 
 /**
@@ -10,7 +11,7 @@ import { BALL_METALNESS, BALL_ROUGHNESS } from '../material-shared.js'
  */
 export function createDynamicBallNodeMaterial(
 	envTexture: ThreeTexture,
-	tintColor = 0xc0c0c0,
+	tintColor = BALL_BASE_COLOR,
 ): MeshStandardNodeMaterial {
 	const mat = new MeshStandardNodeMaterial()
 	envTexture.mapping = EquirectangularReflectionMapping

@@ -8,6 +8,13 @@ import { clampExposure, resolveToneMapping } from './tone-mapping.js'
 
 const BLOOM_SCALE_FULL = 0.5
 const BLOOM_SCALE_LOW = 0.25
+/**
+ * A vpx-js tuning value, not an upstream port. Upstream's bloom shaders
+ * hard-code Threshold = 2.5 with SoftThreshold = 1.0 on linear HDR brightness
+ * (fs_pp_bloom.sc, FBShader.glfx; applied by UpdateBloom in Renderer.cpp),
+ * while three's bloom() threshold is a different curve on different input.
+ */
+const BLOOM_THRESHOLD = 0.85
 
 export interface PipelineConfig {
 	exposure?: number
@@ -49,18 +56,18 @@ export class VpxRenderPipeline {
 
 		// Upstream IsBloomEnabled (Renderer.cpp): bloom runs only while the
 		// table strength is positive (!m_bloomOff && m_bloom_strength > 0).
-		// The 0.85 cutoff below is a vpx-js guess: upstream has no threshold
-		// constant, UpdateBloom derives the cutoff from framebuffer luminance.
 		if (config.bloomEnabled !== false && bloomStrength > 0) {
 			const bloomNode = bloom(
 				this.sceneColor,
 				this.uBloomStrength,
 				config.bloomRadius ?? 0.4,
-				config.bloomThreshold ?? 0.85,
+				config.bloomThreshold ?? BLOOM_THRESHOLD,
 			)
 			try {
 				bloomNode?.setResolutionScale?.(config.lowQuality ? BLOOM_SCALE_LOW : BLOOM_SCALE_FULL)
-			} catch {}
+			} catch {
+				// Best effort: a rejected scale leaves bloom at its default resolution.
+			}
 			compositeNode = compositeNode.add(bloomNode)
 		}
 
@@ -89,6 +96,8 @@ export class VpxRenderPipeline {
 	public dispose(): void {
 		try {
 			;(this.pipeline as any)?.dispose?.()
-		} catch {}
+		} catch {
+			// Best-effort teardown: a pipeline on a lost device can throw, and nothing is left to free.
+		}
 	}
 }

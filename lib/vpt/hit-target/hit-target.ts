@@ -5,7 +5,7 @@ import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { Matrix3D } from '../../math/matrix.js'
 import { Vertex3D } from '../../math/vector.js'
-import { handleBiffTag } from '../biff-helper.js'
+import { type BiffFieldMap, handleBiffTag } from '../biff-helper.js'
 import { Enums } from '../enums.js'
 import { Item } from '../item.js'
 import { ItemData } from '../item-data.js'
@@ -16,7 +16,7 @@ import type { Table } from '../table/table.js'
 import type { Texture } from '../texture.js'
 import { HitTargetMeshGenerator, HitTargetUpdater } from './hit-target-view.js'
 
-const FLOAT_MAP: Record<string, string> = {
+const FLOAT_MAP: BiffFieldMap<HitTargetData> = {
 	ROTZ: 'rotZ',
 	DRSP: 'dropSpeed',
 	THRS: 'threshold',
@@ -28,8 +28,8 @@ const FLOAT_MAP: Record<string, string> = {
 	DILB: 'disableLightingBelow',
 	PIDB: 'depthBias',
 }
-const INT_MAP: Record<string, string> = { TRTY: 'targetType', RADE: 'raiseDelay' }
-const BOOL_MAP: Record<string, string> = {
+const INT_MAP: BiffFieldMap<HitTargetData> = { TRTY: 'targetType', RADE: 'raiseDelay' }
+const BOOL_MAP: BiffFieldMap<HitTargetData> = {
 	TVIS: 'isVisible',
 	LEMO: 'legacy',
 	ISDR: 'isDropped',
@@ -38,7 +38,7 @@ const BOOL_MAP: Record<string, string> = {
 	CLDR: 'isCollidable',
 	OVPH: 'overwritePhysics',
 }
-const STRING_MAP: Record<string, string> = { IMAG: 'szImage', MATR: 'szMaterial', MAPH: 'szPhysicsMaterial' }
+const STRING_MAP: BiffFieldMap<HitTargetData> = { IMAG: 'szImage', MATR: 'szMaterial', MAPH: 'szPhysicsMaterial' }
 
 /** @see https://github.com/vpinball/vpinball/blob/master/hittarget.cpp */
 export class HitTargetData extends ItemData {

@@ -10,6 +10,9 @@ function dequantizeUnsigned(value: number, bits: number): number {
 	return Math.min(value / ((1 << bits) - 1), 1)
 }
 
+/** Upstream's default material base color (`Material.h` `m_cBase(0xB469FF)`). */
+export const DEFAULT_MATERIAL_COLOR = 0xb469ff
+
 /**
  * VPinball material. @see https://github.com/vpinball/vpinball/blob/master/src/parts/Material.h
  *
@@ -29,7 +32,7 @@ export class Material {
 	public edge = 1.0
 	public edgeAlpha = 1.0
 	public opacity = 1.0
-	public baseColor = 0xb469ff
+	public baseColor = DEFAULT_MATERIAL_COLOR
 	public glossiness = 0.0
 	public clearCoat = 0.0
 	public isMetal = false

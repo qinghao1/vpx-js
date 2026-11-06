@@ -1,14 +1,23 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import type { Vertex3D } from '../math/vector.js'
 import type { IRenderApi } from '../render/irender-api.js'
 import { logger } from '../util/logger.js'
 import type { BallState } from '../vpt/ball/ball-state.js'
 import type { BallUpdater } from '../vpt/ball/ball-updater.js'
+import type { BumperState } from '../vpt/bumper/bumper.js'
+import type { FlasherState } from '../vpt/flasher/flasher-state.js'
+import type { FlipperState } from '../vpt/flipper/flipper-state.js'
+import type { GateState } from '../vpt/gate/gate-state.js'
+import type { HitTargetState } from '../vpt/hit-target/hit-target.js'
 import type { ItemState } from '../vpt/item-state.js'
 import type { ItemUpdater } from '../vpt/item-updater.js'
+import type { LightState } from '../vpt/light/light.js'
+import type { PlungerState } from '../vpt/plunger/plunger-state.js'
+import type { PrimitiveState } from '../vpt/primitive/primitive-state.js'
+import type { SpinnerState } from '../vpt/spinner/spinner-state.js'
 import type { Table } from '../vpt/table/table.js'
+import type { TriggerState } from '../vpt/trigger/trigger-state.js'
 import { MoverType, WASM_STRIDES } from './vpinball-wasm.js'
 
 /**
@@ -91,6 +100,7 @@ export interface SyncCounts {
  * `syncAll` result: change counts plus the light parts whose col-1
  * intensity changed this frame. The viewer maps those to names for the
  * lightmap fan-out, so the engine no longer re-walks the lights buffer.
+ * `changedLightParts` is reused scratch, valid until the next `syncAll`.
  */
 export interface SyncResult extends SyncCounts {
 	readonly changedLightParts: readonly number[]
@@ -191,7 +201,7 @@ export class WasmSceneSync<NODE, GEOMETRY, POINT_LIGHT> {
 	 * the host drops names it cannot resolve).
 	 */
 	private readonly lastLightValues = new Map<number, number>()
-	/** Scratch for the current frame's col-1 changes; copied out on return. */
+	/** Scratch for the current frame's col-1 changes; returned as-is, valid until the next `syncAll`. */
 	private readonly lightChanges: number[] = []
 	/** Scratch for the current frame's live ball ids; cleared, never reallocated. */
 	private readonly seenIds = new Set<number>()
@@ -254,7 +264,7 @@ export class WasmSceneSync<NODE, GEOMETRY, POINT_LIGHT> {
 			lights,
 			prims,
 			flashers,
-			changedLightParts: [...this.lightChanges],
+			changedLightParts: this.lightChanges,
 		}
 	}
 
@@ -312,11 +322,7 @@ export class WasmSceneSync<NODE, GEOMETRY, POINT_LIGHT> {
 
 	private applyBallRow(slot: BallSlot<NODE>, row: Float32Array): void {
 		slot.state.pos.set(row[1]!, row[2]!, row[3]!)
-		slot.state.orientation.matrix = [
-			[row[5]!, row[6]!, row[7]!],
-			[row[8]!, row[9]!, row[10]!],
-			[row[11]!, row[12]!, row[13]!],
-		]
+		slot.state.orientation.set(row[5]!, row[6]!, row[7]!, row[8]!, row[9]!, row[10]!, row[11]!, row[12]!, row[13]!)
 		slot.state.isVisible = row[15]! !== 0
 		slot.updater.applyState(slot.obj, slot.state, this.renderApi, this.table)
 	}
@@ -352,43 +358,46 @@ export class WasmSceneSync<NODE, GEOMETRY, POINT_LIGHT> {
 		// Unknown types must not touch state at all (the visibility write
 		// below would otherwise diverge it without ever applying).
 		if (!Number.isInteger(type) || type < MoverType.Flipper || type > MoverType.Trigger) return false
-		const s = slot.state as unknown as Record<string, number | boolean>
+		// The type tag selects the slot's concrete state class.
 		// Visibility first: BumperState derives isVisible from its four part flags
 		// (setting it broadcasts to all of them), so the bumper branch below
 		// re-asserts the engine bits afterwards.
-		s['isVisible'] = this.resolveVisible(row[6]! !== 0, partIdx)
+		slot.state.isVisible = this.resolveVisible(row[6]! !== 0, partIdx)
 		switch (type) {
 			case MoverType.Flipper:
-				s['angle'] = row[2]!
+				;(slot.state as FlipperState).angle = row[2]!
 				break
 			case MoverType.Plunger: {
 				const frames = Math.max(1, this.scene.plungerFrameCount(partIdx))
 				const t = row[4]! === row[3]! ? 0 : (row[2]! - row[3]!) / (row[4]! - row[3]!)
 				// A corrupt row must not poison state with NaN: skip the row.
 				if (!Number.isFinite(t)) return false
-				s['frame'] = Math.min(frames - 1, Math.max(0, Math.round(t * (frames - 1))))
+				;(slot.state as PlungerState).frame = Math.min(frames - 1, Math.max(0, Math.round(t * (frames - 1))))
 				break
 			}
 			case MoverType.Spinner:
 			case MoverType.Gate:
-				s['angle'] = row[2]!
+				;(slot.state as SpinnerState | GateState).angle = row[2]!
 				break
 			case MoverType.Bumper: {
-				s['ringOffset'] = row[2]!
-				s['skirtRotX'] = row[3]!
-				s['skirtRotY'] = row[4]!
+				const s = slot.state as BumperState
+				s.ringOffset = row[2]!
+				s.skirtRotX = row[3]!
+				s.skirtRotY = row[4]!
 				const bits = row[5]! | 0
 				for (let b = 0; b < BUMPER_VIS_BITS.length; b++) {
 					s[BUMPER_VIS_BITS[b]!] = (bits & (1 << b)) !== 0
 				}
 				break
 			}
-			case MoverType.HitTarget:
-				s['zOffset'] = row[2]!
-				s['isDropped'] = row[3]! !== 0
+			case MoverType.HitTarget: {
+				const s = slot.state as HitTargetState
+				s.zOffset = row[2]!
+				s.isDropped = row[3]! !== 0
 				break
+			}
 			case MoverType.Trigger:
-				s['heightOffset'] = row[2]!
+				;(slot.state as TriggerState).heightOffset = row[2]!
 				break
 			default:
 				return false
@@ -415,14 +424,14 @@ export class WasmSceneSync<NODE, GEOMETRY, POINT_LIGHT> {
 			if (WasmSceneSync.rowsEqual(this.lastLightRows, partIdx, row)) continue
 			const slot = this.scene.part(partIdx)
 			if (!slot) continue
-			const s = slot.state as unknown as Record<string, number | boolean>
-			s['intensity'] = row[1]!
-			s['baseIntensity'] = row[2]!
-			s['intensityScale'] = row[3]!
-			s['inPlayState'] = row[4]! !== 0
-			s['color'] = row[5]!
-			s['colorFull'] = row[6]!
-			s['isVisible'] = this.resolveVisible(row[7]! !== 0, partIdx)
+			const s = slot.state as LightState
+			s.intensity = row[1]!
+			s.baseIntensity = row[2]!
+			s.intensityScale = row[3]!
+			s.inPlayState = row[4]! !== 0
+			s.color = row[5]!
+			s.colorFull = row[6]!
+			s.isVisible = this.resolveVisible(row[7]! !== 0, partIdx)
 			slot.updater.applyState(slot.obj, slot.state, this.renderApi, this.table)
 			WasmSceneSync.snapRow(this.lastLightRows, partIdx, row)
 			applied++
@@ -442,19 +451,19 @@ export class WasmSceneSync<NODE, GEOMETRY, POINT_LIGHT> {
 			if (WasmSceneSync.rowsEqual(this.lastPrimRows, partIdx, row)) continue
 			const slot = this.scene.part(partIdx)
 			if (!slot) continue
-			const s = slot.state as unknown as Record<string, number | boolean | Vertex3D>
+			const s = slot.state as PrimitiveState
 			const num = (col: number): number => row[col]!
-			;(s['position'] as Vertex3D).set(num(1), num(2), num(3))
-			;(s['size'] as Vertex3D).set(num(4), num(5), num(6))
-			;(s['rotation'] as Vertex3D).set(num(7), num(8), num(9))
-			;(s['translation'] as Vertex3D).set(num(10), num(11), num(12))
-			;(s['objectRotation'] as Vertex3D).set(num(13), num(14), num(15))
-			s['isVisible'] = this.resolveVisible(num(16) !== 0, partIdx)
-			s['color'] = num(17)
-			s['alpha'] = num(18)
-			s['disableLightingTop'] = num(19)
-			s['disableLightingBelow'] = num(20)
-			s['currentFrame'] = num(21)
+			s.position.set(num(1), num(2), num(3))
+			s.size.set(num(4), num(5), num(6))
+			s.rotation.set(num(7), num(8), num(9))
+			s.translation.set(num(10), num(11), num(12))
+			s.objectRotation.set(num(13), num(14), num(15))
+			s.isVisible = this.resolveVisible(num(16) !== 0, partIdx)
+			s.color = num(17)
+			s.alpha = num(18)
+			s.disableLightingTop = num(19)
+			s.disableLightingBelow = num(20)
+			s.currentFrame = num(21)
 			slot.updater.applyState(slot.obj, slot.state, this.renderApi, this.table)
 			WasmSceneSync.snapRow(this.lastPrimRows, partIdx, row)
 			applied++
@@ -482,18 +491,18 @@ export class WasmSceneSync<NODE, GEOMETRY, POINT_LIGHT> {
 			const image = pollImage ? this.flasherImage(partIdx) : undefined
 			const imageChanged = image !== undefined && image !== this.lastFlasherImages.get(partIdx)
 			if (staticRow && !imageChanged) continue
-			const s = slot.state as unknown as Record<string, number | boolean | string>
+			const s = slot.state as FlasherState
 			if (!staticRow) {
-				s['isVisible'] = this.resolveVisible(row[1]! !== 0, partIdx)
-				s['alpha'] = row[2]!
-				s['color'] = row[3]!
-				s['intensityScale'] = row[4]!
-				s['modulateVsAdd'] = row[5]!
-				s['addBlend'] = row[6]! !== 0
-				s['inPlayState'] = row[7]! !== 0
+				s.isVisible = this.resolveVisible(row[1]! !== 0, partIdx)
+				s.alpha = row[2]!
+				s.color = row[3]!
+				s.intensityScale = row[4]!
+				s.modulateVsAdd = row[5]!
+				s.addBlend = row[6]! !== 0
+				s.inPlayState = row[7]! !== 0
 				WasmSceneSync.snapRow(this.lastFlasherRows, partIdx, row)
 			}
-			if (imageChanged) s['imageA'] = image!
+			if (imageChanged) s.imageA = image!
 			slot.updater.applyState(slot.obj, slot.state, this.renderApi, this.table)
 			if (imageChanged) this.lastFlasherImages.set(partIdx, image!)
 			applied++

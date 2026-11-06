@@ -32,19 +32,7 @@ function makeTex() {
 describe('regression: mapless bake-named flipper parts stay lit', () => {
 	it('routes a mapless bake-named material to the lit primitive path', () => {
 		const generator = makeGenerator(new Map())
-		const mat: any = generator.getMaterial(
-			{ name: 'VLM.Bake.Active', baseColor: 0x323232 } as any,
-			undefined,
-			undefined,
-			undefined,
-			undefined,
-			false,
-			0,
-			undefined,
-			false,
-			undefined,
-			0,
-		)
+		const mat: any = generator.getMaterial({ material: { name: 'VLM.Bake.Active', baseColor: 0x323232 } as any })
 		expect(isPrimitiveNodeMaterial(mat), 'mapless bake must render lit, not flat-unlit').toBe(true)
 		expect(isBakedNodeMaterial(mat), 'mapless bake must not take the unlit bake path').toBe(false)
 		expect(mat.userData.__uAlbedo.value.getHex(), 'authored color survives as lit albedo').toEqual(0x323232)
@@ -52,19 +40,10 @@ describe('regression: mapless bake-named flipper parts stay lit', () => {
 
 	it('keeps the unlit bake path while a bake texture is referenced', () => {
 		const generator = makeGenerator(new Map())
-		const mat: any = generator.getMaterial(
-			{ name: 'VLM.Bake.Active', baseColor: 0x323232 } as any,
-			'vlm.nestmap0',
-			undefined,
-			undefined,
-			undefined,
-			false,
-			0,
-			undefined,
-			false,
-			undefined,
-			0,
-		)
+		const mat: any = generator.getMaterial({
+			material: { name: 'VLM.Bake.Active', baseColor: 0x323232 } as any,
+			map: 'vlm.nestmap0',
+		})
 		expect(isBakedNodeMaterial(mat), 'referenced bake texture keeps the unlit bake path').toBe(true)
 		expect(mat.userData.pendingMap, 'missing bake still streams').toEqual('vlm.nestmap0')
 	})
@@ -72,19 +51,7 @@ describe('regression: mapless bake-named flipper parts stay lit', () => {
 	it('lights a late-arriving map on a mapless bake reference instead of baking it flat', () => {
 		const textures = new Map<string, DataTexture>()
 		const generator = makeGenerator(textures)
-		const mat: any = generator.getMaterial(
-			{ name: 'VLM.Bake.Active', baseColor: 0x323232 } as any,
-			undefined,
-			undefined,
-			undefined,
-			undefined,
-			false,
-			0,
-			undefined,
-			false,
-			undefined,
-			0,
-		)
+		const mat: any = generator.getMaterial({ material: { name: 'VLM.Bake.Active', baseColor: 0x323232 } as any })
 		expect(isPrimitiveNodeMaterial(mat), 'precondition: lit path before the map arrives').toBe(true)
 		textures.set('flipperbat', makeTex())
 		generator.applyMap(mat, 'flipperbat')

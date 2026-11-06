@@ -3,13 +3,16 @@
 
 import type { BiffParser } from '../io/biff-parser.js'
 
+/** Biff tag → field of T: a misspelled field fails to type-check instead of creating a new property. */
+export type BiffFieldMap<T> = Readonly<Record<string, keyof T & string>>
+
 /** Maps for Biff tag dispatch. */
-export interface BiffMaps {
-	float?: Record<string, string>
-	int?: Record<string, string>
-	bool?: Record<string, string>
-	string?: Record<string, string>
-	wideString?: Record<string, string>
+export interface BiffMaps<T> {
+	float?: BiffFieldMap<T>
+	int?: BiffFieldMap<T>
+	bool?: BiffFieldMap<T>
+	string?: BiffFieldMap<T>
+	wideString?: BiffFieldMap<T>
 }
 
 /**
@@ -22,9 +25,9 @@ export function handleBiffTag<T extends BiffParser>(
 	tag: string,
 	buffer: Uint8Array,
 	len: number,
-	maps: BiffMaps,
+	maps: BiffMaps<T>,
 ): boolean {
-	const t = target as BiffParser & Record<string, unknown>
+	const t = target as unknown as Record<string, unknown>
 	if (maps.float && Object.hasOwn(maps.float, tag)) {
 		t[maps.float[tag]] = target.getFloat(buffer)
 		return true

@@ -256,10 +256,10 @@ describe('unshaded baked node material', () => {
 		setGlobalEmissionScale(0.25)
 		try {
 			const generator = new ThreeNodeMaterialGenerator({ hasTexture: () => false } as any)
-			const material = generator.getMaterial(
-				{ name: 'VLM.Bake.Active', baseColor: 0x808080 } as any,
-				'VLM.Nestmap0',
-			)
+			const material = generator.getMaterial({
+				material: { name: 'VLM.Bake.Active', baseColor: 0x808080 } as any,
+				map: 'VLM.Nestmap0',
+			})
 			expect(isBakedNodeMaterial(material)).to.equal(true)
 			const userData = (material as any).userData as Record<string, { value?: { getHex?: () => number } }>
 			expect(userData.__uTint?.value?.getHex?.()).to.equal(0x808080)

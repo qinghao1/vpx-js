@@ -6,12 +6,12 @@ import type { Storage } from '../../io/ole-doc.js'
 import { Vertex2D } from '../../math/vector.js'
 import { CatmullCurve2D } from '../../util/catmull-curve.js'
 import { RenderVertex } from '../../util/vertex.js'
-import { handleBiffTag } from '../biff-helper.js'
+import { type BiffFieldMap, handleBiffTag } from '../biff-helper.js'
 import { DragPoint, dragPointNestedTag } from '../dragpoint.js'
 import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 
-const FLOAT_MAP: Record<string, string> = {
+const FLOAT_MAP: BiffFieldMap<FlasherData> = {
 	FHEI: 'height',
 	FROX: 'rotX',
 	FROY: 'rotY',
@@ -24,7 +24,7 @@ const FLOAT_MAP: Record<string, string> = {
 	GLFT: 'glassPadLeft',
 	GRHT: 'glassPadRight',
 }
-const INT_MAP: Record<string, string> = {
+const INT_MAP: BiffFieldMap<FlasherData> = {
 	ALGN: 'imageAlignment',
 	FILT: 'filter',
 	FIAM: 'filterAmount',
@@ -32,13 +32,13 @@ const INT_MAP: Record<string, string> = {
 	RSTL: 'renderStyle',
 	GAMB: 'glassAmbient',
 }
-const BOOL_MAP: Record<string, string> = {
+const BOOL_MAP: BiffFieldMap<FlasherData> = {
 	FVIS: 'isVisible',
 	IDMD: 'isDMD',
 	DSPT: 'displayTexture',
 	BGLS: 'isBackglass',
 }
-const STRING_MAP: Record<string, string> = {
+const STRING_MAP: BiffFieldMap<FlasherData> = {
 	IMAG: 'szImageA',
 	IMAB: 'szImageB',
 	LMAP: 'szLightmap',

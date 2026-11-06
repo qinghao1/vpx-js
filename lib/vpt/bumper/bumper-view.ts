@@ -198,6 +198,6 @@ export class BumperUpdater extends ItemUpdater<BumperState> {
 		const node = renderApi.findInGroup(obj, `bumper-${name}-${this.state.getName()}`)
 		if (!node) return
 		const material = table.getMaterial(materialName)
-		if (material) renderApi.applyMaterial(node, material)
+		if (material) renderApi.applyMaterial(node, { material })
 	}
 }

@@ -1,11 +1,15 @@
 import type { Group } from 'three'
 import { BufferAttribute, BufferGeometry, Color, DoubleSide, Matrix4, Mesh, Vector2 } from 'three'
 import { attribute, clamp, Fn, float, length, max, mix, positionLocal, pow, sqrt, uniform } from 'three/tsl'
-import { MeshBasicNodeMaterial } from 'three/webgpu'
+import { MeshBasicNodeMaterial, type Node } from 'three/webgpu'
 import { clampModulateVsAdd } from '../../../vpt/flasher/flasher-blend.js'
+import type { Table } from '../../../vpt/table/table.js'
 import { getAuthoredVisible } from '../authored-visible.js'
 import { applyModulateVsAddBlending, modulateVsAddOutput } from './modulate-vs-add.js'
 import { inPlayfieldBounds, playfieldUv, uBulbGlowFootprintClip } from './primitive-bdl-node.js'
+
+/** Falloff floor: keeps the inverse halo radius finite. */
+const MIN_FALLOFF = 0.1
 
 export interface BulbGlowOptions {
 	color: number
@@ -19,42 +23,58 @@ export interface BulbGlowOptions {
 	modulateVsAdd?: number
 }
 
-export function createBulbGlowNodeMaterial(options: BulbGlowOptions): MeshBasicNodeMaterial {
-	const mat = new MeshBasicNodeMaterial()
-	const uColor = uniform(new Color(options.color))
-	const uColor2 = uniform(new Color(options.color2))
-	const uCenter = uniform(new Vector2(options.centerX, options.centerY))
-	const uInvFalloff = uniform(1 / Math.max(options.falloff, 0.1))
-	const uFalloffPower = uniform(options.falloffPower)
-	const uIntensity = uniform(options.intensity)
-	// REVSUBTRACT is order-dependent: overlapping halos composite in draw order
-	// (transparent sort, or bake order when merged), not native's z + depthBias.
-	const uModulate = uniform(clampModulateVsAdd(options.modulateVsAdd))
+type GlowColor = Node<'vec3'> | Node<'color'>
 
-	mat.outputNode = Fn(() => {
-		// Matches fs_light.sc: atten = pow(max(1 - saturate(len), 0.0001),
-		// falloff_power) with the color ramp on the unclamped sqrt(len) —
-		// the floor keeps a fully covered pixel from going exactly 0 and
-		// the ramp extrapolates past the rim instead of clamping.
-		const len = length(positionLocal.xy.sub(uCenter)).mul(uInvFalloff)
-		const atten = pow(max(float(1).sub(clamp(len, float(0), float(1))), float(0.0001)), uFalloffPower)
-		const glowColor = mix(uColor2, uColor, sqrt(len))
-		// Authored halo polygons routinely extend past the cabinet walls
-		// (giant GI discs, flasher sheets); from outside, those overhanging
-		// fragments sit in front of the side art and wash it with playfield
-		// light. Confine the halo to the playfield footprint (same mask as
-		// the transmission lift); disabled until the viewer configures the
-		// playfield area, so unconfigured renders are unchanged.
-		const footprint = mix(float(1), inPlayfieldBounds(playfieldUv()), uBulbGlowFootprintClip)
-		return modulateVsAddOutput(glowColor.mul(atten).mul(uIntensity).mul(footprint), uModulate)
-	})()
+/** Halo composite shared by the per-quad (uniform) and merged (attribute) materials. */
+function glowOutput(
+	center: Node<'vec2'>,
+	invFalloff: Node<'float'>,
+	falloffPower: Node<'float'>,
+	color: GlowColor,
+	color2: GlowColor,
+	intensity: Node<'float'>,
+	modulate: Node<'float'>,
+) {
+	// Matches fs_light.sc: atten = pow(max(1 - saturate(len), 0.0001),
+	// falloff_power) with the color ramp on the unclamped sqrt(len) —
+	// the floor keeps a fully covered pixel from going exactly 0 and
+	// the ramp extrapolates past the rim instead of clamping.
+	const len = length(positionLocal.xy.sub(center)).mul(invFalloff)
+	const atten = pow(max(float(1).sub(clamp(len, float(0), float(1))), float(0.0001)), falloffPower)
+	const glowColor = mix(color2, color, sqrt(len))
+	// Authored halo polygons routinely extend past the cabinet walls
+	// (giant GI discs, flasher sheets); from outside, those overhanging
+	// fragments sit in front of the side art and wash it with playfield
+	// light. Confine the halo to the playfield footprint (same mask as
+	// the transmission lift); disabled until the viewer configures the
+	// playfield area, so unconfigured renders are unchanged.
+	const footprint = mix(float(1), inPlayfieldBounds(playfieldUv()), uBulbGlowFootprintClip)
+	return modulateVsAddOutput(glowColor.mul(atten).mul(intensity).mul(footprint), modulate)
+}
 
+function setupGlowMaterial(mat: MeshBasicNodeMaterial): void {
 	applyModulateVsAddBlending(mat)
 	mat.transparent = true
 	mat.depthWrite = false
 	mat.depthTest = true
 	mat.toneMapped = true
 	mat.side = DoubleSide
+}
+
+export function createBulbGlowNodeMaterial(options: BulbGlowOptions): MeshBasicNodeMaterial {
+	const mat = new MeshBasicNodeMaterial()
+	const uColor = uniform(new Color(options.color))
+	const uColor2 = uniform(new Color(options.color2))
+	const uCenter = uniform(new Vector2(options.centerX, options.centerY))
+	const uInvFalloff = uniform(1 / Math.max(options.falloff, MIN_FALLOFF))
+	const uFalloffPower = uniform(options.falloffPower)
+	const uIntensity = uniform(options.intensity)
+	// REVSUBTRACT is order-dependent: overlapping halos composite in draw order
+	// (transparent sort, or bake order when merged), not native's z + depthBias.
+	const uModulate = uniform(clampModulateVsAdd(options.modulateVsAdd))
+
+	mat.outputNode = Fn(() => glowOutput(uCenter, uInvFalloff, uFalloffPower, uColor, uColor2, uIntensity, uModulate))()
+	setupGlowMaterial(mat)
 
 	const ud = mat.userData as Record<string, unknown>
 	ud.__bulbGlow = true
@@ -130,20 +150,9 @@ export function createMergedBulbGlowMaterial(): MeshBasicNodeMaterial {
 	const aColor = attribute<'vec3'>('aGlowColor', 'vec3')
 	const aColor2 = attribute<'vec3'>('aGlowColor2', 'vec3')
 	const aDyn = attribute<'vec2'>('aGlowDyn', 'vec2')
-	mat.outputNode = Fn(() => {
-		// Same math as the per-quad material; aDyn is the live (intensity, modulate) per lamp.
-		const len = length(positionLocal.xy.sub(aCenter)).mul(aParams.x)
-		const atten = pow(max(float(1).sub(clamp(len, float(0), float(1))), float(0.0001)), aParams.y)
-		const glowColor = mix(aColor2, aColor, sqrt(len))
-		const footprint = mix(float(1), inPlayfieldBounds(playfieldUv()), uBulbGlowFootprintClip)
-		return modulateVsAddOutput(glowColor.mul(atten).mul(aDyn.x).mul(footprint), aDyn.y)
-	})()
-	applyModulateVsAddBlending(mat)
-	mat.transparent = true
-	mat.depthWrite = false
-	mat.depthTest = true
-	mat.toneMapped = true
-	mat.side = DoubleSide
+	// aParams is (inverse falloff, falloff power); aDyn is the live (intensity, modulate) per lamp.
+	mat.outputNode = Fn(() => glowOutput(aCenter, aParams.x, aParams.y, aColor, aColor2, aDyn.x, aDyn.y))()
+	setupGlowMaterial(mat)
 	;(mat.userData as Record<string, unknown>).__bulbGlowMerged = true
 	return mat
 }
@@ -177,18 +186,14 @@ interface GlowLightParams {
 	falloffPower: number
 }
 
-function glowParamsOf(table: unknown, lightName: string): GlowLightParams | undefined {
-	const lights = (table as { lights?: Record<string, { data?: Record<string, unknown> }> })?.lights
-	const data = lights?.[lightName]?.data
+function glowParamsOf(table: Table, lightName: string): GlowLightParams | undefined {
+	const data = table.lights[lightName]?.data
 	if (!data) return undefined
-	const center = data.center as { x?: number; y?: number } | undefined
-	const right = (table as { data?: { right?: number } })?.data?.right || 1
-	const bottom = (table as { data?: { bottom?: number } })?.data?.bottom || 1
 	return {
-		centerX: typeof center?.x === 'number' ? center.x : right / 2,
-		centerY: typeof center?.y === 'number' ? center.y : bottom / 2,
-		falloff: Math.max(typeof data.falloff === 'number' ? data.falloff : 50, 0.1),
-		falloffPower: typeof data.falloffPower === 'number' ? data.falloffPower : 2,
+		centerX: data.center?.x ?? (table.data?.right || 1) / 2,
+		centerY: data.center?.y ?? (table.data?.bottom || 1) / 2,
+		falloff: Math.max(data.falloff, MIN_FALLOFF),
+		falloffPower: data.falloffPower,
 	}
 }
 
@@ -298,7 +303,7 @@ function anyGlowLive(dyn: BufferAttribute): boolean {
  *
  * @returns number of quads folded into the merged mesh (0 when nothing merged).
  */
-export function mergeBulbGlowQuads(root: Group, table: unknown): number {
+export function mergeBulbGlowQuads(root: Group, table: Table): number {
 	root.updateMatrixWorld(true)
 	const invRoot = new Matrix4().copy(root.matrixWorld).invert()
 	interface Candidate {
@@ -400,7 +405,7 @@ export function mergeBulbGlowQuads(root: Group, table: unknown): number {
 		}
 		const ccx = e0 * c.params.centerX + e4 * c.params.centerY + e12
 		const ccy = e1 * c.params.centerX + e5 * c.params.centerY + e13
-		const invFalloff = 1 / Math.max(c.params.falloff, 0.1) / sx
+		const invFalloff = 1 / Math.max(c.params.falloff, MIN_FALLOFF) / sx
 		for (let i = 0; i < count; i++) {
 			const v = vCursor + i
 			aCenter[v * 2] = ccx

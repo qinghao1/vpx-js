@@ -3,7 +3,7 @@
 // `Color` is pure linear-space colorimetry (no renderer); the hex it yields
 // is backend-neutral, so this stays while the sRGB↔linear round-trip must
 // match the renderer exactly.
-import { AdditiveBlending, Color, NormalBlending } from 'three'
+import { Color, NormalBlending } from 'three'
 import { Matrix3D } from '../../math/matrix.js'
 import type { IRenderApi } from '../../render/irender-api.js'
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
@@ -290,21 +290,9 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 			if (kind === PRIMITIVE_ADDITIVE_KIND) {
 				const intensity = Math.min(MAX_EMISSIVE, effectiveAlpha * ALPHA_SCALE)
 				updatePrimitiveAdditive(mat, { tint: hex, intensity })
-				mat.transparent = true
-				mat.depthWrite = false
-				// Overlay light splats sit coplanar with the opaque bake below;
-				// the offset wins that tie while nearer toys still occlude them
-				// (same overlay convention as the classic baked path).
-				mat.depthTest = true
-				mat.polygonOffset = true
-				mat.polygonOffsetFactor = -2
-				mat.polygonOffsetUnits = -4
+				// The material factory owns the overlay render state (blend,
+				// depth, polygon offset); only the draw order lives on the mesh.
 				;(mesh as any).renderOrder = 2
-				// Named three.js blend id: primitives never set absorb (no
-				// addBlendMode flows into their factory call), so the plain
-				// additive re-assert below is a no-op, never a mode clobber.
-				mat.blending = AdditiveBlending
-				mat.toneMapped = true
 				// Native (primitive.cpp:1037,1088): visible=false skips the draw, and
 				// additive is also skipped when there is nothing to add.
 				const scriptVisible = this.state.isVisible ?? this.data.isVisible ?? true

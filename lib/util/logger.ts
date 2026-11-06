@@ -2,11 +2,11 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 export interface ILogger {
-	wtf(f: string, ...a: unknown[]): void
-	error(f: string, ...a: unknown[]): void
-	warn(f: string, ...a: unknown[]): void
-	info(f: string, ...a: unknown[]): void
-	debug(f: string, ...a: unknown[]): void
+	wtf(format: string, ...args: unknown[]): void
+	error(format: string, ...args: unknown[]): void
+	warn(format: string, ...args: unknown[]): void
+	info(format: string, ...args: unknown[]): void
+	debug(format: string, ...args: unknown[]): void
 }
 export interface IProgress {
 	start(id: string, title: string): void
@@ -35,21 +35,21 @@ export class Logger implements ILogger {
 			return true
 		return false
 	}
-	debug(f: string, ...a: unknown[]): void {
+	debug(format: string, ...args: unknown[]): void {
 		if (!Logger.isDebugEnabled) return
-		console.debug(f, ...a)
+		console.debug(format, ...args)
 	}
-	error(f: string, ...a: unknown[]): void {
-		console.error(f, ...a)
+	error(format: string, ...args: unknown[]): void {
+		console.error(format, ...args)
 	}
-	info(f: string, ...a: unknown[]): void {
-		console.log(f, ...a)
+	info(format: string, ...args: unknown[]): void {
+		console.log(format, ...args)
 	}
-	warn(f: string, ...a: unknown[]): void {
-		console.warn(f, ...a)
+	warn(format: string, ...args: unknown[]): void {
+		console.warn(format, ...args)
 	}
-	wtf(f: string, ...a: unknown[]): void {
-		console.error(f, ...a)
+	wtf(format: string, ...args: unknown[]): void {
+		console.error(format, ...args)
 	}
 }
 

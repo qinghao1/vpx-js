@@ -4,11 +4,11 @@
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { Vertex2D } from '../../math/vector.js'
-import { handleBiffTag } from '../biff-helper.js'
+import { type BiffFieldMap, handleBiffTag } from '../biff-helper.js'
 import { Enums } from '../enums.js'
 import { ItemData } from '../item-data.js'
 
-const FLOAT_MAP: Record<string, string> = {
+const FLOAT_MAP: BiffFieldMap<PlungerData> = {
 	WDTH: 'width',
 	ZADJ: 'zAdjust',
 	HIGH: 'height',
@@ -28,14 +28,14 @@ const FLOAT_MAP: Record<string, string> = {
 	SPRL: 'springLoops',
 	SPRE: 'springEndLoops',
 }
-const INT_MAP: Record<string, string> = { TYPE: 'type', ANFR: 'animFrames' }
-const BOOL_MAP: Record<string, string> = {
+const INT_MAP: BiffFieldMap<PlungerData> = { TYPE: 'type', ANFR: 'animFrames' }
+const BOOL_MAP: BiffFieldMap<PlungerData> = {
 	MECH: 'mechPlunger',
 	APLG: 'autoPlunger',
 	VSBL: 'isVisible',
 	REEN: 'isReflectionEnabled',
 }
-const STRING_MAP: Record<string, string> = {
+const STRING_MAP: BiffFieldMap<PlungerData> = {
 	MATR: 'szMaterial',
 	IMAG: 'szImage',
 	SURF: 'szSurface',

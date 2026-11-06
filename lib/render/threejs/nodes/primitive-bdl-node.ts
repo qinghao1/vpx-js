@@ -30,6 +30,7 @@ import {
 	updatePrimitiveAdditive,
 	updatePrimitiveBdl,
 } from '../../../vpt/primitive/primitive-material-protocol.js'
+import type { FlasherBlendTarget } from '../../irender-api.js'
 import { copyForkedRenderState, defineEmissiveIntensityCompat, setNodeMapSlot } from '../material-shared.js'
 import { getTransmissionTexture, TRANSMISSION_OPAQUE_CUTOFF } from '../transmission-buffer.js'
 import { applyModulateVsAddBlending, modulateVsAddOutput } from './modulate-vs-add.js'
@@ -161,8 +162,6 @@ export interface PrimitiveAdditiveOptions {
 	absorb?: boolean
 	plain?: boolean
 }
-
-export type FlasherBlendTarget = 'absorb' | 'additive' | 'plain'
 
 function applyTargetBlend(mat: MeshBasicNodeMaterial, target: FlasherBlendTarget): void {
 	// REVSUBTRACT is order-dependent: overlapping AB_ADD overlays composite in

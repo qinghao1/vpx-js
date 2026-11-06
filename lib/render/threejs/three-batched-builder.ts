@@ -8,6 +8,7 @@ import {
 	Matrix4,
 	type Mesh,
 	type MeshStandardMaterial,
+	type Object3D,
 } from 'three'
 import { isLowQuality } from '../../util/quality.js'
 import type { Table } from '../../vpt/table/table.js'
@@ -108,7 +109,7 @@ function isBallLike(o: any, root: Group, mat: MeshStandardMaterial): boolean {
 }
 
 // Procedural DMD quads stream their texture per frame and must stay live.
-function isDmdLike(o: any): boolean {
+function isDmdLike(o: Object3D): boolean {
 	const n = (o.name || '').toLowerCase()
 	return !!o.userData?.isProceduralDMD || o.name.startsWith('DMD_') || n.includes('dmd')
 }
@@ -149,7 +150,7 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 		return s
 	})()
 	const low = isLowQuality()
-	const isAnimated = (o: any): boolean => {
+	const isAnimated = (o: Object3D): boolean => {
 		const isMovableOrAnim = (name: string): boolean =>
 			!!name && (movables.has(name) || (animatables.has(name) && !primitives.has(name)))
 		if (isMovableOrAnim(o.name)) return true
@@ -165,7 +166,8 @@ export function batchStaticOpaques(root: Group, table: Table, _renderApi: ThreeR
 	}
 
 	const buckets = new Map<string, { material: MeshStandardMaterial; meshes: Mesh[] }>()
-	root.traverse((o: any) => {
+	root.traverse((node: Object3D) => {
+		const o = node as Mesh
 		if (!o.isMesh || !o.geometry || !o.material) return
 		if ((o as any).isBatchedMesh || (o as any).isInstancedMesh) return
 		if (Array.isArray(o.material)) return

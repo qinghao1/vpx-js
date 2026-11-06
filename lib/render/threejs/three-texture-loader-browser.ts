@@ -60,7 +60,10 @@ const NOMIPMAP_MAX_EDGE = 64
 /** No mip chain for magnified DMD panels or tiny (≤64px) icons: ~33% GPU and upload for nothing. */
 const RE_NOMIPMAP = /dmd/i
 
-function tune(tex: any, name?: string): void {
+/** Any loaded texture; only the image extent is read. */
+type SizedTexture = ThreeTexture<{ width?: number; height?: number } | null>
+
+function tune(tex: SizedTexture, name?: string): void {
 	const caps = getEffectiveCaps()
 	const img = tex?.image
 	const edge = Math.max(img?.width ?? 0, img?.height ?? 0)
@@ -71,7 +74,7 @@ function tune(tex: any, name?: string): void {
 	tex.anisotropy = cappedAniso(caps.aniso)
 }
 
-function nameAndTune(tex: any, name: string): void {
+function nameAndTune(tex: SizedTexture, name: string): void {
 	tex.name = `texture:${name}`
 	tex.needsUpdate = true
 	tune(tex, name)

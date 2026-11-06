@@ -5,7 +5,7 @@ import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { Matrix3D } from '../../math/matrix.js'
 import type { Meshes } from '../../render/irender-api.js'
-import { handleBiffTag } from '../biff-helper.js'
+import { type BiffFieldMap, handleBiffTag } from '../biff-helper.js'
 import { type DragPoint, dragPointNestedTag } from '../dragpoint.js'
 import { Item } from '../item.js'
 import { ItemData } from '../item-data.js'
@@ -14,7 +14,7 @@ import type { Material } from '../material.js'
 import type { Table } from '../table/table.js'
 import { SurfaceMeshGenerator, SurfaceUpdater } from './surface-view.js'
 
-const BOOL_MAP: Record<string, string> = {
+const BOOL_MAP: BiffFieldMap<SurfaceData> = {
 	HTEV: 'hitEvent',
 	DROP: 'isDroppable',
 	FLIP: 'isFlipbook',
@@ -27,7 +27,7 @@ const BOOL_MAP: Record<string, string> = {
 	SVBL: 'isSideVisible',
 	REEN: 'isReflectionEnabled',
 }
-const FLOAT_MAP: Record<string, string> = {
+const FLOAT_MAP: BiffFieldMap<SurfaceData> = {
 	THRS: 'threshold',
 	HTBT: 'heightBottom',
 	HTTP: 'heightTop',
@@ -40,7 +40,7 @@ const FLOAT_MAP: Record<string, string> = {
 	DILT: 'disableLightingTop',
 	DILB: 'disableLightingBelow',
 }
-const STRING_MAP: Record<string, string> = {
+const STRING_MAP: BiffFieldMap<SurfaceData> = {
 	IMAG: 'szImage',
 	SIMG: 'szSideImage',
 	MAPH: 'szPhysicsMaterial',

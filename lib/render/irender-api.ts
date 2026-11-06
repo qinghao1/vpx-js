@@ -26,6 +26,9 @@ export interface IRenderable<STATE extends ItemState = ItemState> extends IItem 
 	getUpdater(): ItemUpdater<STATE>
 }
 
+/** Live overlay blend: `FlasherData::AddBlendMode` for addBlend flashers, plain alpha otherwise. */
+export type FlasherBlendTarget = 'absorb' | 'additive' | 'plain'
+
 export interface Meshes<GEOMETRY> {
 	[key: string]: RenderInfo<GEOMETRY>
 }
@@ -150,20 +153,9 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	 * If the node is undefined, nothing is applied.
 	 *
 	 * @param node Node to apply material to
-	 * @param material Material to apply
-	 * @param map Name of the texture, if any
-	 * @param normalMap Name of the normal map, if any
-	 * @param envMap Name of the environment map, if any
-	 * @param emissiveMap Name of the emissive map, if any
+	 * @param desc Material and texture to rebind
 	 */
-	applyMaterial(
-		node: NODE | undefined,
-		material?: Material,
-		map?: string,
-		normalMap?: string,
-		envMap?: string,
-		emissiveMap?: string,
-	): void
+	applyMaterial(node: NODE | undefined, desc: MaterialApplyDesc): void
 
 	/**
 	 * Fork-safe material clone for script writes.
@@ -178,6 +170,16 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	 * @param mat Material to fork for exclusive write access
 	 */
 	cloneMaterialForWrite?<MATERIAL>(mat: MATERIAL): MATERIAL
+
+	/**
+	 * Switches an additive overlay material to its live blend target; other
+	 * materials stay untouched. Optional for backward compatibility: without
+	 * it overlays keep the blend they were created with.
+	 *
+	 * @param mat Material to convert
+	 * @param target Blend target the flasher's live state selects
+	 */
+	convertFlasherBlend?<MATERIAL>(mat: MATERIAL, target: FlasherBlendTarget): void
 
 	createObjectFromRenderable(renderable: IRenderable<ItemState>, table: Table, opts: TableGenerateOptions): NODE
 
@@ -197,6 +199,13 @@ export interface IRenderApi<NODE, GEOMETRY, POINT_LIGHT> {
 	createPointLight(lightData: LightData, table?: Table): POINT_LIGHT
 }
 
+/** Script-driven material rebind for `IRenderApi.applyMaterial`. */
+export interface MaterialApplyDesc {
+	material?: Material
+	/** Texture name; `undefined` keeps the bound one, an empty string clears it. */
+	map?: string
+}
+
 export interface ITextureLoader<TEXTURE> {
 	/** Loads a texture coming from an `Image{n}` stream. */
 	loadTexture(name: string, ext: string, data: Uint8Array): Promise<TEXTURE>
@@ -210,7 +219,8 @@ export interface ITextureLoader<TEXTURE> {
 	/**
 	 * Whether an engine-shipped default texture exists for this name, without loading it.
 	 * Lets callers skip doomed load attempts for table-missing names that are no default.
-	 * Optional for backward compatibility with custom loaders.
+	 * Optional for backward compatibility with custom loaders: callers fall back to
+	 * attempting the default load for every table-missing name.
 	 *
 	 * @param name Texture name as referenced by the scene
 	 */
@@ -218,12 +228,13 @@ export interface ITextureLoader<TEXTURE> {
 
 	/**
 	 * Warms an expensive decode pool ahead of dispatch (e.g. HDR workers).
-	 * Optional for backward compatibility with custom loaders.
+	 * Optional for backward compatibility with custom loaders: without it the
+	 * pool starts cold on the first decode.
 	 */
 	warmup?(): void
 }
 
-export interface MeshConvertOptions {
+export interface MeshConvertOptions<TEXTURE = unknown> {
 	applyMaterials?: boolean
-	applyTextures?: ITextureLoader<any>
+	applyTextures?: ITextureLoader<TEXTURE>
 }

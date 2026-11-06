@@ -44,7 +44,7 @@ describe('dynamic ball material (chrome sphere)', () => {
 
 	it('takes the dynamic path while the env texture is resident', () => {
 		const gen = generatorWith(new Map([['ball.png', ballEnvTex()]]))
-		const mat = gen.getMaterial(ballMaterial(), undefined, undefined, 'ball.png')
+		const mat = gen.getMaterial({ material: ballMaterial(), envMap: 'ball.png' })
 		expect(mat.envMap, 'env bound at creation').not.toBeNull()
 		expect(mat.toneMapped, 'filmic curve on the creation path').toBe(true)
 		expect(mat.metalness, 'full metal on the creation path').toBe(BALL_METALNESS)
@@ -53,7 +53,7 @@ describe('dynamic ball material (chrome sphere)', () => {
 	it('stashes a pending env key instead of rendering envless forever', () => {
 		const textures = new Map<string, DataTexture>()
 		const gen = generatorWith(textures)
-		const mat = gen.getMaterial(ballMaterial(), undefined, undefined, 'ball.png')
+		const mat = gen.getMaterial({ material: ballMaterial(), envMap: 'ball.png' })
 		expect(mat.userData.pendingEnvMap, 'missing env streams in later').toBe('ball.png')
 		textures.set('ball.png', ballEnvTex())
 		expect(gen.resolvePendingTextures(), 'arrival binds the env').toBeGreaterThan(0)

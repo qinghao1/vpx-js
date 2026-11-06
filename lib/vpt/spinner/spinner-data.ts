@@ -4,10 +4,10 @@
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { Vertex2D } from '../../math/vector.js'
-import { handleBiffTag } from '../biff-helper.js'
+import { type BiffFieldMap, handleBiffTag } from '../biff-helper.js'
 import { ItemData } from '../item-data.js'
 
-const FLOAT_MAP: Record<string, string> = {
+const FLOAT_MAP: BiffFieldMap<SpinnerData> = {
 	ROTA: 'rotation',
 	HIGH: 'height',
 	LGTH: 'length',
@@ -16,8 +16,8 @@ const FLOAT_MAP: Record<string, string> = {
 	SMIN: 'angleMin',
 	SELA: 'elasticity',
 }
-const BOOL_MAP: Record<string, string> = { SSUP: 'showBracket', SVIS: 'isVisible', REEN: 'isReflectionEnabled' }
-const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', IMGF: 'szImage', SURF: 'szSurface' }
+const BOOL_MAP: BiffFieldMap<SpinnerData> = { SSUP: 'showBracket', SVIS: 'isVisible', REEN: 'isReflectionEnabled' }
+const STRING_MAP: BiffFieldMap<SpinnerData> = { MATR: 'szMaterial', IMGF: 'szImage', SURF: 'szSurface' }
 
 /** @see https://github.com/vpinball/vpinball/blob/master/spinner.cpp */
 export class SpinnerData extends ItemData {

@@ -422,7 +422,7 @@ describe('The VPinball flasher mesh generator and updater', () => {
 		const rebound: Array<string | undefined> = []
 		const node = { visible: true, traverse: () => {} }
 		const renderApi = new TestRenderApi() as unknown as IRenderApi<any, any, any>
-		renderApi.applyMaterial = (_node: unknown, _material: unknown, map?: string) => {
+		renderApi.applyMaterial = (_node, { map }) => {
 			rebound.push(map)
 		}
 

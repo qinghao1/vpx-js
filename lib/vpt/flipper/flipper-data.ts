@@ -4,10 +4,10 @@
 import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { Vertex2D } from '../../math/vector.js'
-import { handleBiffTag } from '../biff-helper.js'
+import { type BiffFieldMap, handleBiffTag } from '../biff-helper.js'
 import { ItemData } from '../item-data.js'
 
-const FLOAT_MAP: Record<string, string> = {
+const FLOAT_MAP: BiffFieldMap<FlipperData> = {
 	BASR: 'baseRadius',
 	ENDR: 'endRadius',
 	FRTN: 'return',
@@ -28,14 +28,14 @@ const FLOAT_MAP: Record<string, string> = {
 	RHGF: 'rubberHeight',
 	RWDF: 'rubberWidth',
 }
-const INT_MAP: Record<string, string> = {
+const INT_MAP: BiffFieldMap<FlipperData> = {
 	OVRP: 'overridePhysics',
 	RTHK: 'rubberThickness',
 	RHGT: 'rubberHeight',
 	RWDT: 'rubberWidth',
 }
-const BOOL_MAP: Record<string, string> = { VSBL: 'isVisible', ENBL: 'isEnabled', REEN: 'isReflectionEnabled' }
-const STRING_MAP: Record<string, string> = {
+const BOOL_MAP: BiffFieldMap<FlipperData> = { VSBL: 'isVisible', ENBL: 'isEnabled', REEN: 'isReflectionEnabled' }
+const STRING_MAP: BiffFieldMap<FlipperData> = {
 	SURF: 'szSurface',
 	MATR: 'szMaterial',
 	RUMA: 'szRubberMaterial',

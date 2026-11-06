@@ -35,14 +35,7 @@ let hdrNextWorker = 0
  * floor 2 (past behavior on unknown hardware), cap 4 (each 8192px decode
  * peaks near 1GB, matching the map generator's concurrency cap).
  */
-const HDR_POOL_SIZE = (() => {
-	try {
-		const n = typeof availableParallelism === 'function' ? availableParallelism() : 2
-		return Math.min(4, Math.max(2, n))
-	} catch {
-		return 2
-	}
-})()
+const HDR_POOL_SIZE = Math.min(4, Math.max(2, availableParallelism()))
 
 async function getHdrWorkers(): Promise<any[]> {
 	if (hdrWorkers.length) return hdrWorkers

@@ -6,12 +6,12 @@ import type { Storage } from '../../io/ole-doc.js'
 import { Vertex3D } from '../../math/vector.js'
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
 import { FrameData } from '../animation.js'
-import { handleBiffTag } from '../biff-helper.js'
+import { type BiffFieldMap, handleBiffTag } from '../biff-helper.js'
 import { ItemData } from '../item-data.js'
 import { Mesh } from '../mesh.js'
 
 const RTV_TAGS = ['RTV0', 'RTV1', 'RTV2', 'RTV3', 'RTV4', 'RTV5', 'RTV6', 'RTV7', 'RTV8']
-const FLOAT_MAP: Record<string, string> = {
+const FLOAT_MAP: BiffFieldMap<PrimitiveData> = {
 	PIDB: 'depthBias',
 	THRS: 'threshold',
 	ELAS: 'elasticity',
@@ -26,8 +26,8 @@ const FLOAT_MAP: Record<string, string> = {
 	RSTR: 'reflectionStrength',
 	RTHI: 'refractionThickness',
 }
-const INT_MAP: Record<string, string> = { COLR: 'color', SIDS: 'sides', SCOL: 'sideColor' }
-const BOOL_MAP: Record<string, string> = {
+const INT_MAP: BiffFieldMap<PrimitiveData> = { COLR: 'color', SIDS: 'sides', SCOL: 'sideColor' }
+const BOOL_MAP: BiffFieldMap<PrimitiveData> = {
 	DTXI: 'drawTexturesInside',
 	HTEV: 'hitEvent',
 	CLDR: 'isCollidable',
@@ -43,7 +43,7 @@ const BOOL_MAP: Record<string, string> = {
 	TVIS: 'isVisible',
 	REEN: 'isReflectionEnabled',
 }
-const STRING_MAP: Record<string, string> = {
+const STRING_MAP: BiffFieldMap<PrimitiveData> = {
 	IMAG: 'szImage',
 	NRMA: 'szNormalMap',
 	MATR: 'szMaterial',
@@ -53,7 +53,7 @@ const STRING_MAP: Record<string, string> = {
 	REFL: 'szReflectionProbe',
 	REFR: 'szRefractionProbe',
 }
-const WIDE_STRING_MAP: Record<string, string> = { M3DN: 'meshFileName' }
+const WIDE_STRING_MAP: BiffFieldMap<PrimitiveData> = { M3DN: 'meshFileName' }
 
 /** @see https://github.com/vpinball/vpinball/blob/master/primitive.cpp */
 export class PrimitiveData extends ItemData {

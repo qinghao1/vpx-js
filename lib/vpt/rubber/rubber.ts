@@ -5,7 +5,7 @@ import { BiffParser } from '../../io/biff-parser.js'
 import type { Storage } from '../../io/ole-doc.js'
 import { Matrix3D } from '../../math/matrix.js'
 import type { Meshes } from '../../render/irender-api.js'
-import { handleBiffTag } from '../biff-helper.js'
+import { type BiffFieldMap, handleBiffTag } from '../biff-helper.js'
 import { type DragPoint, dragPointNestedTag } from '../dragpoint.js'
 import { Item } from '../item.js'
 import { ItemData } from '../item-data.js'
@@ -13,7 +13,7 @@ import { ItemState } from '../item-state.js'
 import type { Table } from '../table/table.js'
 import { RubberMeshGenerator, RubberUpdater } from './rubber-view.js'
 
-const FLOAT_MAP: Record<string, string> = {
+const FLOAT_MAP: BiffFieldMap<RubberData> = {
 	HTTP: 'height',
 	HTHI: 'hitHeight',
 	ELAS: 'elasticity',
@@ -24,8 +24,8 @@ const FLOAT_MAP: Record<string, string> = {
 	ROTY: 'rotY',
 	ROTZ: 'rotZ',
 }
-const INT_MAP: Record<string, string> = { WDTP: 'thickness' }
-const BOOL_MAP: Record<string, string> = {
+const INT_MAP: BiffFieldMap<RubberData> = { WDTP: 'thickness' }
+const BOOL_MAP: BiffFieldMap<RubberData> = {
 	HTEV: 'hitEvent',
 	CLDR: 'isCollidable',
 	RVIS: 'isVisible',
@@ -34,7 +34,7 @@ const BOOL_MAP: Record<string, string> = {
 	ESIE: 'showInEditor',
 	OVPH: 'overwritePhysics',
 }
-const STRING_MAP: Record<string, string> = { MATR: 'szMaterial', IMAG: 'szImage', MAPH: 'szPhysicsMaterial' }
+const STRING_MAP: BiffFieldMap<RubberData> = { MATR: 'szMaterial', IMAG: 'szImage', MAPH: 'szPhysicsMaterial' }
 
 /** @see https://github.com/vpinball/vpinball/blob/master/rubber.cpp */
 export class RubberData extends ItemData {
