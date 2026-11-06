@@ -3,13 +3,20 @@
 import { initHelp } from './ui/help-dialog.js'
 import { Viewer } from './viewer.js'
 
-const params = new URLSearchParams(location.search)
-const viewer = new Viewer({
-	queryParam: 'vpx',
-	defaultVpx: null,
-	viewerMode: params.get('mode') === 'play' ? 'play' : 'viewer',
-	forceWebGL: params.has('webgl'),
-})
+function parseViewerOptions(search) {
+	const params = new URLSearchParams(search)
+	return {
+		vpx: params.get('vpx') || params.get('table'),
+		rom: params.get('rom'),
+		viewerMode: params.get('mode') === 'play' ? 'play' : 'viewer',
+		antialias: !params.has('noaa'),
+		batched: !params.has('nobatched'),
+		forceWebGL: params.has('webgl'),
+	}
+}
+
+const options = parseViewerOptions(location.search)
+const viewer = new Viewer(options)
 const _isDev = (() => {
 	if (import.meta.env?.DEV) return true
 	const h = location.hostname
@@ -18,11 +25,9 @@ const _isDev = (() => {
 if (_isDev) window.viewer = viewer
 initHelp(viewer)
 
-const vpxParam = params.get('vpx') || params.get('table')
-const romParam = params.get('rom')
-if (vpxParam) {
+if (options.vpx) {
 	viewer.load().catch(e => console.error('[app] load failed', e))
-	if (romParam) viewer.preloadRom?.(romParam).catch(e => console.error('[app] rom load failed', e))
+	if (options.rom) viewer.preloadRom(options.rom).catch(e => console.error('[app] rom load failed', e))
 } else {
 	viewer.startLoop()
 }

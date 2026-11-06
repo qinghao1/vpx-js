@@ -155,10 +155,15 @@ export class Viewer {
 	constructor(opts = {}) {
 		ensureGlobals()
 		ensureBvh()
-		const { defaultVpx = null, queryParam = 'vpx', dom = {}, viewerMode = 'viewer', forceWebGL = false } = opts
-		this.defaultVpx = defaultVpx
-		this.forceWebGL = forceWebGL
-		this.queryParam = queryParam
+		const {
+			vpx = null,
+			viewerMode = 'viewer',
+			antialias = true,
+			batched = true,
+			forceWebGL = false,
+			dom = {},
+		} = opts
+		this.options = { vpx, requestedMode: viewerMode, antialias, batched, forceWebGL }
 		this.viewerMode = viewerMode
 		this.dom = {
 			canvas: dom.canvas || $('canvas'),
@@ -429,14 +434,11 @@ export class Viewer {
 	}
 	async _createRenderer() {
 		const canvas = this.dom.canvas
-		const p = new URLSearchParams(location.search)
-		const wantAA = !p.has('noaa')
-
 		const renderer = new THREE.WebGPURenderer({
 			canvas,
-			antialias: wantAA,
+			antialias: this.options.antialias,
 			powerPreference: 'high-performance',
-			forceWebGL: this.forceWebGL,
+			forceWebGL: this.options.forceWebGL,
 		})
 		await renderer.init()
 
@@ -1298,9 +1300,7 @@ export class Viewer {
 			harnessLog: this.harnessLog,
 		})
 		this._applyNoBakeFill(table, node)
-		const params = new URLSearchParams(location.search)
-		const useBatch = !params.has('nobatched')
-		if (useBatch && table && this.renderApi) {
+		if (this.options.batched && table && this.renderApi) {
 			const res = _optimizeScene(node, table, this.renderApi)
 			if ((res.batched || res.instanced) && this.harnessLog) {
 				const before = (() => {
@@ -1419,16 +1419,11 @@ export class Viewer {
 		if (this._buttonMeshes.length)
 			this.harnessLog?.(`[input] ${this._buttonMeshes.length} cabinet button meshes (BVH)`, 'debug')
 		this.startLoop()
-		if (this.viewerMode === 'viewer') {
-			const p = new URLSearchParams(location.search)
-			const hasVpx = !!(p.get('vpx') || p.get('table'))
-			const mode = p.get('mode')
-			if (hasVpx && mode === 'play') {
-				this.log('[viewer] auto-switch to play (vpx URL)', 'info')
-				setTimeout(() => {
-					this._switchToPlay()
-				}, 600)
-			}
+		if (this.viewerMode === 'viewer' && this.options.requestedMode === 'play') {
+			this.log('[viewer] auto-switch to play (vpx URL)', 'info')
+			setTimeout(() => {
+				this._switchToPlay()
+			}, 600)
 		}
 		return {
 			loaded: table,
@@ -1828,8 +1823,7 @@ export class Viewer {
 					)
 			}
 			if (this.tableGroup && table && this.renderApi) {
-				const params = new URLSearchParams(location.search)
-				if (!params.has('nobatched')) {
+				if (this.options.batched) {
 					const bakedRes = _batchStaticOpaques(this.tableGroup, table, this.renderApi)
 					if (bakedRes) {
 						this.log(`[batch] Post-stream baked ${bakedRes} BatchedMesh`, 'debug')
@@ -1922,10 +1916,7 @@ export class Viewer {
 		const _h = typeof window !== 'undefined' ? window.innerHeight : 600
 		this.renderer?.setSize(_w, _h)
 		this._loading(2, 'Getting ready…', 'Looking for table…')
-		const candidates = resolveVpxCandidates({
-			defaultName: this.defaultVpx,
-			queryParam: this.queryParam,
-		})
+		const candidates = resolveVpxCandidates(this.options.vpx)
 		if (!candidates.length) {
 			this.log('No VPX candidate (pass ?vpx=name)', 'warn')
 			return
@@ -2194,6 +2185,10 @@ export class Viewer {
 		this._needsRender = false
 	}
 
+	togglePause() {
+		this.isPaused = !this.isPaused
+		this.log(this.isPaused ? 'Paused (P to resume)' : 'Resumed', this.isPaused ? 'warn' : 'info')
+	}
 	_nudge(angle, force = 2.6) {
 		if (!this.wasmEngine?.ready || this.viewerMode !== 'play' || this.isPaused) return
 		this.wasmEngine.nudge(angle, force)

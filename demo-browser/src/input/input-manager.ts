@@ -113,19 +113,13 @@ export function makeHost(viewer: any): InputHost {
 			viewer.log?.(msg, level)
 		},
 		enterPlayMode() {
-			if (viewer._switchToPlay) {
-				viewer._switchToPlay()
-			} else {
-				viewer.viewerMode = 'play'
-				viewer.enterPlayMode?.()
-			}
+			void viewer._switchToPlay()
 		},
 		exitPlayMode() {
 			void viewer._switchToViewer()
 		},
 		togglePause() {
-			viewer.isPaused = !viewer.isPaused
-			viewer.log?.(viewer.isPaused ? 'Paused (P to resume)' : 'Resumed', viewer.isPaused ? 'warn' : 'info')
+			viewer.togglePause()
 		},
 		releaseKeys(codes: string[]) {
 			for (const code of codes) {
