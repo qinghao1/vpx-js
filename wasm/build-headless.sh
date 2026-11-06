@@ -4,7 +4,10 @@ IFS=$'\n\t'
 
 # Headless-engine builder — compiles vpinball-headless from the pinned
 # external/vpinball submodule plus the in-repo bridge patches, and deploys
-#   demo-browser/public/wasm/vpinball-headless.{js,wasm,data} (gitignored).
+#   demo-browser/public/wasm/vpinball-headless.{js,wasm,wasm.map,data}
+# (gitignored). The .wasm.map sidecar (bridge-wasm-source-maps patch,
+# -gsource-map) is what makes a SIGILL in the shipped engine debuggable;
+# the build fails if it is missing.
 # Patches live in wasm/modules/headless/patches/ and apply idempotently,
 # pinmame-style: never hand-edit external/vpinball, change the patch files.
 #   npm run build:wasm:headless          # release (default)
@@ -127,11 +130,11 @@ JOBS="${JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
 cmake --build "$BUILD_DIR" --target vpinball-headless --parallel "$JOBS"
 
 mkdir -p "$OUT_DIR"
-for ext in js wasm data; do
+for ext in js wasm wasm.map data; do
   src="$BUILD_DIR/vpinball-headless.$ext"
   [[ -f "$src" ]] || { log "ERROR: expected artifact missing: $src"; exit 1; }
   cp -- "$src" "$OUT_DIR/vpinball-headless.$ext"
 done
 log "deployed:"
 # shellcheck disable=SC2012
-ls -lh "$OUT_DIR"/vpinball-headless.{js,wasm,data}
+ls -lh "$OUT_DIR"/vpinball-headless.{js,wasm,wasm.map,data}

@@ -23,7 +23,7 @@ Node via `fnm` — `.nvmrc` `24`, `.node-version` `24.19.0`. Activate with `eval
 - `lib/` — core: `vpt/` table/items, `io/` OLE/BIFF readers, `math/` numerics, `render/threejs/` scene pipeline, `wasm/` headless-engine seam (ABI types + scene sync; no three.js), `emu/` ROM fetcher
 - `lib/refs.node.ts` / `lib/refs.browser.ts` — explicit env split; demo-browser aliases `refs.node` → `refs.browser`
 - `test/fixtures/*.vpx` + `test/harness/` + `lib/**/*.spec.ts`
-- `wasm/modules/headless/` (patches 0001-0011) + `external/vpinball` (pinned submodule) → `npm run build:wasm:headless` → `demo-browser/public/wasm/`; `external/pinmame` (pinned submodule) mounted as ROM source
+- `wasm/modules/headless/` (patches) + `external/vpinball` (pinned submodule) → `npm run build:wasm:headless` → `demo-browser/public/wasm/`; `external/pinmame` (pinned submodule) mounted as ROM source
 - `demo-browser/` — local static Three.js WebGPU viewer + E2E (`demo-browser/e2e/`)
 - `dist/`, `dist-esm/`, `coverage/`, `node_modules/`, `*.vpx` — ignored, do not commit
 
@@ -42,3 +42,4 @@ Node via `fnm` — `.nvmrc` `24`, `.node-version` `24.19.0`. Activate with `eval
 
 - `Failed to resolve import ../dist-esm/...` → run `npm run build:esm`.
 - Submodules must stay pristine — never hand-edit; if dirty, `git submodule foreach 'git reset --hard'` to clean.
+- SIGILL in the shipped engine → repro with devtools open (WASM debugging on). The `.wasm.map` carries no sourcesContent and no third-party code, so bgfx frames stay raw addresses.

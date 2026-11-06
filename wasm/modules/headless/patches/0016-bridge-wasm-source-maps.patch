@@ -1,0 +1,34 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
+Date: Fri, 6 Nov 2026 00:00:00 -0400
+Subject: [PATCH 16/16] bridge: emit source maps for the headless WASM target
+
+Sidecar .wasm.map for vpinball-headless in every build type so a SIGILL
+(or any trap) in the deployed engine maps back to C++ sources in browser
+devtools. The map is resolved relative to the .wasm URL, so it keeps
+working under any serving subpath. Deployed by wasm/build-headless.sh
+next to the .wasm; zero runtime cost (fetched only when devtools open
+the file).
+
+Target: vpinball/vpinball@64a480a96d1b972711fbb8eea014654c779b1e23
+
+diff --git a/make/CMakeLists_app.txt b/make/CMakeLists_app.txt
+--- a/make/CMakeLists_app.txt
++++ b/make/CMakeLists_app.txt
+@@ -1126,7 +1126,16 @@ elseif(PLATFORM STREQUAL "wasm")
+       "--preload-file=${CMAKE_SOURCE_DIR}/plugins/nixie/layouts@/plugins/nixie/layouts"
+       "--preload-file=${CMAKE_SOURCE_DIR}/plugins/flexdmd/assets@/plugins/flexdmd/assets"
+       "--exclude-file=*.vpz"
+       "--exclude-file=*/src/assets/web"
+    )
+ 
++   # Emit a sidecar source map for SIGILL triage.
++   target_compile_options(vpinball-headless PRIVATE
++      -gsource-map
++   )
++
++   target_link_options(vpinball-headless PRIVATE
++      -gsource-map
++   )
++
+ endif()

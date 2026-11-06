@@ -128,9 +128,9 @@ export class WasmEngine {
 			this.engine = undefined
 			this.sync = undefined
 		}
-		// Root-absolute: the page serves the artifact at `/wasm/`, while a
-		// relative URL would resolve against this module under `/@fs/`.
-		this.engine = (await loadHeadlessEngine('/wasm/vpinball-headless.js')).engine
+		// Page-relative so subpath deploys work: document.baseURI resolves
+		// against the page, unlike a module-relative URL under `/@fs/`.
+		this.engine = (await loadHeadlessEngine(new URL('wasm/vpinball-headless.js', document.baseURI).href)).engine
 		if (this.engine.init() !== 0) throw new WasmEngineStartError('VpxWasm_Init failed')
 		const pending = window as unknown as { __pendingRom?: Uint8Array; __pendingRomName?: string }
 		// PinMAME resolves the zip by the script's game name, not the file basename.
