@@ -525,7 +525,7 @@ describe('loadHeadlessEngine', () => {
 	})
 	it('reports a 404 as missing with the build command and the import cause', async () => {
 		const priorFetch = globalThis.fetch
-		globalThis.fetch = (async () => ({ status: 404 })) as typeof fetch
+		globalThis.fetch = (async () => ({ status: 404 })) as unknown as typeof fetch
 		try {
 			const error = await loadHeadlessEngine('data:text/javascript,throw new Error("boom")?missing=1').catch(
 				e => e,
@@ -539,7 +539,7 @@ describe('loadHeadlessEngine', () => {
 	})
 	it('reports a present-but-broken module as a load error, not missing', async () => {
 		const priorFetch = globalThis.fetch
-		globalThis.fetch = (async () => ({ status: 200 })) as typeof fetch
+		globalThis.fetch = (async () => ({ status: 200 })) as unknown as typeof fetch
 		try {
 			await expect(
 				loadHeadlessEngine('data:text/javascript,throw new Error("boom")?broken=1'),

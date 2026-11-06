@@ -147,14 +147,9 @@ export class WasmEngine {
 		// module is shared page-wide; this instance owns its table from here.
 		this.engine = await loadHeadlessEngine(new URL('wasm/vpinball-headless.js', document.baseURI).href)
 		session = this
-		const pending = window as unknown as { __pendingRom?: Uint8Array; __pendingRomName?: string }
 		// PinMAME resolves the zip by the script's game name, not the file basename.
 		const script = this.host.table.tableScript
-		if (rom) {
-			this.engine.mountRom(romMountFileName(script, rom.name), rom.zip)
-		} else if (pending.__pendingRom?.length && pending.__pendingRomName) {
-			this.engine.mountRom(romMountFileName(script, pending.__pendingRomName), pending.__pendingRom)
-		}
+		if (rom) this.engine.mountRom(romMountFileName(script, rom.name), rom.zip)
 		await this.engine.loadTable(vpxBytes)
 		for (const part of this.readCatalog()) {
 			if (typeof part.idx === 'number' && typeof part.name === 'string') this.partNames.set(part.idx, part.name)

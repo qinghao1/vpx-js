@@ -1,5 +1,4 @@
 // Copyright (C) 2026 Chu Qinghao — GPL-2.0 — see LICENSE
-// Lives under lib/ because vitest only includes lib/**/*.spec.ts.
 
 import { existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
@@ -11,9 +10,9 @@ import {
 	resolvePathToUrl,
 	resolveUrlToPath,
 	resolveVpxPath,
-} from '../test/harness/vpinball-resolver.js'
+} from './vpinball-resolver.js'
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const flipperVpx = join(repoRoot, 'test', 'fixtures', 'table-flipper.vpx')
 
 describe('vpinball resolver', () => {

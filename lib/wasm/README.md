@@ -62,7 +62,7 @@ in `demo-browser/src/wasm-engine.ts`.
 
 `demo-browser/src/wasm-engine.ts` (`WasmEngine`) owns the engine lifetime:
 page-relative artifact load (via `document.baseURI`, so subpath deploys work),
-ROM mount (explicit `?rom=` preload, then `__pendingRom` file bytes), `loadTable`, per-rAF
+ROM mount (explicit `?rom=` preload), `loadTable`, per-rAF
 `stepFrame` + `WasmSceneSync` fan-out, ball spawn/remove, lamp-change set,
 SDL-scancode input, nudge, destroy. The headless bridge is the only engine:
 the viewer boots it at mount (a missing artifact stays viewer-only; play
