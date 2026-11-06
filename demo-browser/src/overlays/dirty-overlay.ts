@@ -5,6 +5,4 @@ export interface DirtyOverlay {
 	update(): boolean
 	/** Rebuilds the overlay for the newly mounted table, if it needs one. */
 	syncTable?(table: any): Promise<void> | void
-	/** Releases overlay resources, if it holds any. */
-	dispose?(): void
 }

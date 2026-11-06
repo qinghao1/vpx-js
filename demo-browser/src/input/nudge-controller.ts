@@ -23,28 +23,9 @@ function attachNudgeHost(host: NudgeHost, signal: AbortSignal): void {
 		trigger(host, (a.x ?? 0) > 0 ? 285 : 75, 3.0)
 	}
 
-	const hasMotion = typeof DeviceMotionEvent !== 'undefined'
-	const needsPermission = hasMotion && 'requestPermission' in (DeviceMotionEvent as any)
-	if (hasMotion && !needsPermission) {
+	// Permission-gated motion (iOS) needs a user-gesture button, which the demo does not have.
+	if (typeof DeviceMotionEvent !== 'undefined' && !('requestPermission' in DeviceMotionEvent)) {
 		window.addEventListener('devicemotion', onMotion as any, { signal } as any)
-	} else if (needsPermission && host.enableMotionButton) {
-		const btn = host.enableMotionButton
-		btn.hidden = false
-		btn.onclick = async () => {
-			const granted = host.requestMotionPermission
-				? await host.requestMotionPermission()
-				: typeof DeviceMotionEvent !== 'undefined' &&
-					'requestPermission' in (DeviceMotionEvent as any) &&
-					(await (DeviceMotionEvent as any).requestPermission()) === 'granted'
-			if (granted) {
-				window.addEventListener('devicemotion', onMotion as any, { signal } as any)
-				btn.hidden = true
-				host.log?.('Motion nudge enabled', 'info')
-			}
-		}
-		signal.addEventListener('abort', () => {
-			if (host.enableMotionButton) host.enableMotionButton.onclick = null
-		})
 	}
 }
 

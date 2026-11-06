@@ -36,15 +36,8 @@ import {
 	showCabFlippers,
 } from '../../dist-esm/lib/render/threejs/three-scene-postprocess.js'
 import { ThreeTextureLoaderBrowser } from '../../dist-esm/lib/render/threejs/three-texture-loader-browser.js'
-import {
-	applyRendererToneMapping,
-	clampExposure,
-	resolveToneMapping,
-} from '../../dist-esm/lib/render/threejs/tone-mapping.js'
-import {
-	getTransmissionDebug,
-	updateTransmissionBuffer,
-} from '../../dist-esm/lib/render/threejs/transmission-buffer.js'
+import { applyRendererToneMapping, clampExposure } from '../../dist-esm/lib/render/threejs/tone-mapping.js'
+import { updateTransmissionBuffer } from '../../dist-esm/lib/render/threejs/transmission-buffer.js'
 import { collectPostProcessNodes, needsNoBakeFill } from '../../dist-esm/lib/render/threejs/visibility-heuristics.js'
 import { AnimationGate } from '../../dist-esm/lib/util/animation-gate.js'
 import { Table } from '../../dist-esm/lib/vpt/table/table.js'
@@ -76,7 +69,7 @@ import { pollNudgePads } from './input/nudge-controller.js'
 import { attachInput } from './input.js'
 import type { DirtyOverlay } from './overlays/dirty-overlay.js'
 import { createHarness } from './ui/log-viewer.js'
-import { renderModeHint, renderStats } from './ui/stats-overlay.js'
+import { fpsClass, renderModeHint, renderStats } from './ui/stats-overlay.js'
 import {
 	$,
 	computeTexMem,
@@ -237,9 +230,6 @@ export class Viewer {
 		this.renderPipeline = null
 		this.renderer = null
 		this.controls = null
-		this._eventCleanups = []
-		this._boundResize = () => this._onResize()
-		this._disposed = false
 		this._deviceLossCount = 0
 		this._rendererReady = this._createRenderer()
 		this._rendererReady.catch(e => {
@@ -257,76 +247,20 @@ export class Viewer {
 				camera: this.camera,
 				THREE,
 			})
-		addEventListener('resize', this._boundResize)
-		this._eventCleanups.push(() => removeEventListener('resize', this._boundResize))
-		{
-			const onPopState = () => {
-				if (this.viewerMode === 'play') {
-					this._switchToViewer()
-				}
-			}
-			addEventListener('popstate', onPopState)
-			this._eventCleanups.push(() => removeEventListener('popstate', onPopState))
-		}
+		addEventListener('resize', () => this._onResize())
+		addEventListener('popstate', () => {
+			if (this.viewerMode === 'play') this._switchToViewer()
+		})
 		this._setupSoundControls()
-		{
-			const onReset = () => this._onResetView()
-			this.dom.resetBtn?.addEventListener('click', onReset)
-			if (this.dom.resetBtn)
-				this._eventCleanups.push(() => this.dom.resetBtn?.removeEventListener('click', onReset))
-		}
+		this.dom.resetBtn?.addEventListener('click', () => this._onResetView())
 		this._setupModeSwitch()
 		this._setupDebugToggle()
 		this._syncChrome()
 	}
-	destroy() {
-		if (this._disposed) return
-		this._disposed = true
-		if (this._cameraRaf) cancelAnimationFrame(this._cameraRaf)
-		if (this._cameraTimeout) clearTimeout(this._cameraTimeout)
-		if (this._animRaf) cancelAnimationFrame(this._animRaf)
-		if (this._animTimeout) clearTimeout(this._animTimeout)
-		if (this.animFrame) {
-			cancelAnimationFrame(this.animFrame)
-			this.animFrame = null
-		}
-		if ((this as any)._physicsTimeout) clearTimeout((this as any)._physicsTimeout)
-		this._inputCleanup?.()
-		this._inputCleanup = null
-		this._nudgeCleanup?.()
-		this._nudgeCleanup = null
-		this._touchCleanup?.()
-		this._touchCleanup = null
-		if (this._cameraTimeoutResolver) {
-			const resolver = this._cameraTimeoutResolver
-			this._cameraTimeoutResolver = null
-			resolver()
-		}
-		if (this._loadAbort) {
-			this._loadAbort.abort()
-			this._loadAbort = null
-		}
-		for (const fn of this._eventCleanups) fn()
-		this._eventCleanups = []
-		if (this.wasmEngine) {
-			const engine = this.wasmEngine
-			this.wasmEngine = null
-			void engine.destroy().catch(() => {})
-		}
-		for (const overlay of this.overlays) overlay.dispose?.()
-		this.controls?.dispose?.()
-		this.renderPipeline?.dispose?.()
-		this.renderer?.setAnimationLoop(null)
-		this.renderer?.dispose?.()
-		this.scene?.clear?.()
-	}
 	_setupDebugToggle() {
 		const btn = document.getElementById('debug-toggle')
 		const toggle = () => document.body.classList.toggle('show-debug')
-		if (btn) {
-			btn.addEventListener('click', toggle)
-			this._eventCleanups.push(() => btn.removeEventListener('click', toggle))
-		}
+		btn?.addEventListener('click', toggle)
 		const onKey = e => {
 			if ((e.code === 'Backquote' || e.key === '`' || e.key === 'F2') && !e.ctrlKey && !e.metaKey && !e.altKey) {
 				const tag = (document.activeElement?.tagName || '').toLowerCase()
@@ -335,7 +269,6 @@ export class Viewer {
 			}
 		}
 		addEventListener('keydown', onKey)
-		this._eventCleanups.push(() => removeEventListener('keydown', onKey))
 	}
 	/**
 	 * Controls-first sound surface for the chrome and e2e: mute flag and 0..1
@@ -386,7 +319,6 @@ export class Viewer {
 				toggle()
 			}
 			btn.addEventListener('click', onToggle)
-			this._eventCleanups.push(() => btn.removeEventListener('click', onToggle))
 		}
 		// Touch (no-hover) support: tapping the icon reveals the slider until
 		// the next tap outside the control. Desktop hover/:focus-within needs no JS.
@@ -395,7 +327,6 @@ export class Viewer {
 				if (e.target instanceof Node && !group.contains(e.target)) group.classList.remove('expanded')
 			}
 			document.addEventListener('pointerdown', collapseOutside)
-			this._eventCleanups.push(() => document.removeEventListener('pointerdown', collapseOutside))
 		}
 		if (slider) {
 			const onSlider = () => {
@@ -404,7 +335,6 @@ export class Viewer {
 				this._syncSoundChrome()
 			}
 			slider.addEventListener('input', onSlider)
-			this._eventCleanups.push(() => slider.removeEventListener('input', onSlider))
 		}
 		const onKey = e => {
 			// Global mute shortcut (all modes); the key still reaches the
@@ -417,7 +347,6 @@ export class Viewer {
 			}
 		}
 		addEventListener('keydown', onKey)
-		this._eventCleanups.push(() => removeEventListener('keydown', onKey))
 	}
 	_syncSoundChrome() {
 		const engine = this.wasmEngine
@@ -487,7 +416,6 @@ export class Viewer {
 		const onLost = renderer.onDeviceLost.bind(renderer)
 		renderer.onDeviceLost = info => {
 			onLost(info)
-			if (this._disposed) return
 			if (++this._deviceLossCount > 2) {
 				this.log(
 					`${info.api} device keeps failing (${info.reason ?? info.message}) — not retrying. Reload with ?noaa or ?webgl, update Chrome and GPU drivers, or relaunch Chrome with --use-angle=vulkan.`,
@@ -569,9 +497,6 @@ export class Viewer {
 		)
 	}
 
-	stopLoop() {
-		this.renderer?.setAnimationLoop(null)
-	}
 	async _ensureRenderer() {
 		await this._rendererReady
 		return this.renderer
@@ -603,21 +528,17 @@ export class Viewer {
 			}
 		}
 		addEventListener('keydown', onOrbitToggle)
-		this._eventCleanups.push(() => removeEventListener('keydown', onOrbitToggle))
 		this._raycaster = new THREE.Raycaster()
 		this._raycaster.firstHitOnly = false
 		this._mouse = new THREE.Vector2()
 		const tip = this.dom.playTip
 		const canvas = this.dom.canvas
-		let hovered = false
 		const hideTip = () => {
-			hovered = false
 			if (tip) tip.hidden = true
 			if (canvas) canvas.classList.remove('is-pointer')
 		}
 		const showTipAt = (x, y) => {
 			if (!tip || this.viewerMode !== 'viewer' || !this.tableGroup) return
-			hovered = true
 			tip.style.setProperty('--tip-x', `${x}px`)
 			tip.style.setProperty('--tip-y', `${y}px`)
 			tip.hidden = false
@@ -670,7 +591,6 @@ export class Viewer {
 			event.preventDefault()
 		}
 		canvas.addEventListener('touchend', onViewerTouchEnd, { passive: false })
-		this._eventCleanups.push(() => canvas.removeEventListener('touchend', onViewerTouchEnd))
 	}
 	async _switchToPlay() {
 		if (this.viewerMode === 'play' || !this.tableGroup) return
@@ -810,12 +730,6 @@ export class Viewer {
 					this.gate.endAnimation()
 					this.controls.enableDamping = prevDamping
 					this.controls.enabled = this.viewerMode !== 'play'
-					resolve()
-					return
-				}
-				if (this._disposed) {
-					this.gate.endAnimation()
-					this.controls.enableDamping = prevDamping
 					resolve()
 					return
 				}
@@ -1831,7 +1745,7 @@ export class Viewer {
 						else this.log('[bvh] low quality: skip post-batch BVH', 'debug')
 					} else {
 						setTimeout(() => {
-							if (this._disposed || !this.tableGroup) return
+							if (!this.tableGroup) return
 							const retry = _batchStaticOpaques(this.tableGroup, table, this.renderApi)
 							if (retry) {
 								this.log(`[batch] Post-stream retry baked ${retry} BatchedMesh`, 'debug')
@@ -2039,9 +1953,9 @@ export class Viewer {
 	}
 	async startLoop() {
 		await this._ensureRenderer()
-		if (this._disposed || !this.renderer) return
+		if (!this.renderer) return
 		await this.precompilePipelines()
-		if (this._disposed || !this.renderer) return
+		if (!this.renderer) return
 		if (this.animFrame) {
 			cancelAnimationFrame(this.animFrame)
 			clearTimeout(this.animFrame)
@@ -2055,12 +1969,7 @@ export class Viewer {
 			clearTimeout(this._animTimeout)
 			this._animTimeout = null
 		}
-		if ((this as any)._physicsTimeout) {
-			clearTimeout((this as any)._physicsTimeout)
-			;(this as any)._physicsTimeout = null
-		}
-		let last = performance.now(),
-			frames = 0,
+		let frames = 0,
 			fps = 0
 		let lastFpsUpdate = performance.now()
 		// Skipped frames reset without recording, so the next present measures
@@ -2076,31 +1985,28 @@ export class Viewer {
 		;(this as any)._tickPhysicsImmediate = () => {
 			if (!this.wasmEngine?.ready) return
 			if (this.isPaused || this.viewerMode !== 'play' || isLowQuality()) return
-			if (this._syncWasmTransforms(performance.now()) && !this._disposed) {
+			if (this._syncWasmTransforms(performance.now())) {
 				this.renderApi?.flushMatrixUpdates?.(this.tableGroup)
 				if (this.renderPipeline) this.renderPipeline.render()
 				else this.renderer.render(this.scene, this.camera)
 			}
 		}
 		this.renderer.setAnimationLoop((timestamp, frame) => {
-			if (this._disposed || this.isPaused) {
-				if (this.isPaused) this.wasmEngine?.resetStepClock(timestamp)
+			if (this.isPaused) {
+				this.wasmEngine?.resetStepClock(timestamp)
 				return
 			}
 			// Dirty-gated present: idle frames skip the present (and its matrix
 			// pass) entirely — physics above still steps every frame. The scan
 			// itself is cheap (numeric signatures, no string work).
 			const transmissionDirty = (() => {
-				if (!this.table || (this as any)._skipTrans) return false
+				if (!this.table) return false
 				try {
 					return updateTransmissionBuffer(this.table as never)
 				} catch {
 					return false
 				}
 			})()
-			if (transmissionDirty) {
-				;(window as unknown as Record<string, unknown>).__transDebug = getTransmissionDebug()
-			}
 			const stateDirty = this._syncPhysicsTransforms(timestamp)
 			const controlsDirty = this.controls?.enabled ? !!this.controls.update() : false
 			const cameraDirty = !!this._cameraRaf
@@ -2127,8 +2033,6 @@ export class Viewer {
 				if (this.dom.stats) {
 					const balls = this.wasmEngine?.ballCount ?? 0
 					const mode = this.viewerMode === 'play' ? (this.isPaused ? 'PLAY PAUSED' : 'PLAY') : 'VIEWER'
-					const emuRaw = '—'
-					const emuLabel = emuRaw
 					const draws = this.renderer?.info?.render?.calls ?? 0
 					const tris = this.renderer?.info?.render?.triangles ?? 0
 					const trisFmt =
@@ -2144,10 +2048,6 @@ export class Viewer {
 						draws,
 						trisFmt,
 						balls,
-						tFmt: '—',
-						tHasValue: false,
-						emuLabel,
-						emuRaw,
 						wasmLabel,
 						wasmReady,
 						backend: this._rendererBackend,
@@ -2164,8 +2064,7 @@ export class Viewer {
 						hud.append(el)
 					}
 					el.textContent = `${fps} fps`
-					const cls = fps >= 55 ? 'fps--good' : fps >= 30 ? 'fps--mid' : fps > 0 ? 'fps--low' : ''
-					el.className = `fps ${cls}`.trim()
+					el.className = `fps ${fpsClass(fps)}`.trim()
 				}
 			}
 		})
@@ -2249,7 +2148,4 @@ export class Viewer {
 			}, 300)
 		}
 	}
-}
-export function createViewer(opts) {
-	return new Viewer(opts)
 }

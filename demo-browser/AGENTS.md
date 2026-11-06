@@ -25,7 +25,7 @@ Requires `dist-esm` built. `server.fs.allow` covers repo root, `dist`, `dist-esm
 - `src/input/input-manager.ts` — keys, touch zones & cabinet button raycasting (~560 LOC)
 - `src/input/nudge-controller.ts` — nudge physics, swipe, gamepad & motion (~170 LOC)
 - `src/dmd/dmd-renderer.ts` — on-table DMD mesh updater (~385 LOC)
-- `src/ui/loading-bar.ts`, `stats-overlay.ts`, `help-dialog.ts`, `log-viewer.ts` — typed `CustomEvent` UI, no `fetch`/`XHR` monkey-patch
+- `src/ui/stats-overlay.ts`, `help-dialog.ts`, `log-viewer.ts` — stats HUD, controls dialog, log panel (no `console`/`fetch`/`XHR` monkey-patch)
 - `src/utils/candidate-resolver.ts`, `texture-filter.ts` — VPX/ROM resolution & glass-texture filtering
 - `src/env.js`, `src/utils.js` — env caps/quality flags + `$`/`fmtBytes` helpers and `utils/*` re-exports
 - `src/input.js` — `attachInput` composer over `input/` + `nudge-controller` (defines logic, not a shim); `config.js`, `utils.js`, `env.js` are real sources (viewer imports them directly from `./ui/*` and `./input/*`)
