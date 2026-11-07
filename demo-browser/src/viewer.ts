@@ -195,8 +195,11 @@ export class Viewer {
 		this._streamId = 0
 		this._loadId = 0
 		this._loadAbort = null
-		/** ROM for the current table (`owner` = its load id; 0 = before any table, taken by the next load). */
+		/** What `?vpx=` would reload: the name, path or URL the current table was asked for. */
+		this.tableSource = undefined
 		this.rom = undefined
+		/** The current table's ROM request: `source` is what `?rom=` would reload, `owner` the table's load id (0 = before any table, taken by the next load). */
+		this._romRequest = undefined
 		this._romLoad = undefined
 		this._engineBoot = undefined
 		this._engineGen = 0
@@ -1682,11 +1685,11 @@ export class Viewer {
 	}
 	/** Load a table by name, path or URL (`?vpx=` semantics, see resolveVpxCandidates). */
 	load(vpx) {
-		return this._load(`Looking for ${vpx}…`, signal => this._fetchTable(vpx, signal))
+		return this._load(vpx, `Looking for ${vpx}…`, signal => this._fetchTable(vpx, signal))
 	}
 	/** Load a dropped or picked `.vpx` file. */
 	loadFromFile(file) {
-		return this._load(`Reading ${file.name}…`, async () => ({
+		return this._load(file.name, `Reading ${file.name}…`, async () => ({
 			bytes: new Uint8Array(await file.arrayBuffer()),
 			source: file.name,
 		}))
@@ -1696,14 +1699,16 @@ export class Viewer {
 	 * failures on the loading card, and resolves null when superseded. Rejects
 	 * (after reporting) when this load fails.
 	 */
-	async _load(detail, readBytes) {
+	async _load(source, detail, readBytes) {
 		const gen = ++this._loadId
 		this._loadAbort?.abort()
 		const abort = (this._loadAbort = new AbortController())
 		this._streamId++
+		this.tableSource = source
 		// The current table's ROM stays behind; one attached before any table goes with this one.
-		if (this.rom?.owner) this.rom = undefined
-		else if (this.rom) this.rom.owner = gen
+		if (this._romRequest?.owner) this._dropRom()
+		else if (this._romRequest) this._romRequest.owner = gen
+		this._emitSourceChange()
 		this._setLoadState('loading')
 		this.dom.loading.hidden = false
 		this.dom.loading.classList.remove('is-error')
@@ -1777,6 +1782,7 @@ export class Viewer {
 	loadRomFile(file) {
 		return this._attachRom(
 			file.name,
+			file.name,
 			file.arrayBuffer().then(buffer => new Uint8Array(buffer)),
 		)
 	}
@@ -1784,19 +1790,22 @@ export class Viewer {
 	preloadRom(url) {
 		this.log(`Downloading ROM ${url}…`, 'debug')
 		// Query strings are not part of the file name (signed URLs).
-		return this._attachRom(new URL(url, document.baseURI).pathname.split('/').pop(), fetchWithProgress(url))
+		return this._attachRom(url, new URL(url, document.baseURI).pathname.split('/').pop(), fetchWithProgress(url))
 	}
 	/**
 	 * A ROM belongs to the table on screen or loading, whose engine reboots
 	 * with it; before any table it waits for the next one. Engine boots await
-	 * a ROM in flight. A ROM whose table was replaced meanwhile is dropped.
+	 * a ROM in flight. A ROM whose table was replaced meanwhile, or that a
+	 * newer ROM replaced, is dropped.
 	 */
-	_attachRom(fileName, bytes) {
-		const owner = this._loadId
+	_attachRom(source, fileName, bytes) {
 		const name = fileName.replace(/\.zip$/i, '')
+		const request = { source, owner: this._loadId }
+		this._romRequest = request
+		this._emitSourceChange()
 		const attach = bytes.then(zip => {
-			if (owner && owner !== this._loadId) return
-			this.rom = { name, zip, owner: this._loadId }
+			if (this._romRequest !== request) return
+			this.rom = { name, zip }
 			this.log(`ROM ${name} ${fmtBytes(zip.length)} ready`, 'debug')
 			if (this._engineGen && this._engineGen === this._loadId)
 				this._bootEngine(true).catch(e =>
@@ -1808,8 +1817,24 @@ export class Viewer {
 			.finally(() => {
 				if (this._romLoad === attach) this._romLoad = undefined
 			})
-			.catch(e => this.log(`ROM ${name} failed: ${e?.message ?? e}`, 'error'))
+			.catch(e => {
+				this.log(`ROM ${name} failed: ${e?.message ?? e}`, 'error')
+				if (this._romRequest !== request) return
+				this._dropRom()
+				this._emitSourceChange()
+			})
 		return attach
+	}
+	_dropRom() {
+		this.rom = undefined
+		this._romRequest = undefined
+	}
+	/** The table and ROM the viewer holds, as `?vpx=` / `?rom=` values: the URL mirrors this. */
+	get sources() {
+		return { vpx: this.tableSource, rom: this._romRequest?.source }
+	}
+	_emitSourceChange() {
+		dispatchEvent(new CustomEvent('viewer:sourcechange'))
 	}
 	/** Run the frame loop on the current renderer; device-loss recovery re-attaches it to the new one. */
 	async startLoop() {

@@ -68,7 +68,7 @@ async function isFetchable(url: string): Promise<boolean> {
  * and ROMs, load direct CORS-readable files through the viewer's `?vpx`/`?rom`
  * path, and otherwise open the source page for a manual download + drop.
  */
-export function initTableBrowser(viewer: BrowserViewer, syncParam: (key: Kind, value: string) => void): void {
+export function initTableBrowser(viewer: BrowserViewer): void {
 	const search = el('input', {
 		type: 'search',
 		placeholder: 'Search tables, makers, years, ROMs',
@@ -179,7 +179,6 @@ export function initTableBrowser(viewer: BrowserViewer, syncParam: (key: Kind, v
 				handOff(kind, file, url, popup !== null)
 				return
 			}
-			syncParam(kind, url)
 			if (kind === 'rom') {
 				setStatus(`Downloading ${file.version}.zip…`)
 				await viewer.preloadRom(url).then(

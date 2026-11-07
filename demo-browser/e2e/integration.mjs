@@ -33,6 +33,7 @@ import {
 	playfieldLightsCheckAfterLamp,
 	plungerChecks,
 	pollLog,
+	romUrlChecks,
 	shot,
 	soundChecks,
 	tableHasInserts,
@@ -199,6 +200,7 @@ async function runOne(targetUrl, label) {
 	results.runErrors = runErrors.length === 0 && scriptErrors.length === 0
 	for (const e of runErrors.slice(0, 10)) console.log(`[integration:${label}] pageerror[run] ${e.message}`)
 	for (const t of scriptErrors.slice(0, 10)) console.log(`[integration:${label}] console[run] ${t.slice(0, 300)}`)
+	if (!hasRom(targetUrl)) results.romUrl = await leg(label, 'romUrl', () => romUrlChecks(page))
 	await page.close().catch(() => {})
 	const optional = hasRom(targetUrl) ? OPTIONAL_WITH_ROM : OPTIONAL_WITHOUT_ROM
 	const ok = Object.entries(results).every(([name, v]) => v === true || (v === 'skip' && optional.has(name)))

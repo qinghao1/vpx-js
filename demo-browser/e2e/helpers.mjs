@@ -1263,3 +1263,29 @@ export const soundChecks = async page => {
 		}
 	})
 }
+
+/**
+ * A ROM picked while playing must still be in `?rom=` after leaving play:
+ * history back restores the entry pushed on the way in, which predates it.
+ * Run last: the placeholder zip reboots the engine without a usable ROM.
+ */
+export const romUrlChecks = async page => {
+	const rom = () => page.evaluate(() => new URL(location.href).searchParams.get('rom'))
+	// Enter play from the viewer so the history entry exists.
+	await page.evaluate(async () => {
+		await window.vpx.setMode('viewer')
+		await window.vpx.setMode('play')
+	})
+	await page.evaluate(() => {
+		const input = document.getElementById('file-rom')
+		const files = new DataTransfer()
+		files.items.add(new File([new Uint8Array(8)], 'placeholder.zip'))
+		input.files = files.files
+		input.dispatchEvent(new Event('change'))
+	})
+	const inPlay = await rom()
+	await page.evaluate(() => window.vpx.setMode('viewer'))
+	await new Promise(r => setTimeout(r, 500))
+	const afterPlay = await rom()
+	return { pass: inPlay === 'placeholder.zip' && afterPlay === 'placeholder.zip', inPlay, afterPlay }
+}

@@ -2,6 +2,7 @@
 
 import { crossOriginIsolate, showIsolationNotice } from './cross-origin-isolation.js'
 import { isDev, isLowQuality } from './env.js'
+import { withSourceParams } from './source-params.js'
 import { initTableBrowser } from './ui/table-browser.js'
 import { Viewer } from './viewer.js'
 
@@ -41,38 +42,27 @@ if (isDev) {
 /** The viewer reports a failed load on its loading card and log; this keeps the rejection handled. */
 const reportFailure = (what: string) => (error: unknown) => console.error(`[app] ${what} failed`, error)
 
-if (options.vpx) {
-	viewer.load(options.vpx).catch(reportFailure('load'))
-	if (options.rom) viewer.preloadRom(options.rom).catch(reportFailure('rom load'))
-} else {
-	viewer.startLoop()
-}
+// A ROM named without a table waits for the table that follows it.
+if (options.rom) viewer.preloadRom(options.rom).catch(reportFailure('rom load'))
+if (options.vpx) viewer.load(options.vpx).catch(reportFailure('load'))
+else viewer.startLoop()
 
 /**
- * Mirror the open table/ROM in the URL so a reload refetches it. Local files
- * sync by file name (page-relative on reload); a new table also drops the ROM.
+ * Mirror the viewer's table and ROM in the URL so a reload refetches them.
+ * Local files go by file name (page-relative on reload). Navigating back out
+ * of play restores the entry that was pushed on the way in, so it re-syncs.
  */
-const syncParam = (key: 'vpx' | 'rom', value?: string) => {
-	const url = new URL(location.href)
-	if (key === 'vpx') for (const stale of ['table', 'rom']) url.searchParams.delete(stale)
-	if (value) url.searchParams.set(key, value)
-	else url.searchParams.delete(key)
-	history.replaceState(history.state, '', url)
-}
-initTableBrowser(viewer, syncParam)
+const syncUrl = () => history.replaceState(history.state, '', withSourceParams(location.href, viewer.sources))
+addEventListener('viewer:sourcechange', syncUrl)
+addEventListener('popstate', syncUrl)
+initTableBrowser(viewer)
 
 // Tables go first: a ROM belongs to the table it arrives with.
 function openFiles(files: Iterable<File>) {
 	const list = [...files]
 	const named = (ext: string) => list.filter(f => f.name.toLowerCase().endsWith(ext))
-	for (const f of named('.vpx')) {
-		syncParam('vpx', f.name)
-		viewer.loadFromFile(f).catch(reportFailure('load'))
-	}
-	for (const f of named('.zip')) {
-		syncParam('rom', f.name)
-		viewer.loadRomFile(f).catch(reportFailure('rom load'))
-	}
+	for (const f of named('.vpx')) viewer.loadFromFile(f).catch(reportFailure('load'))
+	for (const f of named('.zip')) viewer.loadRomFile(f).catch(reportFailure('rom load'))
 }
 
 for (const id of ['file-vpx', 'file-rom']) {
