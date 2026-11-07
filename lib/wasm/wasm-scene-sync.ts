@@ -44,6 +44,7 @@ import { MoverType, WASM_STRIDES } from './vpinball-wasm.js'
  *   visible, color, alpha, disableLightingTop, disableLightingBelow, currentFrame
  * - flashers stride 8: partIdx, visible, alpha, color, intensityScale,
  *   modulateVsAdd, addBlend, inPlayState
+ * - reels stride 4: partIdx, reel, value, visible (one row per EM score-reel digit)
  */
 
 /** Scene-side binding for one engine part. */
@@ -71,6 +72,15 @@ export interface WasmSyncPolicy {
 	 * frame, because script swaps move no numeric column.
 	 */
 	flasherImage?: (partIdx: number) => string | undefined
+}
+
+/**
+ * Live digits of one DispReel part (`DispReel::m_reelInfo[].currentValue`).
+ * Reels have no scene slot: the host draws them on its backglass.
+ */
+export interface ReelState {
+	readonly values: number[]
+	visible: boolean
 }
 
 /** Host-owned ball lifetime; spawn builds the node, data, state, and updater. */
@@ -165,6 +175,34 @@ export class WasmSceneSync<NODE, GEOMETRY, POINT_LIGHT> {
 	private readonly lastFlasherImages = new Map<number, string>()
 	/** Cumulative applied light-row changes; harness boot/activity signal. */
 	private totalLightChanges = 0
+	private readonly reelStates = new Map<number, ReelState>()
+
+	/** Last synced digits of a DispReel part; `undefined` until its first reels row. */
+	public reel(partIdx: number): Readonly<ReelState> | undefined {
+		return this.reelStates.get(partIdx)
+	}
+
+	/** Applies reels rows (see the header); returns how many digits or visibilities changed. */
+	public syncReels(view: Float32Array): number {
+		const stride = WASM_STRIDES.reels
+		let changed = 0
+		for (let i = 0; i + stride <= view.length; i += stride) {
+			const partIdx = view[i]!
+			const reel = view[i + 1]!
+			const value = view[i + 2]!
+			const visible = view[i + 3]! !== 0
+			if (!Number.isInteger(reel) || reel < 0) continue
+			let state = this.reelStates.get(partIdx)
+			if (!state) {
+				state = { values: [], visible }
+				this.reelStates.set(partIdx, state)
+			} else if (state.values[reel] === value && state.visible === visible) continue
+			state.values[reel] = value
+			state.visible = visible
+			changed++
+		}
+		return changed
+	}
 
 	/**
 	 * Read-only flipper angles for harnesses: [partIdx, angleRad].

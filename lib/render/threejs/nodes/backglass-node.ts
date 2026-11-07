@@ -1,19 +1,17 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 /**
- * Desktop backglass layer: fullscreen backdrop image plus EM score-reel
- * digit quads, positioned in upstream's 1000x750 backdrop space.
+ * Backglass panel: backdrop image plus EM score-reel digit quads,
+ * positioned in upstream's 1000x750 backdrop space.
  *
  * Upstream draws the backdrop and every `DispReel` in-scene on desktop
  * (`Renderer::DrawBackground` + `DispReel::Render`, both in desktop-backdrop
  * coordinates, gated by decals/EM-reels flags); cabinet (BG_FULLSCREEN),
  * VR, and editor playfield views hide them in favor of ancillary windows.
- * This module
- * ports the layout math (`DispReel::RenderSetup` digit cells,
- * `BackdropToClip` NDC mapping, plus a contain-fit so authored proportions
- * stay true on any screen) and builds the three.js meshes; the viewer
- * billboards them far behind the table with plain depth testing, so the
- * table occludes the backdrop exactly where it covers the screen.
+ * This module ports the layout math (`DispReel::RenderSetup` digit cells,
+ * `BackdropToClip` NDC mapping) and builds the three.js meshes; the viewer
+ * stands them up as a backglass above the head of the table, where tables
+ * with an authored VR backbox show theirs.
  *
  * @see https://github.com/vpinball/vpinball/blob/master/src/parts/dispreel.cpp
  * @see https://github.com/vpinball/vpinball/blob/master/src/renderer/Renderer.cpp
@@ -25,22 +23,89 @@ import * as THREE from 'three'
 export const BACKDROP_WIDTH = 1000
 export const BACKDROP_HEIGHT = 750
 
-/** Fallback screen shape when no live aspect is available. */
+/** Panel shape when the table has no backdrop image (a desktop window). */
 export const DEFAULT_ASPECT = 16 / 9
 
 /**
- * Contain-fit of the backdrop space inside a `viewAspect` (width/height)
- * screen: NDC scale factors keeping authored proportions true. Native
- * stretches the space to fill (`DrawSprite(0, 0, 1, 1)`), skewing circles
- * on non-4:3 screens; art and reels share this transform so digits stay
- * registered with the art while the table's backdrop color fills the bars.
+ * Backglass shape measured from an authored VR cabinet (The Walking Dead's
+ * `VRCab_Backglass`, in playfield widths): at most 1.335 wide, leaning back
+ * atan(57/907). It stands on the head line itself, never over the playfield.
  */
-export function backdropContainScale(viewAspect: number): { scaleX: number; scaleY: number } {
-	const aspect = Number.isFinite(viewAspect) && viewAspect > 0 ? viewAspect : DEFAULT_ASPECT
-	const spaceAspect = BACKDROP_WIDTH / BACKDROP_HEIGHT
-	return aspect >= spaceAspect
-		? { scaleX: spaceAspect / aspect, scaleY: 1 }
-		: { scaleX: 1, scaleY: aspect / spaceAspect }
+const PANEL = { maxWidth: 1.335, lean: Math.atan2(57, 907) }
+
+/** Table-local playfield extent (VPX units, `TableData` fields): the panel stands on its head at glass height. */
+export interface PlayfieldExtent {
+	left: number
+	right: number
+	top: number
+	glassHeight: number
+}
+
+const panelAspect = (artAspect: number): number =>
+	Number.isFinite(artAspect) && artAspect > 0 ? artAspect : DEFAULT_ASPECT
+
+/**
+ * Table-local transform (VPX units, height along -z) of a backglass panel
+ * `height` tall: maps the NDC panel (x, y in [-1, 1], +z facing the player)
+ * onto an upright, slightly leaning panel whose bottom edge sits on the head
+ * of the playfield at glass height. Native stretches backdrop space over the
+ * desktop window (`DrawSprite(0, 0, 1, 1)`); here it spans the panel, shaped
+ * like the art (`artAspect`) so neither distorts.
+ */
+export function backglassPanelMatrix(playfield: PlayfieldExtent, artAspect: number, height: number): THREE.Matrix4 {
+	const width = height * panelAspect(artAspect)
+	const centerHeight = playfield.glassHeight + (height / 2) * Math.cos(PANEL.lean)
+	return new THREE.Matrix4().compose(
+		new THREE.Vector3(
+			(playfield.left + playfield.right) / 2,
+			playfield.top - (height / 2) * Math.sin(PANEL.lean),
+			-centerHeight,
+		),
+		new THREE.Quaternion().setFromEuler(new THREE.Euler(-(Math.PI / 2 + PANEL.lean), 0, 0)),
+		new THREE.Vector3(width / 2, height / 2, 1),
+	)
+}
+
+/**
+ * The largest backglass panel (up to the authored backglass width) whose
+ * corners all stay `margin` (NDC) inside the view of `camera` (world space,
+ * matrices current), so it fills the room the play view leaves above the
+ * table without covering the playfield. `tableToWorld` is the table group's
+ * world matrix. Bisects the height: corners only rise and widen as it grows.
+ */
+export function fitBackglassPanel(
+	playfield: PlayfieldExtent,
+	artAspect: number,
+	camera: THREE.Camera,
+	tableToWorld: THREE.Matrix4,
+	margin = 0.04,
+): THREE.Matrix4 {
+	const limit = 1 - margin
+	const world = new THREE.Matrix4()
+	const corner = new THREE.Vector3()
+	const fits = (height: number): boolean => {
+		world.multiplyMatrices(tableToWorld, backglassPanelMatrix(playfield, artAspect, height))
+		for (const [x, y] of [
+			[-1, -1],
+			[1, -1],
+			[-1, 1],
+			[1, 1],
+		]) {
+			corner.set(x!, y!, 0).applyMatrix4(world).project(camera)
+			if (Math.abs(corner.x) > limit || corner.y > limit || Math.abs(corner.z) > 1) return false
+		}
+		return true
+	}
+	let low = 0
+	let high = (PANEL.maxWidth * (playfield.right - playfield.left)) / panelAspect(artAspect)
+	if (fits(high)) low = high
+	else
+		for (let i = 0; i < 24; i++) {
+			const mid = (low + high) / 2
+			if (fits(mid)) low = mid
+			else high = mid
+		}
+	return backglassPanelMatrix(playfield, artAspect, low)
 }
 
 /** Native alpha-cutout threshold (`alphaTestValue 128/255`). */
@@ -118,8 +183,7 @@ export function applyDigitCellUV(geometry: THREE.BufferGeometry, cell: DigitCell
 
 /**
  * One reel digit: a 1x1 plane scaled to `rect`, showing `cell` of the
- * strip texture with the native cutout. Depth testing stays at defaults —
- * the quad sits at z=2 in the far-behind group and depth-tests against it.
+ * strip texture with the native cutout, two units in front of the art.
  */
 export function createReelDigitQuad(map: THREE.Texture, rect: NdcRect, cell: DigitCellUV): THREE.Mesh {
 	const geometry = new THREE.PlaneGeometry(1, 1)
@@ -130,8 +194,6 @@ export function createReelDigitQuad(map: THREE.Texture, rect: NdcRect, cell: Dig
 		toneMapped: false,
 	})
 	const mesh = new THREE.Mesh(geometry, material)
-	// Two units ahead of the backdrop plane: enough depth separation at
-	// backglass range to resolve, so the digit wins without z-fighting.
 	mesh.position.set(rect.centerX, rect.centerY, 2)
 	mesh.scale.set(rect.sizeX, rect.sizeY, 1)
 	mesh.frustumCulled = false

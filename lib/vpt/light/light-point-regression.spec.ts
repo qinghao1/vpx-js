@@ -104,6 +104,49 @@ describe('regression: bulb lights with glow polygons are not scene lights', () =
 		expect(names).toEqual(['RoundLight'])
 	})
 
+	it('should keep backglass bulb lights out of the playfield scene', async () => {
+		const mockLight = (name: string, isBackglass: boolean, dragPointCount: number): any => ({
+			data: {
+				bulbLight: true,
+				isBackglass,
+				showBulbMesh: true,
+				meshRadius: 20,
+				dragPoints: Array.from({ length: dragPointCount }, () => ({})),
+				center: { x: 0, y: 0 },
+			},
+			isBulbLight: () => true,
+			hasBulbGlow: () => dragPointCount > 2,
+			isSurfaceLight: () => false,
+			getName: () => name,
+			getMeshes: () => ({}),
+			getState: () => ({ isVisible: true }),
+			center: { x: 0, y: 0 },
+		})
+		const table = new TableBuilder().build()
+		;(table as any).lights = {
+			BackglassGlow: mockLight('BackglassGlow', true, 4),
+			BackglassRound: mockLight('BackglassRound', true, 0),
+			PlayfieldGlow: mockLight('PlayfieldGlow', false, 4),
+			PlayfieldRound: mockLight('PlayfieldRound', false, 0),
+		}
+		const { ThreeRenderApi } = await import('../../render/threejs/three-render-api.js')
+		const { TableMeshGenerator } = await import('../table/table-mesh-generator.js')
+		const api = new ThreeRenderApi({ applyMaterials: true } as any)
+		const scene = new TableMeshGenerator(table).generateTableNode(api, {
+			exportLightBulbs: true,
+			exportLightBulbLights: true,
+		}) as any
+		const names: string[] = []
+		let pointLights = 0
+		scene.traverse((childNode: any) => {
+			if (childNode.name.endsWith('Glow') || childNode.name.endsWith('Round')) names.push(childNode.name)
+			if (childNode.isPointLight) pointLights++
+		})
+		expect(names.filter(name => name.startsWith('Backglass'))).toEqual([])
+		expect(names.filter(name => name.startsWith('Playfield')).sort()).toEqual(['PlayfieldGlow', 'PlayfieldRound'])
+		expect(pointLights).toBe(1)
+	})
+
 	it.skipIf(!walkingDeadVpx)(
 		'should generate no point lights but glow meshes for walking_dead.vpx if available',
 		async () => {

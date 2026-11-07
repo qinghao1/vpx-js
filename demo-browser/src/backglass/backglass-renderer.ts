@@ -1,77 +1,89 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-// Desktop backglass overlay: backdrop art plus EM score-reel digit quads,
-// glued to the camera like native's screen-space backdrop pass — but
-// contain-fitted to keep authored proportions true instead of stretching
-// to fill (native's `DrawSprite(0, 0, 1, 1)` fills the window).
+// Backglass: backdrop art plus EM score-reel digit quads, standing on the
+// head of the table where an authored VR cabinet puts its backbox, as large
+// as the play view's room above the table allows — so every table shows its
+// backglass and score the same way.
 //
-// Upstream draws the backdrop and every DispReel in-scene on desktop and FSS
-// views (gated by decals/EM-reels flags); this mirrors that presentation
-// view so the score stays readable whatever the table camera does. The
-// group billboards in front of the camera every frame (world-space, so the
-// depth-tested table occludes it exactly where it covers the screen);
-// layout math and mesh builders live in lib (backglass-node).
+// Upstream draws the backdrop and every DispReel in desktop screen space
+// (gated by decals/EM-reels flags) and hides them in VR, where tables bring
+// their own backbox. Tables that do (e.g. a `VRCab_Backbox`) keep theirs:
+// this panel stands down while one is shown. Layout math and mesh builders
+// live in lib (backglass-node).
 import * as THREE from 'three'
 import {
 	applyDigitCellUV,
-	backdropContainScale,
 	backdropRectToNdc,
 	createBackdropPlane,
 	createReelDigitQuad,
-	DEFAULT_ASPECT,
 	digitCellUV,
+	fitBackglassPanel,
 } from '../../../dist-esm/lib/render/threejs/nodes/backglass-node.js'
+import { flatName } from '../../../dist-esm/lib/render/threejs/scene-classify.js'
+import { computePlayFraming } from '../../../dist-esm/lib/render/threejs/three-camera-framing.js'
 import type { DirtyOverlay } from '../overlays/dirty-overlay.js'
 
 interface ReelEntry {
-	item: any
+	name: string
 	data: any
-	animation: any
 	meshes: THREE.Mesh[]
 	lastValues: number[]
 	lastVisible: boolean
 	map: THREE.Texture | undefined
 }
 
+const isBackboxName = (name: string): boolean => /backbox|backglass/.test(flatName(name))
+
+/** Shown in the table: the node and every ancestor up to `root` are visible. */
+function isShown(node: THREE.Object3D, root: THREE.Object3D): boolean {
+	for (let n: THREE.Object3D | null = node; n && n !== root; n = n.parent) if (!n.visible) return false
+	return root.visible
+}
+
 export class BackglassRenderer implements DirtyOverlay {
 	private readonly viewer: any
+	/**
+	 * Lives in the scene, not the table group (camera framing and picking
+	 * walk that); its matrix pins it to the table each frame instead.
+	 */
 	private readonly group = new THREE.Group()
-	private readonly fitGroup = new THREE.Group()
 	private entries: ReelEntry[] = []
 	private table: any = null
 	private ready = false
 	private syncKey: string | null = null
-	private boundsTable: any = null
-	private boundsCenter = new THREE.Vector3()
-	private boundsRadius = 0
-	private readonly scratchDir = new THREE.Vector3()
+	/** Table-local panel transform, fitted to the play view (see `fitPanel`). */
+	private panel = new THREE.Matrix4()
+	/** Art width/height (NaN without art); the panel takes its shape. */
+	private artAspect = Number.NaN
+	/** Camera shape and table group the panel was last fitted for. */
+	private fitKey = ''
+	/** The table group's own backbox nodes, collected once per table group. */
+	private authored: THREE.Object3D[] = []
+	private authoredFrom: THREE.Object3D | null = null
+	private readonly scratch = new THREE.Matrix4()
 
 	constructor(viewer: any) {
 		this.viewer = viewer
-		// Plain depth testing occludes the backdrop exactly where the table
-		// (or anything nearer) covers the screen — no order/depth hacks.
-		// Art and reels live in the fit group so one scale keeps authored
-		// proportions true on any screen; the fullscreen color quad stays
-		// outside it, filling the bars like a clear color.
-		this.group.add(this.fitGroup)
+		this.group.matrixAutoUpdate = false
 		this.group.visible = false
 	}
 
-	/** DirtyOverlay.update: true when reels/backdrop visibly changed. */
+	/** DirtyOverlay.update: true when the panel, its reels, or its visibility changed. */
 	update(): boolean {
 		if (!this.table || !this.ready) return false
-		this.billboardToCamera()
-		let dirty = false
+		let dirty = this.place()
 		const emReels = this.table.data?.renderEMReels !== false
 		for (const entry of this.entries) {
-			const visible = emReels && entry.data?.isVisible !== false && !!entry.map
+			// Live engine digits; before the engine reports, reels rest at 0 as
+			// after upstream's RenderSetup, with their authored visibility.
+			const live = this.viewer.wasmEngine?.reel(entry.name)
+			const visible = emReels && (live?.visible ?? entry.data?.isVisible !== false) && !!entry.map
 			if (visible !== entry.lastVisible) {
 				entry.lastVisible = visible
 				for (const mesh of entry.meshes) mesh.visible = visible
 				dirty = true
 			}
 			if (!visible) continue
-			entry.animation ??= entry.item?.getAnimation?.()
-			const values = entry.animation?.getReelValues?.() ?? []
+			const values = live?.values ?? []
 			for (let r = 0; r < entry.meshes.length; r++) {
 				const value = values[r] ?? 0
 				if (value !== entry.lastValues[r]) {
@@ -92,7 +104,7 @@ export class BackglassRenderer implements DirtyOverlay {
 		return dirty
 	}
 
-	/** Rebuilds the overlay for the current table; textures stream in async. */
+	/** Rebuilds the backglass for the current table; textures stream in async. */
 	async syncTable(table: any): Promise<void> {
 		const key = table
 			? `${table?.data?.szImage ?? table?.getName?.() ?? ''}|${table?.data?.bgImage?.[table?.data?.bgCurrentSet ?? 0] ?? ''}|${Object.keys(table?.dispReels ?? {}).length}|${table?.data?.renderDecals !== false}|${table?.data?.renderEMReels !== false}`
@@ -107,10 +119,13 @@ export class BackglassRenderer implements DirtyOverlay {
 		const bgName =
 			table.data?.renderDecals !== false ? (table.data?.bgImage?.[table.data?.bgCurrentSet ?? 0] ?? '') : ''
 		if (!reelItems.length && !bgName) return
-		// Backdrop first so reels land on top; textures resolve below.
+		// Shaped like the art, so neither art nor reel layout distorts.
+		const bgTexture = bgName ? table.getTexture?.(bgName) : undefined
+		this.artAspect = bgTexture ? bgTexture.width / bgTexture.height : Number.NaN
+		this.fitKey = ''
+		// Backing first so art and reels land on top; textures resolve below.
 		this.group.add(createBackdropPlane(undefined, table.data?.colorBackdrop ?? 0x000000))
-		const wanted: any[] = []
-		if (bgName && table.getTexture?.(bgName)) wanted.push(table.getTexture(bgName))
+		const wanted: any[] = bgTexture ? [bgTexture] : []
 		for (const item of reelItems) {
 			const image = item?.data?.szImage
 			if (image && table.getTexture?.(image)) wanted.push(table.getTexture(image))
@@ -123,102 +138,106 @@ export class BackglassRenderer implements DirtyOverlay {
 		if (this.table !== table) return
 		const getTexture = (name: string) => this.viewer.renderApi?.getMapGenerator?.()?.getTexture?.(name)
 		const bgMap = bgName ? getTexture(bgName) : undefined
-		if (bgMap) this.fitGroup.add(createBackdropPlane(bgMap, 0xffffff, 1))
+		if (bgMap) this.group.add(createBackdropPlane(bgMap, 0xffffff, 1))
 		for (const item of reelItems) {
 			const entry: ReelEntry = {
-				item,
+				name: item?.getName?.() ?? '',
 				data: item?.data,
-				animation: item?.getAnimation?.(),
 				meshes: [],
 				lastValues: [],
 				lastVisible: false,
 				map: undefined,
 			}
-			const d = entry.data
-			if (!d) continue
-			entry.map = d.szImage ? getTexture(d.szImage) : undefined
+			const reel = entry.data
+			if (!reel) continue
+			entry.map = reel.szImage ? getTexture(reel.szImage) : undefined
 			if (!entry.map) continue
-			const spacing = Math.max(0, d.reelSpacing ?? 0)
-			const width = Math.max(0, d.width ?? 0)
-			const height = Math.max(0, d.height ?? 0)
-			const count = Math.max(0, d.reelCount ?? 0)
+			const spacing = Math.max(0, reel.reelSpacing ?? 0)
+			const width = Math.max(0, reel.width ?? 0)
+			const height = Math.max(0, reel.height ?? 0)
+			const count = Math.max(0, reel.reelCount ?? 0)
 			for (let r = 0; r < count; r++) {
 				const rect = backdropRectToNdc(
-					d.v1.x + spacing + r * (width + spacing),
-					d.v1.y + spacing,
+					reel.v1.x + spacing + r * (width + spacing),
+					reel.v1.y + spacing,
 					width,
 					height,
 				)
 				const mesh = createReelDigitQuad(
 					entry.map,
 					rect,
-					digitCellUV(0, d.digitRange ?? 9, !!d.useImageGrid, d.imagesPerGridRow ?? 1),
+					digitCellUV(0, reel.digitRange ?? 9, !!reel.useImageGrid, reel.imagesPerGridRow ?? 1),
 				)
 				mesh.visible = false
-				this.fitGroup.add(mesh)
+				this.group.add(mesh)
 				entry.meshes.push(mesh)
 				entry.lastValues.push(-1)
 			}
 			this.entries.push(entry)
 		}
 		this.ready = true
-		this.group.visible = true
 		this.viewer.invalidate?.()
 	}
 
 	/**
-	 * Pins the NDC-space group onto the live camera frustum, just behind
-	 * the table: plain depth testing then occludes it exactly where the
-	 * table (or anything nearer) covers the screen, matching native's backdrop outcome by other means
-	 * (native instead draws first with depth off and lets the scene overdraw it) — with real depth margin,
-	 * since clinging to the far plane risks depth-precision failure against the cleared far value. World-space
-	 * billboarding — never camera-parented, since three.js only renders camera children when the camera itself
-	 * is added to the scene (which this viewer never does).
+	 * Pins the panel to the table's world transform and shows it unless the
+	 * table shows its own backbox (scripts toggle those per play mode).
+	 * Returns whether the placement or visibility changed.
 	 */
-	private billboardToCamera(): void {
-		const camera = this.viewer.camera
-		if (!camera || this.group.parent !== this.viewer.scene) return
-		if (this.table !== this.boundsTable) {
-			this.boundsTable = this.table
-			this.boundsRadius = 0
-			try {
-				const box = new THREE.Box3().setFromObject(this.viewer.tableGroup ?? this.group)
-				box.getCenter(this.boundsCenter)
-				this.boundsRadius = box.getSize(new THREE.Vector3()).length() / 2
-			} catch {
-				this.boundsCenter.set(0, 0, 0)
-			}
+	private place(): boolean {
+		const tableGroup: THREE.Object3D | null = this.viewer.tableGroup
+		if (tableGroup !== this.authoredFrom) {
+			this.authoredFrom = tableGroup
+			this.authored = []
+			tableGroup?.traverse(node => {
+				if (isBackboxName(node.name)) this.authored.push(node)
+			})
 		}
-		// Just behind the table bounds: far enough that nothing nearer is
-		// hidden, close enough for comfortable depth precision.
-		const dist =
-			this.boundsRadius > 0 ? camera.position.distanceTo(this.boundsCenter) + this.boundsRadius + 50 : 1000
-		const fov = THREE.MathUtils.degToRad(Number.isFinite(camera.fov) ? camera.fov : 60)
-		const halfH = Math.tan(fov / 2) * dist
-		const halfW = halfH * (Number.isFinite(camera.aspect) && camera.aspect > 0 ? camera.aspect : DEFAULT_ASPECT)
-		camera.getWorldDirection(this.scratchDir)
-		this.group.position.copy(camera.position).addScaledVector(this.scratchDir, dist)
-		this.group.quaternion.copy(camera.quaternion)
-		this.group.scale.set(halfW, halfH, 1)
-		// Contain-fit the backdrop space every frame: geometry is built
-		// once in full-space NDC, so resizes need no rebuild.
-		const fit = backdropContainScale(camera.aspect)
-		this.fitGroup.scale.set(fit.scaleX, fit.scaleY, 1)
+		const visible = !!tableGroup && !this.authored.some(node => isShown(node, tableGroup))
+		let changed = visible !== this.group.visible
+		this.group.visible = visible
+		const camera = this.viewer.camera
+		if (!tableGroup || !camera) return changed
+		tableGroup.updateWorldMatrix(true, false)
+		const fitKey = `${tableGroup.uuid}|${camera.aspect}|${camera.fov}`
+		if (fitKey !== this.fitKey) {
+			this.fitKey = fitKey
+			this.panel = this.fitPanel(tableGroup, camera)
+		}
+		this.scratch.multiplyMatrices(tableGroup.matrixWorld, this.panel)
+		if (!this.scratch.equals(this.group.matrix)) {
+			this.group.matrix.copy(this.scratch)
+			this.group.matrixWorldNeedsUpdate = true
+			changed = true
+		}
+		return changed
+	}
+
+	/**
+	 * Fits the panel into the play view (the play framing, not the live
+	 * camera), so it stays put while the player orbits and only refits when
+	 * the screen shape or table changes.
+	 */
+	private fitPanel(tableGroup: THREE.Object3D, camera: THREE.PerspectiveCamera): THREE.Matrix4 {
+		const play = computePlayFraming(tableGroup, camera)
+		const view = new THREE.PerspectiveCamera(camera.fov, camera.aspect, play.near, play.far)
+		view.position.copy(play.position)
+		view.lookAt(play.target)
+		view.updateMatrixWorld()
+		const { left, right, top, glassHeight } = this.table.data
+		return fitBackglassPanel({ left, right, top, glassHeight }, this.artAspect, view, tableGroup.matrixWorld)
 	}
 
 	private clear(): void {
-		for (const child of [...this.fitGroup.children]) this.detach(child, this.fitGroup)
-		for (const child of [...this.group.children]) {
-			if (child !== this.fitGroup) this.detach(child, this.group)
-		}
+		for (const child of [...this.group.children]) this.detach(child)
 		this.entries = []
 		this.ready = false
 		this.group.visible = false
 	}
 
-	/** Removes one overlay mesh and frees its geometry/material. */
-	private detach(child: THREE.Object3D, parent: THREE.Object3D): void {
-		parent.remove(child)
+	/** Removes one backglass mesh and frees its geometry/material. */
+	private detach(child: THREE.Object3D): void {
+		this.group.remove(child)
 		const mesh = child as THREE.Mesh
 		mesh.geometry?.dispose?.()
 		const material = mesh.material as THREE.Material | THREE.Material[]

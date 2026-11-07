@@ -168,10 +168,20 @@ Parsed and scriptable; rendering is partial:
 Which mesh a light builds depends on its flags (`light/light.ts:136-161`):
 a bulb mesh (`showBulbMesh` + `meshRadius`), a bulb glow polygon (`bulbLight`
 - 3 or more drag points), a playfield-surface insert (neither, + drag
-  points), or a backglass light (`isBackglass`). `fader` (default Linear = 1,
+  points). Backglass lights (`isBackglass`, upstream `m_desktopBackdrop`)
+  sit in 1000x750 backdrop space and build nothing in the playfield scene
+  (`table/table-mesh-generator.ts`, `transmission-buffer.ts`). `fader` (default Linear = 1,
   `Enums.Fader`: None = 0, Linear = 1, Incandescent = 2) selects the
   brightness envelope; bake-time levels come from `bakedIntensity`
   (`light/light.ts`), live levels from the WASM bridge.
+
+### DispReel: backdrop score reels
+
+`DispReelData` (`dispreel/dispreel.ts`) is layout only: backdrop position,
+reel size/spacing/count, and the digit strip (`szImage`, `digitRange`, image
+grid). The engine rolls the digits (`DispReel::UpdateAnimation`); the bridge
+publishes them as the `reels` buffer (`WasmSceneSync.syncReels`), and the
+demo's backglass (above the table head) draws them.
 
 ### `SizingType`, DMD, transparency
 

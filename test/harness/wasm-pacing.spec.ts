@@ -59,6 +59,7 @@ function makeEngine(
 			prims: 0,
 			flashers: 0,
 		}),
+		syncReels: (): number => 0,
 	}
 	const host = {
 		renderApi: {},

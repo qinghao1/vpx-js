@@ -238,4 +238,5 @@ export interface LoadedTable {
 	spinners?: import('../spinner/spinner.js').Spinner[]
 	plungers?: import('../plunger/plunger.js').Plunger[]
 	decals?: import('../decal/decal.js').Decal[]
+	dispReels?: import('../dispreel/dispreel.js').DispReel[]
 }

@@ -5,11 +5,12 @@ import * as THREE from 'three'
 import {
 	BACKDROP_HEIGHT,
 	BACKDROP_WIDTH,
-	backdropContainScale,
 	backdropRectToNdc,
+	backglassPanelMatrix,
 	createBackdropPlane,
 	createReelDigitQuad,
 	digitCellUV,
+	fitBackglassPanel,
 } from './backglass-node.js'
 
 describe('Backglass layout', () => {
@@ -62,25 +63,57 @@ describe('Backglass layout', () => {
 		expect(quad.centerY).to.be.closeTo(0.5, 1e-9)
 	})
 
-	it('contain-fits the backdrop space: square units on any screen', () => {
-		// 4:3 space is identity; wider screens pillarbox, taller letterbox.
-		expect(backdropContainScale(4 / 3)).to.deep.equal({ scaleX: 1, scaleY: 1 })
-		expect(backdropContainScale(16 / 9)).to.deep.equal({ scaleX: 3 / 4, scaleY: 1 })
-		expect(backdropContainScale(1)).to.deep.equal({ scaleX: 1, scaleY: 3 / 4 })
-		// Degenerate input falls back to a 16:9 screen.
-		expect(backdropContainScale(0)).to.deep.equal(backdropContainScale(16 / 9))
-		// A backdrop-space square covers square pixels at any resolution,
-		// and contain never magnifies.
-		for (const [w, h] of [
-			[1920, 1080],
-			[800, 600],
-			[600, 800],
-		]) {
-			const fit = backdropContainScale(w / h)
-			expect(fit.scaleX).to.be.at.most(1)
-			expect(fit.scaleY).to.be.at.most(1)
-			expect((fit.scaleX * w) / BACKDROP_WIDTH).to.be.closeTo((fit.scaleY * h) / BACKDROP_HEIGHT, 1e-9)
+	const playfield = { left: 0, right: 952, top: 0, glassHeight: 210 }
+	const corners = (panel: THREE.Matrix4) =>
+		[
+			[-1, -1],
+			[1, -1],
+			[-1, 1],
+			[1, 1],
+		].map(([x, y]) => new THREE.Vector3(x, y, 0).applyMatrix4(panel))
+
+	it('stands the panel on the head of the table, shaped like the art', () => {
+		const panel = backglassPanelMatrix(playfield, 16 / 9, 450)
+		const [bottomLeft, bottomRight, topLeft] = corners(panel)
+		// Height is -z in table space: the bottom edge sits at glass height.
+		expect(-bottomLeft!.z).to.be.closeTo(210, 1e-6)
+		// On the head line itself, never over the playfield (y grows down-table).
+		expect(bottomLeft!.y).to.be.closeTo(0, 1e-6)
+		expect(bottomRight!.x - bottomLeft!.x).to.be.closeTo(800, 1e-6)
+		expect((bottomLeft!.x + bottomRight!.x) / 2).to.be.closeTo(476, 1e-6)
+		// Upright with the authored lean: the top edge is higher and further back.
+		expect(-topLeft!.z - 210).to.be.closeTo(450 * Math.cos(Math.atan2(57, 907)), 1e-6)
+		expect(topLeft!.y).to.be.lessThan(bottomLeft!.y)
+		expect(new THREE.Vector3(0, 0, 1).transformDirection(panel).y).to.be.greaterThan(0.99)
+	})
+
+	it('fits the panel into the room the view leaves above the table', () => {
+		// Table-local VPX space is the world here; a camera down-table and above
+		// the playfield (height is -z), looking at the head.
+		const view = (fov: number, aspect: number) => {
+			const camera = new THREE.PerspectiveCamera(fov, aspect, 1, 1e5)
+			camera.up.set(0, 0, -1)
+			camera.position.set(476, 2600, -1500)
+			camera.lookAt(476, 600, 0)
+			camera.updateMatrixWorld()
+			return camera
 		}
+		const heightOf = (panel: THREE.Matrix4) => {
+			const [bottomLeft, , topLeft] = corners(panel)
+			return topLeft!.distanceTo(bottomLeft!)
+		}
+		const tight = view(40, 16 / 9)
+		const fitted = fitBackglassPanel(playfield, 16 / 9, tight, new THREE.Matrix4())
+		expect(heightOf(fitted)).to.be.greaterThan(0)
+		for (const corner of corners(fitted)) {
+			const ndc = corner.project(tight)
+			expect(Math.abs(ndc.x)).to.be.at.most(0.96 + 1e-6)
+			expect(ndc.y).to.be.at.most(0.96 + 1e-6)
+		}
+		// More room grows it, up to the authored backglass width (1.335 playfields).
+		const roomy = fitBackglassPanel(playfield, 16 / 9, view(90, 0.5), new THREE.Matrix4())
+		expect(heightOf(roomy)).to.be.greaterThan(heightOf(fitted))
+		expect(heightOf(roomy) * (16 / 9)).to.be.closeTo(1.335 * 952, 1e-3)
 	})
 
 	it('builds cutout digit quads and a flat fallback backdrop', () => {

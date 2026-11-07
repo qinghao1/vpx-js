@@ -46,6 +46,16 @@ describe('regression: room must remain visible', () => {
 		expect(c3.isCab, 'cab true').toEqual(true)
 	})
 
+	it('classify hides playfield glass but keeps an authored backglass', () => {
+		expect(classify('primitive-primitive001', 'material:glass', 'glassnormal', false, false).isGlass).toEqual(true)
+		expect(classify('primitive-playfieldglass', '', '', false, false).isGlass).toEqual(true)
+		for (const name of ['primitive-vrcab_backglass', 'primitive-vrcab_backglassblocker'])
+			expect(
+				classify(name, 'material:colormaxnoreflectionhalf', 'backglassimage', false, true).isGlass,
+				name,
+			).toEqual(false)
+	})
+
 	it('postProcessScene must keep VR, cabinet and bm_playfield while hiding dark occluders', () => {
 		const root = new THREE.Group()
 		root.name = 'table'

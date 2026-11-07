@@ -114,6 +114,16 @@ export class DmdRenderer implements DirtyOverlay {
 			this.viewer.dmdMeshes = this.meshes
 			return
 		}
+		// Every DMD flasher shows the DMD frame (upstream Flasher::Render);
+		// left on its flasher material one draws a solid tint quad (e.g. a
+		// desktop DMD peeking out of a VR backbox). The engine keeps owning
+		// visibility; the selection below only picks which meshes to reveal.
+		for (const fl of flashers) {
+			const mesh = tableGroup.getObjectByName(`flasher-${fl.getName()}`)
+			if (!mesh?.isMesh) continue
+			mesh.material = this.material
+			mesh.renderOrder = 20
+		}
 
 		const tableCenter = (() => {
 			const d = table?.data

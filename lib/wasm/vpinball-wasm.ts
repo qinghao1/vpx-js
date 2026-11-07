@@ -11,10 +11,10 @@
  * Bridge ABI this facade speaks (`VpxWasm_GetAbiVersion`, patch 0017). Bump
  * together with the bridge on any export, descriptor or row-layout change.
  */
-export const HEADLESS_ABI_VERSION = 1
+export const HEADLESS_ABI_VERSION = 2
 
 /** Per-frame state buffer kinds, mirroring `VpxWasm_GetBuffer` (see `FillBuffers`). */
-export type WasmBufferKind = 'balls' | 'movers' | 'lights' | 'prims' | 'flashers'
+export type WasmBufferKind = 'balls' | 'movers' | 'lights' | 'prims' | 'flashers' | 'reels'
 
 /** Floats per row. Movers use one fixed stride; the type tag selects the layout. */
 export const WASM_STRIDES = {
@@ -23,6 +23,7 @@ export const WASM_STRIDES = {
 	lights: 8,
 	prims: 22,
 	flashers: 8,
+	reels: 4,
 } as const
 
 /** Mover type tag (column 1 of a mover row). The bridge implements the same order. */
@@ -225,6 +226,7 @@ export const WASM_BUFFER_IDS: Record<WasmBufferKind, number> = {
 	lights: 2,
 	prims: 3,
 	flashers: 4,
+	reels: 5,
 }
 
 /** A decoded DMD frame; pixels are copied out so they survive heap growth. */

@@ -23,7 +23,8 @@ export const RE_AUTHOR_DEBUG = /(?:^|[^a-zA-Z])debug/i
 
 export const isAuthorDebugName = (name: string | undefined): boolean => !!name && RE_AUTHOR_DEBUG.test(name)
 
-export const RE_GLASS = /glass/i
+// Playfield glass, not the backglass art of an authored VR backbox (`VRCab_Backglass`).
+export const RE_GLASS = /(?<!back)glass/i
 export const RE_LM = /lm_/i
 export const RE_GI = /gi0|gi1|_gi|gi_/i
 export const RE_RAMP_FAMILY = /armp|ramp|botramp|rampscrw/i

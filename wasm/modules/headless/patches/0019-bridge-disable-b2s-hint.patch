@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
+Date: Fri, 6 Nov 2026 00:00:00 -0400
+Subject: [PATCH 19/19] bridge: default Controller.ForceDisableB2S on
+
+The host never opens a B2S backglass window; it shows the table's own
+desktop backdrop (EM score reels, backdrop images). With the B2S plugin
+linked, controller.vbs LoadController creates B2S.Server and sets B2SOn,
+and B2SOn scripts hide their backdrop reels for B2S to draw scores that
+go nowhere. Default upstream's 'Disable B2S' setting on, as a native
+desktop setup without a B2S screen would (the vpx-js A/B harness writes
+the same ForceDisableB2S = 1 for native runs).
+
+Target: vpinball/vpinball@64a480a96d1b972711fbb8eea014654c779b1e23
+
+diff --git a/src/web/vpx_wasm_bridge.cpp b/src/web/vpx_wasm_bridge.cpp
+--- a/src/web/vpx_wasm_bridge.cpp
++++ b/src/web/vpx_wasm_bridge.cpp
+@@ -400,6 +400,9 @@
+       return 0;
+    // Play in VR mode: scripts read RenderingMode = 2 and show their own room and cabinet.
+    Settings::SetStandalone_RenderingModeOverride_Default(2);
++   // No B2S window exists: the host shows the table's own desktop backdrop. Hint
++   // controller.vbs off B2S, or B2SOn scripts hide their EM reels and backdrop items.
++   Settings::SetController_ForceDisableB2S_Default(true);
+    g_app = new VPApp();
+    g_app->InitInstance(true);
+    return 0;

@@ -68,6 +68,7 @@ interface LampLike {
 		color?: number
 		color2?: number
 		bulbLight?: boolean
+		isBackglass?: boolean
 		transmissionScale?: number
 		center?: { x?: number; y?: number }
 		falloff?: number
@@ -111,7 +112,8 @@ export function updateTransmissionBuffer(table: Table): boolean {
 	if (lightMap) {
 		for (const key in lightMap) {
 			const lamp = lightMap[key] as LampLike
-			if (lamp.data?.bulbLight !== true) continue
+			// Native skips backdrop lights in the light buffer (`Light::Render`).
+			if (lamp.data?.bulbLight !== true || lamp.data.isBackglass) continue
 			let level = 0
 			let color = 0xffffff
 			let color2 = 0xffffff

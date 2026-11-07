@@ -16,7 +16,7 @@ import {
 	romMountFileName,
 	WASM_STRIDES,
 } from '../../dist-esm/lib/wasm/vpinball-wasm.js'
-import type { BallSlot, PartSlot, SyncCounts, SyncScene } from '../../dist-esm/lib/wasm/wasm-scene-sync.js'
+import type { BallSlot, PartSlot, ReelState, SyncCounts, SyncScene } from '../../dist-esm/lib/wasm/wasm-scene-sync.js'
 import { WasmSceneSync } from '../../dist-esm/lib/wasm/wasm-scene-sync.js'
 
 /** Scene hooks the WASM engine adapter needs from the viewer. */
@@ -74,6 +74,8 @@ export function effectiveGain(volume: number, muted: boolean): number {
 export class WasmEngine {
 	private readonly liveBalls = new Map<number, BallSlot<Object3D>>()
 	private readonly partNames = new Map<number, string>()
+	/** Lowercase part name to catalog index (upstream resolves names case-insensitively). */
+	private readonly partIndices = new Map<string, number>()
 	/** Plunger animation frame count per part index, resolved on first use. */
 	private readonly plungerFrames = new Map<number, number>()
 	private sync?: WasmSceneSync<Object3D, BufferGeometry, PointLight>
@@ -123,6 +125,7 @@ export class WasmEngine {
 		this.debtMs = 0
 		this.lastStepWallMs = 0
 		this.partNames.clear()
+		this.partIndices.clear()
 		this.plungerFrames.clear()
 		this.dmdCache = undefined
 		this.liveBalls.clear()
@@ -158,7 +161,10 @@ export class WasmEngine {
 		// load must not leave a dead instance owning the shared module.
 		session = this
 		for (const part of this.readCatalog()) {
-			if (typeof part.idx === 'number' && typeof part.name === 'string') this.partNames.set(part.idx, part.name)
+			if (typeof part.idx === 'number' && typeof part.name === 'string') {
+				this.partNames.set(part.idx, part.name)
+				this.partIndices.set(part.name.toLowerCase(), part.idx)
+			}
 		}
 		// The generated base slab carries the playfield, so the parsed table
 		// force-hides the authored collision mesh (see forceHidePlayfieldMesh);
@@ -262,6 +268,12 @@ export class WasmEngine {
 
 	partName(idx: number): string | undefined {
 		return this.partNames.get(idx)
+	}
+
+	/** Live digits of a DispReel part by name; `undefined` until the engine reports it. */
+	reel(name: string): Readonly<ReelState> | undefined {
+		const idx = this.partIndices.get(name.toLowerCase())
+		return idx === undefined ? undefined : this.sync?.reel(idx)
 	}
 
 	get scriptErrorCount(): number {
@@ -459,6 +471,7 @@ export class WasmEngine {
 			flashers: read('flashers'),
 		}
 		const counts = this.sync.syncAll(buffers)
+		this.sync.syncReels(read('reels'))
 		this.pumpAudio()
 		// The sync already visited every light row and knows which col-1
 		// intensities changed; map those straight to names instead of
@@ -494,6 +507,7 @@ export class WasmEngine {
 		for (const id of [...this.liveBalls.keys()]) this.balls().remove(id)
 		this.liveBalls.clear()
 		this.partNames.clear()
+		this.partIndices.clear()
 		this.plungerFrames.clear()
 		this.sync = undefined
 		// A superseded instance must not tear down its successor's table.

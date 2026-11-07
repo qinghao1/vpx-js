@@ -4,6 +4,7 @@
 import type { Storage } from '../io/ole-doc.js'
 import { Bumper } from './bumper/bumper.js'
 import { Decal } from './decal/decal.js'
+import { DispReel } from './dispreel/dispreel.js'
 import { ItemType } from './enums.js'
 import { Flasher } from './flasher/flasher.js'
 import { Flipper } from './flipper/flipper.js'
@@ -49,6 +50,7 @@ export const ITEM_REGISTRY: Record<number, RegistryEntry> = {
 	[ItemType.Spinner]: { key: 'spinners', factory: (s, n) => Spinner.fromStorage(s, n) },
 	[ItemType.Plunger]: { key: 'plungers', factory: (s, n) => Plunger.fromStorage(s, n) },
 	[ItemType.Decal]: { key: 'decals', factory: (s, n) => Decal.fromStorage(s, n) },
+	[ItemType.DispReel]: { key: 'dispReels', factory: (s, n) => DispReel.fromStorage(s, n) },
 }
 
 /** All keys used in LoadedTable for game items. */

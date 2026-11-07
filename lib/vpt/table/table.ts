@@ -6,6 +6,7 @@ import type { IRenderApi, IRenderable, MeshConvertOptions, Meshes } from '../../
 import { logger } from '../../util/logger.js'
 import type { Bumper } from '../bumper/bumper.js'
 import type { Decal } from '../decal/decal.js'
+import type { DispReel } from '../dispreel/dispreel.js'
 import type { Flasher } from '../flasher/flasher.js'
 import type { Flipper } from '../flipper/flipper.js'
 import type { Gate } from '../gate/gate.js'
@@ -63,6 +64,7 @@ export class Table implements IRenderable<TableState> {
 	public readonly surfaces: Record<string, Surface> = {}
 	public readonly triggers: Record<string, Trigger> = {}
 	public readonly decals: Record<string, Decal> = {}
+	public readonly dispReels: Record<string, DispReel> = {}
 
 	private readonly meshGenerator?: TableMeshGenerator
 

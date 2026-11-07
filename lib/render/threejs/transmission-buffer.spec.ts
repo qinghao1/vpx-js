@@ -93,6 +93,38 @@ describe('transmission light buffer', () => {
 		expect(data[0], 'outside the falloff radius the buffer stays black').to.equal(0)
 	})
 
+	it('leaves backglass lamps out of the playfield buffer', () => {
+		const tableWith = (isBackglass: boolean) =>
+			({
+				data: { right: 1000, bottom: 2000 },
+				lights: {
+					a: {
+						data: {
+							center: { x: 500, y: 1000 },
+							intensity: 100,
+							color: 0xff0000,
+							bulbLight: true,
+							isBackglass,
+							transmissionScale: 1,
+							falloff: 200,
+							falloffPower: 2,
+						},
+						getState: () => ({ intensity: 8, color: 0xff0000 }),
+					},
+				},
+			}) as never
+		resetTransmissionBuffer()
+		updateTransmissionBuffer(tableWith(true))
+		const data = getTransmissionTexture().image.data as Uint16Array
+		expect(Math.max(...data), 'backglass lamp contributes nothing').to.equal(0)
+		resetTransmissionBuffer()
+		updateTransmissionBuffer(tableWith(false))
+		expect(
+			Math.max(...(getTransmissionTexture().image.data as Uint16Array)),
+			'playfield twin does',
+		).to.be.greaterThan(0)
+	})
+
 	it('splats bulb halos at full native intensity (no 0.02 hull coefficient)', () => {
 		resetTransmissionBuffer()
 		const table = {

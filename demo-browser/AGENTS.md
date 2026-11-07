@@ -34,7 +34,7 @@ Requires `dist-esm` built. `server.fs.allow` covers the repo root, `~/Downloads`
 - `src/input.js` — `attachInput`: attaches keyboard, pointer/touch and nudge input once through one host and one `AbortController`
 - `src/input/input-manager.ts` — keys, touch flipper zones, swipe nudges & cabinet button raycasting
 - `src/input/nudge-controller.ts` — device-motion shake nudges and gamepad nudges (polled on the viewer's frame loop)
-- `src/dmd/dmd-renderer.ts`, `src/backglass/backglass-renderer.ts` — on-table DMD mesh updater and desktop backglass overlay
+- `src/dmd/dmd-renderer.ts`, `src/backglass/backglass-renderer.ts` — on-table DMD mesh updater and the backglass (backdrop art + EM reels) standing on the table head, sized to the room the play view leaves above it, standing down when the table shows its own VR backbox
 - `src/ui/stats-overlay.ts`, `help-dialog.ts`, `log-viewer.ts`, `src/overlays/dirty-overlay.ts` — stats HUD, controls dialog, page log (no `console`/`fetch`/`XHR` monkey-patch), dirty-gated present loop
 - `src/ui/table-browser.ts` — Virtual Pinball Spreadsheet table/ROM browser (`lib/emu/vps-catalog.ts`)
 - `src/utils/candidate-resolver.ts`, `texture-filter.ts` — VPX resolution, downloads & glass-texture filtering

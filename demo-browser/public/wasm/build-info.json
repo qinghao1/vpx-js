@@ -19,12 +19,14 @@
     "0014-bridge-set-audio-level.patch": "ca664e6edb081bcbb50611fd068f319c0f1a92f1eaa05c52855b2f179905b698",
     "0015-bridge-vr-player-mode.patch": "427d1e2c91dd0758bd2a01ef482aedb33d6e4c091f5c29431f1ad6672e73d3b7",
     "0016-bridge-wasm-source-maps.patch": "a73fdae0af6d35531fd816f796d3a3b4fc8108a929f55ddc4f1c6656d5b80400",
-    "0017-bridge-abi-version-catalog-escape-reset.patch": "263c181429725c0d544e009601a15118da2e7ae6ff0fd09f36dc0cab633dea5b"
+    "0017-bridge-abi-version-catalog-escape-reset.patch": "263c181429725c0d544e009601a15118da2e7ae6ff0fd09f36dc0cab633dea5b",
+    "0018-bridge-dispreel-values.patch": "7a5083fee9fa9ca629378bb7420816b8e059319f7b978621702b4b650b96f67e",
+    "0019-bridge-disable-b2s-hint.patch": "89e4b2ca88e8fb84f23409425e4e52595a5b27598faca8d64c26f3ecd064ea1f"
   },
   "untrackedPatches": [],
   "artifacts": {
-    "vpinball-headless.js": "c2321cc918ded2d33a66b6db0bd72ad72f69f8c702048079607bfee2a530a7dd",
-    "vpinball-headless.wasm": "35d3abeb3bd19da9cd8cf3bd91c4c0f06065dd4b1195deb06b168dde5827da05",
+    "vpinball-headless.js": "0fa14433e13150fae2cf4bf2ca21ae94af30565297125be0f8d61ebb4ded3b35",
+    "vpinball-headless.wasm": "926c23b7f5df3f276332a897e103a1e803aae29bb4c8324287ae9968f5d79edd",
     "vpinball-headless.data": "086a299fb4257ed43e6dec2550fe7dfdbbfe3914a139e8d8191607966768b389"
   }
 }

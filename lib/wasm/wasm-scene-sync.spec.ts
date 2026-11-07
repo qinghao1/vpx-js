@@ -484,7 +484,7 @@ describe('WASM scene sync', () => {
 	})
 
 	it('pins the buffer contract: strides, tags, and DMD formats', () => {
-		expect(WASM_STRIDES).toEqual({ balls: 16, movers: 8, lights: 8, prims: 22, flashers: 8 })
+		expect(WASM_STRIDES).toEqual({ balls: 16, movers: 8, lights: 8, prims: 22, flashers: 8, reels: 4 })
 		expect(MoverType).toMatchObject({
 			Flipper: 0,
 			Plunger: 1,
@@ -1055,6 +1055,60 @@ describe('WASM scene sync', () => {
 			})
 			expect(sync.syncFlashers(row)).toBe(1)
 			expect(state.imageA).toBe('')
+		})
+	})
+
+	describe('reel rows', () => {
+		const newSync = () =>
+			new WasmSceneSync<object, unknown, unknown>(
+				mockScene(new Map()),
+				mockBalls(),
+				new RecordingApi() as any,
+				new TableBuilder().build(),
+			)
+
+		it('applies digits and visibility on the first frame and counts them', () => {
+			const sync = newSync()
+			expect(sync.syncReels(new Float32Array([4, 0, 3, 1, 4, 1, 7, 1]))).toBe(2)
+			expect(sync.reel(4)).toEqual({ values: [3, 7], visible: true })
+		})
+
+		it('reports nothing for an identical frame', () => {
+			const sync = newSync()
+			const frame = new Float32Array([4, 0, 3, 1, 4, 1, 7, 1])
+			sync.syncReels(frame)
+			expect(sync.syncReels(frame)).toBe(0)
+		})
+
+		it('reports a single digit roll and updates only that digit', () => {
+			const sync = newSync()
+			sync.syncReels(new Float32Array([4, 0, 3, 1, 4, 1, 7, 1]))
+			expect(sync.syncReels(new Float32Array([4, 0, 3, 1, 4, 1, 8, 1]))).toBe(1)
+			expect(sync.reel(4)?.values).toEqual([3, 8])
+		})
+
+		it('reports a visibility flip', () => {
+			const sync = newSync()
+			sync.syncReels(new Float32Array([4, 0, 3, 1]))
+			expect(sync.syncReels(new Float32Array([4, 0, 3, 0]))).toBe(1)
+			expect(sync.reel(4)?.visible).toBe(false)
+		})
+
+		it('keeps rows of different parts separate', () => {
+			const sync = newSync()
+			sync.syncReels(new Float32Array([1, 0, 2, 1, 9, 0, 5, 0]))
+			expect(sync.reel(1)).toEqual({ values: [2], visible: true })
+			expect(sync.reel(9)).toEqual({ values: [5], visible: false })
+		})
+
+		it('ignores rows with an invalid reel index', () => {
+			const sync = newSync()
+			expect(sync.syncReels(new Float32Array([4, -1, 3, 1, 4, 1.5, 3, 1]))).toBe(0)
+			expect(sync.reel(4)).toBeUndefined()
+		})
+
+		it('has no state for an unknown part', () => {
+			expect(newSync().reel(42)).toBeUndefined()
 		})
 	})
 

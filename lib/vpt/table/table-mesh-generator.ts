@@ -33,6 +33,10 @@ export class TableMeshGenerator {
 		if (decalNames.length > 0 && this.table.data?.renderDecals !== false) {
 			logger().warn('[TableMeshGenerator] Decals are not rendered; skipping %s decal(s).', decalNames.length)
 		}
+		// Backglass lights (`BGLS`, upstream `m_desktopBackdrop`) live in 1000x750
+		// backdrop space and never render in the playfield scene: placed there,
+		// they glow wherever their backdrop coordinates land on the playfield.
+		const playfieldLights = Object.values(this.table.lights).filter(l => !l.data.isBackglass)
 		const tableNode = renderApi.createParentNode('playfield')
 		renderApi.transformScene(tableNode, this.table)
 		const renderGroups: IRenderGroup[] = [
@@ -50,7 +54,7 @@ export class TableMeshGenerator {
 			{ name: 'ramps', meshes: Object.values<Ramp>(this.table.ramps), enabled: !!opts.exportRamps },
 			{
 				name: 'lightBulbs',
-				meshes: Object.values(this.table.lights).filter(
+				meshes: playfieldLights.filter(
 					l =>
 						l.isBulbLight() ||
 						(l.hasBulbGlow ? l.hasBulbGlow() : !!(l.data?.bulbLight && l.data?.dragPoints?.length > 2)),
@@ -59,7 +63,7 @@ export class TableMeshGenerator {
 			},
 			{
 				name: 'playfieldLights',
-				meshes: Object.values(this.table.lights).filter(l => l.isSurfaceLight()),
+				meshes: playfieldLights.filter(l => l.isSurfaceLight()),
 				enabled: !!opts.exportPlayfieldLights,
 			},
 			{ name: 'hitTargets', meshes: Object.values(this.table.hitTargets), enabled: !!opts.exportHitTargets },
@@ -93,9 +97,7 @@ export class TableMeshGenerator {
 				lightGroup = renderApi.createParentNode('lightBulbs')
 				renderApi.addChildToParent(tableNode, lightGroup)
 			}
-			for (const lightInfo of Object.values(this.table.lights).filter(
-				l => l.data.bulbLight && l.data.dragPoints.length <= 2,
-			)) {
+			for (const lightInfo of playfieldLights.filter(l => l.data.bulbLight && l.data.dragPoints.length <= 2)) {
 				let itemGroup = renderApi.findInGroup(lightGroup, lightInfo.getName())
 				if (!itemGroup) {
 					itemGroup = renderApi.createParentNode(lightInfo.getName())

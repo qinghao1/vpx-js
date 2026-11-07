@@ -201,6 +201,19 @@ describe('getBuffer', () => {
 		expect(view?.stride).toBe(WASM_STRIDES.movers)
 		expect(view?.view.length).toBe(2 * WASM_STRIDES.movers)
 	})
+	it('reads the reels buffer through buffer id 5', () => {
+		const fake = fakeRaw()
+		const requested: number[] = []
+		fake.raw._VpxWasm_GetBuffer = (id: number) => {
+			requested.push(id)
+			return bufPtr(fake, 2, WASM_STRIDES.reels)
+		}
+		const view = wrapHeadlessEngine(fake.raw, 'test').getBuffer('reels')
+		expect(requested).toEqual([5])
+		expect(view?.count).toBe(2)
+		expect(view?.stride).toBe(WASM_STRIDES.reels)
+		expect(Array.from(view?.view ?? [])).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
+	})
 	/** A GetBuffer descriptor only: 3 words (bytePtr, count, stride). */
 	const descPtr = (fake: ReturnType<typeof fakeRaw>, bytePtr: number, count: number): number => {
 		const desc = new Uint8Array(12)

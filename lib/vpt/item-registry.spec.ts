@@ -4,7 +4,7 @@ import type { Storage } from '../io/ole-doc.js'
 import { ItemType } from './enums.js'
 import { ITEM_KEYS, ITEM_REGISTRY, loadItemByType } from './item-registry.js'
 
-// Renderable table items only: Timer/Textbox/LightSeq/DispReel left with the script surface.
+// Renderable table items (DispReel draws on the backglass); Timer/Textbox/LightSeq left with the script surface.
 const EXPECTED_KEYS: Array<[number, string]> = [
 	[ItemType.Surface, 'surfaces'],
 	[ItemType.Flipper, 'flippers'],
@@ -21,6 +21,7 @@ const EXPECTED_KEYS: Array<[number, string]> = [
 	[ItemType.Flasher, 'flashers'],
 	[ItemType.Rubber, 'rubbers'],
 	[ItemType.HitTarget, 'hitTargets'],
+	[ItemType.DispReel, 'dispReels'],
 ]
 
 describe('The VPinball item registry', () => {
@@ -41,7 +42,7 @@ describe('The VPinball item registry', () => {
 
 	it('should not register non-game-item types', () => {
 		// Table/LightCenter/DragPoint never appear as GameItems; Timer/Textbox/
-		// LightSeq/DispReel/Collection load separately or not at all.
+		// LightSeq/Collection load separately or not at all.
 		expect(ITEM_REGISTRY[ItemType.Table]?.key).toBeUndefined()
 		expect(ITEM_REGISTRY[ItemType.LightCenter]?.key).toBeUndefined()
 		expect(ITEM_REGISTRY[ItemType.DragPoint]?.key).toBeUndefined()
@@ -49,7 +50,6 @@ describe('The VPinball item registry', () => {
 		expect(ITEM_REGISTRY[ItemType.Timer]?.key).toBeUndefined()
 		expect(ITEM_REGISTRY[ItemType.Textbox]?.key).toBeUndefined()
 		expect(ITEM_REGISTRY[ItemType.LightSeq]?.key).toBeUndefined()
-		expect(ITEM_REGISTRY[ItemType.DispReel]?.key).toBeUndefined()
 		expect(ITEM_REGISTRY[99]?.key).toBeUndefined()
 	})
 
