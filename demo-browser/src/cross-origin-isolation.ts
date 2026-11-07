@@ -14,9 +14,10 @@ const RELOADED = 'vpx:coi-reloaded'
  * unavailable; the caller must surface that instead of booting an app whose
  * engine can never start. The failure reason distinguishes builds:
  * 'unsupported' means service workers cannot exist here at all, 'failed'
- * means the dance ran but the page stayed unisolated.
+ * means the dance ran but the page stayed unisolated, 'cert-error' means
+ * the worker script fetch failed TLS validation (broken domain certificate).
  */
-export type IsolationResult = true | 'unsupported' | 'failed'
+export type IsolationResult = true | 'unsupported' | 'failed' | 'cert-error'
 export async function crossOriginIsolate(): Promise<IsolationResult> {
 	try {
 		if (crossOriginIsolated) {
@@ -36,7 +37,7 @@ export async function crossOriginIsolate(): Promise<IsolationResult> {
 		return new Promise<IsolationResult>(() => {})
 	} catch (error) {
 		console.warn('[coi] cross-origin isolation unavailable', error)
-		return 'failed'
+		return /ssl|certificate/i.test(String(error)) ? 'cert-error' : 'failed'
 	}
 }
 
@@ -51,7 +52,9 @@ export function showIsolationNotice(reason: Exclude<IsolationResult, true>): voi
 		? 'You are browsing over http:// — service workers (and the engine) need https://. Open the https:// address instead.'
 		: reason === 'unsupported'
 			? 'This browser has service workers disabled or does not support them — use Chrome or Edge.'
-			: 'Reload to retry. If this persists, close this site’s other tabs and check that service workers are enabled.'
+			: reason === 'cert-error'
+				? 'The site’s HTTPS certificate is invalid, so the browser refuses the isolation worker. Fix the domain certificate (Pages settings → Custom domain), then reload — reloading cannot help until then.'
+				: 'Reload to retry. If this persists, close this site’s other tabs and check that service workers are enabled.'
 	const box = document.createElement('div')
 	box.setAttribute('role', 'alert')
 	box.style.cssText =
@@ -60,13 +63,18 @@ export function showIsolationNotice(reason: Exclude<IsolationResult, true>): voi
 		'display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap'
 	const text = document.createElement('span')
 	text.textContent = `Engine unavailable: this page is not cross-origin isolated. ${detail}`
-	const retry = document.createElement('button')
-	retry.textContent = 'Reload'
-	retry.style.cssText = 'padding:4px 14px;cursor:pointer'
-	retry.addEventListener('click', () => {
-		sessionStorage.removeItem(RELOADED)
-		location.reload()
-	})
-	box.append(text, retry)
+	box.append(text)
+	// A reload can only help the transient case; the others need a settings
+	// or browser change first.
+	if (reason === 'failed' && !insecure) {
+		const retry = document.createElement('button')
+		retry.textContent = 'Reload'
+		retry.style.cssText = 'padding:4px 14px;cursor:pointer'
+		retry.addEventListener('click', () => {
+			sessionStorage.removeItem(RELOADED)
+			location.reload()
+		})
+		box.append(retry)
+	}
 	document.body.prepend(box)
 }
