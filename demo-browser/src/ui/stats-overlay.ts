@@ -1,81 +1,33 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-// @ts-nocheck
-function setText(el, v) {
-	if (el.textContent !== v) el.textContent = v
+
+export interface HudStats {
+	mode: 'viewer' | 'play' | 'paused'
+	backend: string
+	draws: number
+	triangles: number
+	balls: number
+	engineReady: boolean
 }
 
-function setClass(el, v) {
-	if (el.className !== v) el.className = v
+const compact = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
+
+/** Write only on change: the HUD refreshes at 2 Hz and steady values must cost no style work. */
+function set(node: HTMLElement, text: string): void {
+	if (node.textContent !== text) node.textContent = text
 }
 
-// renderStats runs 2x/s on the live HUD: rebuild the subtree once per
-// container, then only touch textContent/className when values change, so
-// steady values cost no createElement, no container wipe, no restyle.
-const statsCache = new WeakMap()
-
-const STAT_KEYS = ['Draws', 'Tris', 'Balls', 'WASM']
-
-function buildStats() {
-	const head = document.createElement('div')
-	head.className = 'stats-head'
-	const badge = document.createElement('span')
-	const sep1 = document.createElement('span')
-	sep1.className = 'sep'
-	sep1.textContent = '·'
-	const backend = document.createElement('span')
-	const sep2 = document.createElement('span')
-	sep2.className = 'sep'
-	sep2.textContent = '·'
-	const fps = document.createElement('span')
-	const fpsText = document.createTextNode('')
-	fps.append(fpsText)
-	head.append(badge, sep1, backend, sep2, fps)
-	const grid = document.createElement('div')
-	grid.className = 'stats-grid'
-	const values = []
-	for (let i = 0; i < STAT_KEYS.length; i++) {
-		const item = document.createElement('div')
-		item.className = 'stats-item'
-		const kEl = document.createElement('span')
-		kEl.className = 'k'
-		kEl.textContent = STAT_KEYS[i]
-		const vEl = document.createElement('span')
-		item.append(kEl, vEl)
-		grid.append(item)
-		values.push({ kEl, vEl })
-	}
-	return { head, badge, backend, fps, fpsText, grid, values }
-}
-
-export const fpsClass = fps => (fps >= 55 ? 'fps--good' : fps >= 30 ? 'fps--mid' : fps > 0 ? 'fps--low' : '')
-
-export function renderStats(container, data) {
-	if (!container) return
-	const { fps, draws, trisFmt, balls, wasmLabel, wasmReady, backend, mode } = data
-	const modeCls = mode.includes('PAUSED') ? 'badge--paused' : mode === 'PLAY' ? 'badge--play' : 'badge--viewer'
-	const modeLabel = mode === 'PLAY PAUSED' ? 'PAUSED' : mode
-	let c = statsCache.get(container)
-	if (!c?.head.isConnected) {
-		c = buildStats()
-		container.textContent = ''
-		container.append(c.head, c.grid)
-		statsCache.set(container, c)
-	}
-	setClass(c.badge, `badge ${modeCls}`)
-	setText(c.badge, modeLabel)
-	setText(c.backend, backend)
-	setClass(c.fps, `fps ${fpsClass(fps)}`.trim())
-	setText(c.fpsText, `${fps} fps`)
-	const rows = [
-		[String(draws), false],
-		[trisFmt, false],
-		[String(balls), false],
-		[wasmLabel, !wasmReady],
-	]
-	for (let i = 0; i < rows.length; i++) {
-		const [v, muted] = rows[i]
-		const { vEl } = c.values[i]
-		setText(vEl, v)
-		setClass(vEl, muted ? 'v v--muted' : 'v')
+/** Binds the debug panel's `[data-stat]` cells once; the returned updater writes the live values. */
+export function createStatsView(root: HTMLElement): (stats: HudStats) => void {
+	const cells: Record<string, HTMLElement> = {}
+	for (const node of root.querySelectorAll<HTMLElement>('[data-stat]')) cells[node.dataset.stat!] = node
+	return ({ mode, backend, draws, triangles, balls, engineReady }) => {
+		set(cells.mode, mode)
+		cells.mode.dataset.state = mode
+		set(cells.backend, backend)
+		set(cells.draws, String(draws))
+		set(cells.triangles, compact.format(triangles))
+		set(cells.balls, String(balls))
+		set(cells.engine, engineReady ? 'Ready' : 'Loading…')
+		cells.engine.classList.toggle('is-muted', !engineReady)
 	}
 }

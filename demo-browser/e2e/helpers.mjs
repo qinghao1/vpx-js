@@ -8,7 +8,7 @@ export const DEFAULT_PAGE = '/?vpx=/test/fixtures/table-empty.vpx&mode=viewer'
 // call sites pass this string in and build the RegExp inside the page.
 export const INSERT_NAME_PATTERN = 'insert|round|rect|flasher|vrlight|switc'
 
-export const pageLog = page => page.evaluate(() => document.getElementById('log')?.innerText || '').catch(() => '')
+export const pageLog = page => page.evaluate(() => window.vpx?.log() ?? '').catch(() => '')
 
 export const pollLog = async (page, needle, timeout = 60000) => {
 	const start = Date.now()
@@ -47,10 +47,8 @@ export const tableHasInserts = page =>
 
 export const hideOverlays = page =>
 	page.evaluate(() => {
-		const l = document.getElementById('log')
-		if (l) l.style.display = 'none'
-		const a = document.getElementById('harness-actions')
-		if (a) a.style.display = 'none'
+		const hud = document.getElementById('hud')
+		if (hud) hud.hidden = true
 	})
 
 export const diagnostics = page =>
@@ -1233,12 +1231,9 @@ export const soundChecks = async page => {
 			const slider = document.getElementById('sound-volume')
 			if (!btn || !slider) return { pass: false, reason: 'missing sound controls' }
 			const wasMuted = !!s.isMuted()
-			// Mute through the user control: on touch layouts the first tap only
-			// reveals the slider, so tap until the engine state actually flips.
 			btn.click()
-			if (s.isMuted() === wasMuted) btn.click()
 			const mutedOk = s.isMuted() !== wasMuted && btn.getAttribute('aria-pressed') === String(s.isMuted())
-			const iconOk = s.isMuted() ? btn.innerHTML.includes('<line') : !btn.innerHTML.includes('<line')
+			const iconOk = s.isMuted() ? btn.dataset.level === 'off' : btn.dataset.level !== 'off'
 			// Probe the volume unmuted: mute keeps the level, so read getLevel().
 			const volBefore = s.getLevel()
 			slider.value = '50'
@@ -1258,7 +1253,6 @@ export const soundChecks = async page => {
 			const mOk = s.isMuted() !== mBefore && s.getLevel() === mLevel
 			mKey()
 			const mRestoreOk = s.isMuted() === mBefore
-			btn.closest?.('.sound-control')?.classList.remove('expanded')
 			const pass = mutedOk && iconOk && volOk && muteRestoreOk && mOk && mRestoreOk
 			return {
 				pass,

@@ -2,7 +2,6 @@
 
 import { crossOriginIsolate, showIsolationNotice } from './cross-origin-isolation.js'
 import { isDev, isLowQuality } from './env.js'
-import { initHelp } from './ui/help-dialog.js'
 import { initTableBrowser } from './ui/table-browser.js'
 import { Viewer } from './viewer.js'
 
@@ -38,7 +37,6 @@ if (isDev) {
 	const { createTestApi } = await import('./test-api.js')
 	Object.assign(window, { viewer, vpx: createTestApi(viewer) })
 }
-initHelp()
 
 /** The viewer reports a failed load on its loading card and log; this keeps the rejection handled. */
 const reportFailure = (what: string) => (error: unknown) => console.error(`[app] ${what} failed`, error)
@@ -99,14 +97,4 @@ addEventListener('drop', e => {
 	e.preventDefault()
 	document.body.classList.remove('drag')
 	if (e.dataTransfer) openFiles(e.dataTransfer.files)
-})
-
-const logEl = document.getElementById('log')
-const logText = () => Array.from(logEl?.children ?? [], entry => entry.textContent).join('\n')
-document.getElementById('dump-log')?.addEventListener('click', () => console.log(logText()))
-document.getElementById('copy-log')?.addEventListener('click', () => {
-	navigator.clipboard.writeText(logText()).catch(e => console.warn('[app] copy log failed', e))
-})
-document.getElementById('toggle-log')?.addEventListener('click', () => {
-	if (logEl) logEl.hidden = !logEl.hidden
 })

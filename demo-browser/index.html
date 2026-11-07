@@ -2,7 +2,9 @@
 <html lang="en">
 	<head>
 		<meta charset="UTF-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+		<meta name="color-scheme" content="dark">
+		<meta name="theme-color" content="#05070a">
 		<title>vpx-js — Browser Demo</title>
 		<!-- empty favicon: silence /favicon.ico 404s; the demo needs no icon asset -->
 		<link rel="icon" href="data:,">
@@ -49,61 +51,101 @@
 		</script>
 	</head>
 	<body>
-		<header id="brand">
-			<span class="kicker">vpx-js</span>
-			<h1 id="title">Visual Pinball</h1>
-			<span class="sub" id="subtitle">Loading …</span>
-		</header>
-		<nav id="actions" aria-label="Primary actions">
-			<button id="browse-btn" type="button" title="Browse tables and ROMs">Browse</button>
-			<button id="help-btn" type="button" title="Controls (?)">Controls</button>
-			<button id="reset" type="button" title="Reset camera">Reset view</button>
-			<span class="sound-control" id="sound-control">
-				<button
-					id="sound-btn"
-					type="button"
-					title="Mute/unmute (M)"
-					aria-pressed="false"
-					aria-label="Mute sound"
-				>
-					<svg
-						viewBox="0 0 24 24"
-						width="18"
-						height="18"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="1.8"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						aria-hidden="true"
-					>
-						<path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" stroke="none"></path>
-						<path d="M15.5 8.5a5 5 0 0 1 0 7"></path>
-						<path d="M18.4 5.6a9 9 0 0 1 0 12.8"></path>
-					</svg>
+		<!-- Icons: Lucide (ISC, https://lucide.dev), one sprite referenced by <use>. -->
+		<svg class="sprite" aria-hidden="true">
+			<symbol id="i-help" viewBox="0 0 24 24">
+				<circle cx="12" cy="12" r="10"></circle>
+				<path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+				<path d="M12 17h.01"></path>
+			</symbol>
+			<symbol id="i-reset" viewBox="0 0 24 24">
+				<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+				<path d="M3 3v5h5"></path>
+			</symbol>
+			<symbol id="i-maximize" viewBox="0 0 24 24">
+				<path d="M8 3H5a2 2 0 0 0-2 2v3"></path>
+				<path d="M21 8V5a2 2 0 0 0-2-2h-3"></path>
+				<path d="M3 16v3a2 2 0 0 0 2 2h3"></path>
+				<path d="M16 21h3a2 2 0 0 0 2-2v-3"></path>
+			</symbol>
+			<symbol id="i-minimize" viewBox="0 0 24 24">
+				<path d="M8 3v3a2 2 0 0 1-2 2H3"></path>
+				<path d="M21 8h-3a2 2 0 0 1-2-2V3"></path>
+				<path d="M3 16h3a2 2 0 0 1 2 2v3"></path>
+				<path d="M16 21v-3a2 2 0 0 1 2-2h3"></path>
+			</symbol>
+			<symbol id="i-x" viewBox="0 0 24 24">
+				<path d="M18 6 6 18"></path>
+				<path d="m6 6 12 12"></path>
+			</symbol>
+		</svg>
+		<header id="topbar">
+			<div id="brand">
+				<span class="kicker">vpx-js</span>
+				<h1 id="title">Visual Pinball</h1>
+			</div>
+			<!-- biome-ignore lint/a11y/useSemanticElements: styled button group; fieldset would add default border/padding -->
+			<div class="touch-keys" role="group" aria-label="Coin and Start">
+				<button type="button" class="key-btn" data-code="Digit5">Coin</button>
+				<button type="button" class="key-btn" data-code="Digit1">Start</button>
+			</div>
+			<nav id="actions" class="toolbar glass" aria-label="Viewer actions">
+				<button id="help-btn" class="icon-btn" type="button" aria-label="Controls" aria-keyshortcuts="?">
+					<svg class="icon" aria-hidden="true"><use href="#i-help"></use></svg>
 				</button>
-				<input
-					id="sound-volume"
-					type="range"
-					min="0"
-					max="100"
-					value="100"
-					step="1"
-					title="Sound volume"
-					aria-label="Sound volume"
+				<button id="reset" class="icon-btn" type="button" data-mode="viewer" aria-label="Reset view">
+					<svg class="icon" aria-hidden="true"><use href="#i-reset"></use></svg>
+				</button>
+				<button
+					id="fullscreen-btn"
+					class="icon-btn"
+					type="button"
+					aria-label="Full screen"
+					aria-pressed="false"
+					hidden
 				>
-			</span>
-		</nav>
+					<svg class="icon icon--off" aria-hidden="true"><use href="#i-maximize"></use></svg>
+					<svg class="icon icon--on" aria-hidden="true"><use href="#i-minimize"></use></svg>
+				</button>
+				<span class="sound-control">
+					<button
+						id="sound-btn"
+						class="icon-btn"
+						type="button"
+						aria-pressed="false"
+						aria-label="Mute"
+						aria-keyshortcuts="M"
+						data-level="high"
+					>
+						<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+							<path
+								d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"
+							></path>
+							<path class="wave-1" d="M16 9a5 5 0 0 1 0 6"></path>
+							<path class="wave-2" d="M19.364 18.364a9 9 0 0 0 0-12.728"></path>
+							<path class="mute-x" d="m16.5 9.5 5 5m0-5-5 5"></path>
+						</svg>
+					</button>
+					<input id="sound-volume" type="range" min="0" max="100" value="100" step="1" aria-label="Volume">
+				</span>
+				<button
+					id="exit-play"
+					class="icon-btn"
+					type="button"
+					data-mode="play"
+					aria-label="Back to viewer"
+					aria-keyshortcuts="Escape"
+				>
+					<svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+				</button>
+			</nav>
+		</header>
 		<main id="loading" aria-live="polite">
 			<section id="loading-card" aria-labelledby="load-title">
 				<h2 id="load-title">Drop a table to begin</h2>
 				<p>
-					Drag &amp; drop a <code>.vpx</code> table (and optional <code>.zip</code> ROM) — works entirely in
-					the browser.
-				</p>
-				<p class="load-hint">
-					Or use <code>?vpx=tables/example.vpx&amp;rom=roms/example.zip</code> — try
-					<code>test/fixtures/table-empty.vpx</code>
+					Drag &amp; drop a <code>.vpx</code> table (and optional <code>.zip</code> ROM), open one below, or
+					browse the catalog — everything runs in the browser.
 				</p>
 				<div
 					id="bar"
@@ -117,54 +159,86 @@
 				</div>
 				<div id="bar-text">Waiting for table…</div>
 				<p id="load-detail"></p>
-				<div class="picker picker--files">
+				<div class="picker">
 					<label class="btn" for="file-vpx">Open .vpx</label>
 					<input type="file" id="file-vpx" accept=".vpx">
 					<label class="btn btn--alt" for="file-rom">Open .zip ROM</label>
 					<input type="file" id="file-rom" accept=".zip">
+					<button type="button" class="btn btn--alt" data-browse>Browse catalog</button>
 				</div>
+				<p class="load-hint">Or link one: <code>?vpx=tables/example.vpx&amp;rom=roms/example.zip</code></p>
 			</section>
 		</main>
-		<div id="stream-progress" hidden>
-			<span id="stream-label">Enhancing visuals…</span>
-			<div id="stream-bar"><div id="stream-fill"></div></div>
-			<span id="stream-text">0%</span>
-		</div>
 		<div id="canvas-wrap">
 			<canvas id="canvas" tabindex="0"></canvas>
 			<div id="nudge-flash" hidden></div>
 		</div>
-		<!-- biome-ignore lint/a11y/useSemanticElements: styled overlay div; fieldset would add default border/padding -->
-		<div id="mobile-controls" role="group" aria-label="Pinball controls">
-			<button type="button" data-code="Digit5" aria-label="Coin">Coin <span>5</span></button>
-			<button type="button" data-code="Digit1" aria-label="Start">Start <span>1</span></button>
-			<button type="button" data-code="Enter" aria-label="Plunger">Plunger <span>Enter</span></button>
-			<button type="button" data-code="AltLeft" aria-label="Fire">Fire <span>Alt</span></button>
-		</div>
-		<div id="play-tip">▶ Play</div>
-		<button id="debug-toggle" type="button" title="Toggle debug info (`)" aria-label="Toggle debug">≡</button>
-		<div id="fps-hud" role="status"><span class="fps fps--good">-- fps</span></div>
-		<aside id="debug-panel" class="debug-panel" aria-label="Debug information">
-			<div id="stats" class="stats"></div>
-			<div id="log-wrap" class="log-wrap">
-				<div id="log" role="log" aria-live="polite"></div>
-				<div id="harness-actions">
-					<button id="dump-log" type="button">Dump log</button>
-					<button id="copy-log" type="button">Copy log</button>
-					<button id="toggle-log" type="button">Toggle log</button>
+		<div id="dock">
+			<div class="dock-row">
+				<aside id="hud" aria-label="Performance">
+					<section id="debug-panel" aria-label="Debug information" hidden>
+						<header class="hud-head">
+							<span class="badge" data-stat="mode">Viewer</span>
+							<span data-stat="backend">—</span>
+							<button id="copy-log" type="button">Copy log</button>
+						</header>
+						<dl class="stats">
+							<div>
+								<dt>Draws</dt>
+								<dd data-stat="draws">0</dd>
+							</div>
+							<div>
+								<dt>Triangles</dt>
+								<dd data-stat="triangles">0</dd>
+							</div>
+							<div>
+								<dt>Balls</dt>
+								<dd data-stat="balls">0</dd>
+							</div>
+							<div>
+								<dt>Engine</dt>
+								<dd data-stat="engine">—</dd>
+							</div>
+						</dl>
+					</section>
+					<button
+						id="hud-toggle"
+						type="button"
+						title="Stats (`)"
+						aria-expanded="false"
+						aria-controls="debug-panel"
+						aria-keyshortcuts="`"
+					>
+						-- fps
+					</button>
+				</aside>
+				<div id="stream-progress" hidden>
+					<span id="stream-label">Enhancing visuals…</span>
+					<div id="stream-bar"><div id="stream-fill"></div></div>
+					<span id="stream-text">0%</span>
 				</div>
 			</div>
-		</aside>
+			<!-- biome-ignore lint/a11y/useSemanticElements: styled button group; fieldset would add default border/padding -->
+			<div id="touch-bar" class="touch-keys" role="group" aria-label="Fire and Plunger">
+				<button type="button" class="key-btn key-btn--fire" data-code="AltLeft">Fire</button>
+				<button type="button" class="key-btn key-btn--plunger" data-code="Enter">Plunger</button>
+			</div>
+		</div>
+		<div id="play-tip" hidden>▶ Play</div>
 		<dialog id="help" class="help" closedby="any" aria-labelledby="help-title">
 			<div class="help-head">
 				<h3 id="help-title">Controls</h3>
-				<button data-close-help aria-label="Close help" type="button">×</button>
+				<button class="icon-btn" data-close-help aria-label="Close" type="button">
+					<svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+				</button>
 			</div>
-			<div class="help-grid"></div>
+			<div class="help-grid" tabindex="-1" autofocus></div>
 			<div class="help-foot">
-				Touch: tap sides = flippers · tap apron/yellow = fire · swipe = nudge · drag to orbit · wheel to zoom ·
-				<kbd>Esc</kbd>
-				back to viewer
+				<p><strong>Viewer</strong> drag to orbit · pinch or wheel to zoom · click/tap the table to play</p>
+				<p>
+					<strong>Touch play</strong>
+					tap left/right half = flippers · swipe = nudge · on-screen Coin, Start, Fire, Plunger
+				</p>
 			</div>
 		</dialog>
 		<script type="module" src="./src/main.ts"></script>

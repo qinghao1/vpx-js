@@ -67,12 +67,12 @@ import {
 	isQualityPinned,
 	QUALITY_CAPS,
 } from './env.js'
-import { ownsKey, RELEASE_CODES } from './input/input-manager.js'
+import { RELEASE_CODES } from './input/input-manager.js'
 import { pollNudgePads } from './input/nudge-controller.js'
 import { attachInput } from './input.js'
 import type { DirtyOverlay } from './overlays/dirty-overlay.js'
+import { type Chrome, initChrome } from './ui/chrome.js'
 import { createLog, type PageLog } from './ui/page-log.js'
-import { createStatsView, perfTier } from './ui/stats-overlay.js'
 import {
 	$,
 	computeTexMem,
@@ -142,6 +142,7 @@ export class Viewer {
 	declare viewerMode: 'viewer' | 'play'
 	declare isPaused: boolean
 	declare log: PageLog
+	declare chrome: Chrome
 	private readonly overlays: DirtyOverlay[]
 	constructor({ viewerMode = 'viewer', antialias = true, batched = true, forceWebGL = false } = {}) {
 		ensureBvh()
@@ -155,24 +156,15 @@ export class Viewer {
 			barText: $('bar-text'),
 			loadDetail: $('load-detail'),
 			loadTitle: $('load-title'),
-			subtitle: $('subtitle'),
-			resetBtn: $('reset'),
-			exitBtn: $('exit-play'),
 			wrap: $('canvas-wrap'),
 			playTip: $('play-tip'),
-			soundBtn: $('sound-btn'),
-			soundVolume: $('sound-volume'),
 			streamWrap: $('stream-progress'),
 			streamFill: $('stream-fill'),
 			streamText: $('stream-text'),
 			streamLabel: $('stream-label'),
 			nudgeFlash: $('nudge-flash'),
-			hudToggle: $('hud-toggle'),
-			debugPanel: $('debug-panel'),
 		}
 		this.log = createLog()
-		this._renderStats = createStatsView(this.dom.debugPanel)
-		this._fps = 0
 		this._frameStats = { draws: 0, triangles: 0 }
 		this.scene = new THREE.Scene()
 		this.scene.background = getPrerenderedBackground() as any
@@ -230,29 +222,15 @@ export class Viewer {
 		addEventListener('popstate', () => {
 			if (this.viewerMode === 'play') this._switchToViewer()
 		})
-		this._setupSoundControls()
-		this.dom.resetBtn?.addEventListener('click', () => this._onResetView())
-		this.dom.exitBtn?.addEventListener('click', () => this._switchToViewer())
+		this.chrome = initChrome(this, () => ({
+			mode: this.viewerMode === 'play' ? (this.isPaused ? 'paused' : 'play') : 'viewer',
+			backend: this._rendererBackend ?? '—',
+			...this._frameStats,
+			balls: this.wasmEngine?.ballCount ?? 0,
+			engineReady: !!this.wasmEngine?.ready,
+		}))
 		this._setupModeSwitch()
-		this._setupDebugToggle()
 		this._syncChrome()
-	}
-	/** The FPS pill doubles as the stats toggle (also `` ` `` / F2); the panel opens above it. */
-	_setupDebugToggle() {
-		const { hudToggle, debugPanel } = this.dom
-		if (!hudToggle || !debugPanel) return
-		const toggle = () => {
-			debugPanel.hidden = !debugPanel.hidden
-			hudToggle.setAttribute('aria-expanded', String(!debugPanel.hidden))
-			this._renderHud(this._fps)
-		}
-		hudToggle.addEventListener('click', toggle)
-		const onKey = e => {
-			if ((e.code === 'Backquote' || e.key === '`' || e.key === 'F2') && !e.ctrlKey && !e.metaKey && !e.altKey) {
-				if (!ownsKey(e.target, e.code)) toggle()
-			}
-		}
-		addEventListener('keydown', onKey)
 	}
 	/**
 	 * Controls-first sound surface for the chrome and e2e: mute flag and 0..1
@@ -270,49 +248,9 @@ export class Viewer {
 	}
 	/** Sound-button/shortcut entry: flip the engine mute and reflect it in the chrome. */
 	toggleSoundMuted() {
-		const engine = this.wasmEngine
-		const muted = engine ? engine.toggleMuted() : false
-		this._syncSoundChrome()
+		const muted = this.wasmEngine?.toggleMuted() ?? false
+		this.chrome.syncSound()
 		return muted
-	}
-	// Chrome over engine-owned mute/level: per-load engine state, so each table starts fresh.
-	// The button is always a mute toggle; the slider (desktop hover/focus
-	// overlay only, hidden on touch and small screens) never affects layout.
-	_setupSoundControls() {
-		this._syncSoundChrome()
-		const btn = this.dom.soundBtn
-		const slider = this.dom.soundVolume
-		const toggle = () => this.toggleSoundMuted()
-		if (btn) btn.addEventListener('click', toggle)
-		if (slider) {
-			const onSlider = () => {
-				if (!this.wasmEngine) return
-				this.wasmEngine.setVolume(Number(slider.value) / 100)
-				this._syncSoundChrome()
-			}
-			slider.addEventListener('input', onSlider)
-		}
-		const onKey = e => {
-			// Global mute shortcut (all modes); the key still reaches the
-			// table as DIK_M. No repeat: holding M must not strobe.
-			if ((e.code === 'KeyM' || e.key === 'm' || e.key === 'M') && !e.ctrlKey && !e.metaKey && !e.altKey) {
-				if (!e.repeat && !ownsKey(e.target, e.code)) toggle()
-			}
-		}
-		addEventListener('keydown', onKey)
-	}
-	_syncSoundChrome() {
-		const engine = this.wasmEngine
-		const btn = this.dom.soundBtn
-		const slider = this.dom.soundVolume
-		if (btn && engine) {
-			const muted = engine.muted
-			const level = engine.volume
-			btn.dataset.level = muted || level <= 0 ? 'off' : level <= 0.5 ? 'low' : 'high'
-			btn.setAttribute('aria-pressed', muted ? 'true' : 'false')
-			btn.setAttribute('aria-label', muted ? 'Unmute sound' : 'Mute sound')
-		}
-		if (slider && engine) slider.value = String(Math.round(engine.volume * 100))
 	}
 	/**
 	 * The one renderer-start path, for boot and device-loss recovery: disposes
@@ -1196,7 +1134,6 @@ export class Viewer {
 			vpxName = infoName
 		else if (basename) vpxName = basename.replace(/[_-]+/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
 		if (vpxName) setTitle(vpxName)
-		if (this.dom.subtitle) this.dom.subtitle.textContent = ''
 		this._loading(92, 'Almost ready…', 'Starting game logic…')
 		await new Promise(r => setTimeout(r, 0))
 		try {
@@ -1304,7 +1241,7 @@ export class Viewer {
 		this.buildNodeCache()
 		const ballsGroup = this._ensureBallsGroup()
 		if (ballsGroup) ballsGroup.visible = true
-		this._syncSoundChrome()
+		this.chrome.syncSound()
 		this.log(`WASM engine ready: ${engine.catalogSize} parts, script errors: ${engine.scriptErrorCount}`, 'debug')
 		this.isPaused = false
 		if (this.viewerMode === 'play') this.enterPlayMode()
@@ -1886,8 +1823,11 @@ export class Viewer {
 	}
 	_createLoop() {
 		// FPS counts only back-to-back presents, so neither the HUD nor quality
-		// adaptation averages in the idle gaps of the dirty-gated loop; a window
-		// without any reads as idle (0).
+		// adaptation averages in the idle gaps of the dirty-gated loop (a window
+		// without any reads as idle, 0). Longer gaps are stalls (hidden tab,
+		// blocked main thread), not frames.
+		const WINDOW_MS = 500
+		const MAX_FRAME_GAP_MS = 250
 		let frames = 0
 		let busyMs = 0
 		let lastTick = 0
@@ -1923,9 +1863,10 @@ export class Viewer {
 			if (dirty) {
 				if (stateDirty) this.renderApi?.flushMatrixUpdates(this.tableGroup)
 				this._present()
-				if (lastPresented) {
+				const gap = timestamp - lastTick
+				if (lastPresented && gap < MAX_FRAME_GAP_MS) {
 					frames++
-					busyMs += timestamp - lastTick
+					busyMs += gap
 				}
 				// three resets `info` at the top of every loop frame, so sample right after a present.
 				const info = this.renderer?.info.render
@@ -1933,12 +1874,12 @@ export class Viewer {
 			}
 			lastPresented = dirty
 			lastTick = timestamp
-			// The HUD refreshes on every window roll, so mode/pause/engine state shows while idle too.
-			// Adaptation needs a real sample: a few lone intervals are noise, not a slow GPU.
-			if (timestamp - windowStart >= 500) {
+			// The HUD refreshes on every window, so mode/pause/engine state shows while idle too;
+			// quality adapts only on windows that were mostly rendering.
+			if (timestamp - windowStart >= WINDOW_MS) {
 				const fps = busyMs > 0 ? Math.round((frames * 1000) / busyMs) : 0
-				this._renderHud(fps)
-				if (frames >= 8) this._adaptQuality(fps, timestamp)
+				this.chrome.updateHud(fps)
+				if (busyMs >= WINDOW_MS / 2) this._adaptQuality(fps, timestamp)
 				frames = 0
 				busyMs = 0
 				windowStart = timestamp
@@ -1949,25 +1890,6 @@ export class Viewer {
 		if (this.renderPipeline) this.renderPipeline.render()
 		else this.renderer?.render(this.scene, this.camera)
 	}
-	/** 2 Hz HUD refresh: the FPS pill always, the stats card only while it is open. */
-	_renderHud(fps) {
-		this._fps = fps
-		const pill = this.dom.hudToggle
-		if (pill) {
-			const label = fps ? `${fps} fps` : 'idle'
-			if (pill.textContent !== label) pill.textContent = label
-			pill.dataset.perf = perfTier(fps)
-		}
-		if (this.dom.debugPanel?.hidden !== false) return
-		this._renderStats({
-			mode: this.viewerMode === 'play' ? (this.isPaused ? 'paused' : 'play') : 'viewer',
-			backend: this._rendererBackend ?? '—',
-			...this._frameStats,
-			balls: this.wasmEngine?.ballCount ?? 0,
-			engineReady: !!this.wasmEngine?.ready,
-		})
-	}
-
 	_needsRender = false
 
 	/** Requests one gated-loop present (mode switch, resize, camera tick, demand texture). Immediate render() also clears it. */

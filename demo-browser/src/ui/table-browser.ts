@@ -64,21 +64,22 @@ async function isFetchable(url: string): Promise<boolean> {
 }
 
 /**
- * Catalog dialog behind `#browse-btn`: search VPS, list a game's VPX tables
+ * Catalog dialog behind every `[data-browse]` button: search VPS, list a game's VPX tables
  * and ROMs, load direct CORS-readable files through the viewer's `?vpx`/`?rom`
  * path, and otherwise open the source page for a manual download + drop.
  */
 export function initTableBrowser(viewer: BrowserViewer, syncParam: (key: Kind, value: string) => void): void {
 	const search = el('input', {
 		type: 'search',
-		placeholder: 'Search tables, manufacturers, years or ROM names',
+		placeholder: 'Search tables, makers, years, ROMs',
 		ariaLabel: 'Search catalog',
 	})
 	const status = el('p', { className: 'tb-status' })
 	status.setAttribute('aria-live', 'polite')
 	const results = el('ul', { className: 'tb-results', ariaLabel: 'Games' })
 	const detail = el('section', { className: 'tb-detail', ariaLabel: 'Game files' })
-	const close = el('button', { type: 'button', ariaLabel: 'Close catalog', textContent: '×' })
+	const close = el('button', { type: 'button', className: 'icon-btn', ariaLabel: 'Close catalog' })
+	close.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>'
 	const dialog = el(
 		'dialog',
 		{ id: 'table-browser', className: 'table-browser' },
@@ -280,9 +281,14 @@ export function initTableBrowser(viewer: BrowserViewer, syncParam: (key: Kind, v
 	// Keys typed or pressed in the dialog must not reach the table's input handlers.
 	dialog.addEventListener('keydown', e => e.stopPropagation())
 	close.addEventListener('click', () => dialog.close())
-	document.getElementById('browse-btn')?.addEventListener('click', () => {
-		dialog.showModal()
-		search.focus()
-		void ensureCatalog()
+	// Backdrop click for browsers without `closedby` (Safari).
+	dialog.addEventListener('click', e => {
+		if (e.target === dialog) dialog.close()
 	})
+	for (const trigger of document.querySelectorAll('[data-browse]'))
+		trigger.addEventListener('click', () => {
+			dialog.showModal()
+			search.focus()
+			void ensureCatalog()
+		})
 }

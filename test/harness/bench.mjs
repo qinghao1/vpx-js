@@ -152,7 +152,7 @@ let readyHeap = null
 for (let i = 0; i < 90; i++) {
 	await sleep(1000)
 	const s = await page.evaluate(() => {
-		const txt = document.getElementById('log')?.innerText ?? ''
+		const txt = window.vpx?.log() ?? ''
 		const isReady = window.vpx?.state.loadState === 'ready'
 		const hasPlayer = !!window.vpx?.state.wasmReady
 		const lastLines = txt.split('\n').filter(Boolean).slice(-2).join(' | ')
@@ -193,7 +193,7 @@ let streamDone = false
 let pollHeap = readyHeap
 for (let i = 0; i < 80; i++) {
 	const status = await page.evaluate(() => {
-		const txt = document.getElementById('log')?.innerText ?? ''
+		const txt = window.vpx?.log() ?? ''
 		const isStreaming = txt.includes('Streaming') || txt.includes('Enhancing visuals')
 		const isDone = txt.includes('[stream] Done') || txt.includes('Visuals ready')
 		const heap = performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null
@@ -403,7 +403,7 @@ const journeyResult = await page.evaluate(
 		// WASM ball count includes unlaunched trough balls (4 on TWD from
 		// boot), so a failed launch reads ~4, never 0.
 		const ballCount = () => w?.ballCount ?? 0
-		const logText = () => document.getElementById('log')?.innerText ?? ''
+		const logText = () => window.vpx?.log() ?? ''
 		const keyDropped = code => logText().includes(`no SDL scancode for ${code}`)
 		// Flipper angles via the public engine accessor (no private reach-through).
 		const flipperAngles = () => w?.flipperAngles?.() ?? []

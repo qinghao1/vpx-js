@@ -50,7 +50,7 @@ async function runLeg(mode) {
 	for (let i = 0; i < 90; i++) {
 		const s = await page
 			.evaluate(() => {
-				const txt = document.getElementById('log')?.innerText ?? ''
+				const txt = window.vpx?.log() ?? ''
 				return {
 					streaming: txt.includes('Streaming') || txt.includes('Enhancing visuals'),
 					done: txt.includes('[stream] Done') || txt.includes('Visuals ready'),

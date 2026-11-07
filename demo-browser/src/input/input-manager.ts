@@ -307,16 +307,11 @@ export function attachPointer(host: InputHost, signal: AbortSignal): void {
 		})
 	}
 
-	function attachMobileControls(): void {
-		const wrap = document.getElementById('mobile-controls') as HTMLElement | null
-		if (!wrap) return
-		for (const btn of wrap.querySelectorAll('button[data-code]')) {
+	/** On-screen cabinet buttons (top bar Coin/Start, bottom bar Fire/Plunger), shown in touch play only. */
+	function attachTouchKeys(): void {
+		for (const btn of document.querySelectorAll('.touch-keys button[data-code]')) {
 			const code = (btn as HTMLElement).getAttribute('data-code')!
 			const onDown = (e: PointerEvent) => {
-				if (host.viewerMode !== 'play') {
-					host.enterPlayMode()
-					return
-				}
 				e.preventDefault()
 				e.stopPropagation()
 				if ((btn as HTMLElement).hasAttribute('data-pressed')) return
@@ -344,7 +339,7 @@ export function attachPointer(host: InputHost, signal: AbortSignal): void {
 		}
 	}
 
-	attachMobileControls()
+	attachTouchKeys()
 
 	canvas.addEventListener(
 		'pointerdown',

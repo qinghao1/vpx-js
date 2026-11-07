@@ -604,8 +604,8 @@ function abFreezeAutoplay() {
 			v._fallbackBallTimer = null
 		} catch {}
 		try {
-			const l = document.getElementById('log')
-			if (l) l.style.display = 'none'
+			const overlay = document.getElementById('hud') ?? document.getElementById('log')
+			if (overlay) overlay.style.display = 'none'
 		} catch {}
 	} catch {}
 }
@@ -1572,7 +1572,10 @@ async function abPollLog(page, needle, timeoutMs) {
 	const t0 = Date.now()
 	for (;;) {
 		try {
-			const t = await page.evaluate(() => document.getElementById('log')?.textContent || '')
+			// NEW keeps the log in memory (`vpx.log()`); OLD renders it into #log.
+			const t = await page.evaluate(
+				() => window.vpx?.log?.() ?? document.getElementById('log')?.textContent ?? '',
+			)
 			if (t.includes(needle)) return t
 		} catch {
 			// Transient detached frame under SwiftShader load: keep polling

@@ -83,6 +83,8 @@ export interface ViewerTestApi {
 	step(nowMs?: number): boolean
 	/** Latest DMD frame, if the engine publishes one. */
 	dmd(): VpxDmdFrame | undefined
+	/** The page log so far, one entry per line. */
+	log(): string
 }
 
 /** Build the dev-only test surface over a live viewer. No stored mutable state. */
@@ -148,6 +150,9 @@ export function createTestApi(viewer: Viewer): ViewerTestApi {
 		},
 		dmd(): VpxDmdFrame | undefined {
 			return viewer.wasmEngine?.dmdFrame
+		},
+		log(): string {
+			return viewer.log.text()
 		},
 	}
 }
