@@ -1258,16 +1258,11 @@ export const soundChecks = async page => {
 			const mOk = s.isMuted() !== mBefore && s.getLevel() === mLevel
 			mKey()
 			const mRestoreOk = s.isMuted() === mBefore
-			// The output gain follows when it exists: with no real user
-			// gesture yet there is no AudioContext at all (primeAudioOnGesture
-			// design), so a missing node is reported, not failed.
-			const gain = v.wasmEngine?.audioGain?.gain.value
-			const gainOk = gain === undefined ? 'skip' : Math.abs(gain - (s.isMuted() ? 0 : s.getLevel())) < 1e-9
 			btn.closest?.('.sound-control')?.classList.remove('expanded')
-			const pass = mutedOk && iconOk && volOk && muteRestoreOk && mOk && mRestoreOk && gainOk !== false
+			const pass = mutedOk && iconOk && volOk && muteRestoreOk && mOk && mRestoreOk
 			return {
 				pass,
-				reason: `mute=${mutedOk} icon=${iconOk} vol=${volOk} muteRestore=${muteRestoreOk} m=${mOk} mRestore=${mRestoreOk} gain=${gainOk}`,
+				reason: `mute=${mutedOk} icon=${iconOk} vol=${volOk} muteRestore=${muteRestoreOk} m=${mOk} mRestore=${mRestoreOk}`,
 			}
 		} catch (e) {
 			return { pass: false, reason: String(e?.message ?? e).slice(0, 200) }

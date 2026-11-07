@@ -76,7 +76,7 @@ describe('wasm audio controls', () => {
 		expect(calls).to.deep.equal([])
 	})
 
-	it('fans mute and level out to the engine SDL path', () => {
+	it('pushes mute and level to the engine', () => {
 		const engine = makeEngine()
 		const calls: [number, boolean][] = []
 		;(engine as unknown as { engine: unknown }).engine = {
@@ -90,42 +90,5 @@ describe('wasm audio controls', () => {
 			[0.5, true],
 			[1, false],
 		])
-	})
-
-	it('never snaps the engine mix on the gesture unlock path', () => {
-		;(globalThis as Record<string, unknown>).AudioContext = class {
-			state = 'suspended'
-			async resume(): Promise<void> {
-				this.state = 'running'
-			}
-			async close(): Promise<void> {}
-			createGain(): { connect(o: unknown): void; gain: { value: number } } {
-				return { connect: (): void => {}, gain: { value: 1 } }
-			}
-		} as never
-		try {
-			const engine = makeEngine()
-			const calls: [number, boolean][] = []
-			;(engine as unknown as { engine: unknown }).engine = {
-				setAudioLevel: (volume: number, muted: boolean) => calls.push([volume, muted]),
-				getAudio: (): undefined => undefined,
-			}
-			engine.resumeAudio()
-			expect(calls).to.deep.equal([])
-		} finally {
-			delete (globalThis as Record<string, unknown>).AudioContext
-		}
-	})
-
-	it('pushes mute and level to the output gain when one exists', () => {
-		const engine = makeEngine()
-		const audio = engine as unknown as { audioGain?: { gain: { value: number } }; audioCtx?: object }
-		audio.audioGain = { gain: { value: -1 } }
-		audio.audioCtx = { state: 'running' }
-		engine.setVolume(0.25)
-		expect(audio.audioGain.gain.value).to.equal(0.25)
-		expect(engine.muted).to.equal(false)
-		engine.setMuted(true)
-		expect(audio.audioGain.gain.value).to.equal(0)
 	})
 })

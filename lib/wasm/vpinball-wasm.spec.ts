@@ -46,8 +46,6 @@ function fakeRaw(): { raw: RawHeadlessModule; malloc: (bytes: Uint8Array) => num
 		_VpxWasm_PushKey: () => {},
 		_VpxWasm_Nudge: () => {},
 		_VpxWasm_SetAudioLevel: () => {},
-		_VpxWasm_GetAudioInfo: () => 0,
-		_VpxWasm_GetAudio: () => 0,
 		_VpxWasm_GetScriptErrorCount: () => 0,
 		_VpxWasm_GetScriptError: () => 0,
 		_VpxWasm_DestroyTable: () => {},
@@ -296,35 +294,6 @@ describe('getDmdFrame', () => {
 	})
 })
 
-describe('getAudio', () => {
-	it('copies drained int16 samples with the info format', () => {
-		const fake = fakeRaw()
-		const info = new Uint8Array(8)
-		new DataView(info.buffer).setUint32(0, 44100, true)
-		new DataView(info.buffer).setUint32(4, 2, true)
-		fake.raw._VpxWasm_GetAudioInfo = () => fake.malloc(info)
-		const pcm = new Int16Array([1000, -1000, 2000, -2000])
-		const pcmPtr = fake.malloc(new Uint8Array(pcm.buffer))
-		const desc = new Uint8Array(12)
-		const view = new DataView(desc.buffer)
-		view.setUint32(0, pcmPtr, true)
-		view.setUint32(4, 4, true)
-		view.setUint32(8, 2, true)
-		fake.raw._VpxWasm_GetAudio = () => fake.malloc(desc)
-		const engine = wrapHeadlessEngine(fake.raw, 'test')
-		expect(engine.getAudioInfo()).toEqual({ sampleRate: 44100, channels: 2 })
-		const frame = engine.getAudio()
-		expect(frame?.channels).toBe(2)
-		expect(frame?.samples).toBeInstanceOf(Int16Array)
-		expect(frame?.samples && Array.from(frame.samples)).toEqual([1000, -1000, 2000, -2000])
-	})
-	it('returns undefined when the ring is empty', () => {
-		const fake = fakeRaw()
-		const engine = wrapHeadlessEngine(fake.raw, 'test')
-		expect(engine.getAudio()).toBeUndefined()
-	})
-})
-
 describe('hostile descriptors', () => {
 	it('rejects unknown DMD formats instead of misdecoding them', () => {
 		const fake = fakeRaw()
@@ -350,16 +319,6 @@ describe('hostile descriptors', () => {
 		view.setUint32(16, 3, true)
 		fake.raw._VpxWasm_GetDmdFrame = () => fake.malloc(desc)
 		expect(() => wrapHeadlessEngine(fake.raw, 'test').getDmdFrame()).toThrow(HeadlessEngineError)
-	})
-	it('throws on misaligned audio ranges', () => {
-		const fake = fakeRaw()
-		const desc = new Uint8Array(12)
-		const view = new DataView(desc.buffer)
-		view.setUint32(0, 1, true)
-		view.setUint32(4, 100, true)
-		view.setUint32(8, 2, true)
-		fake.raw._VpxWasm_GetAudio = () => fake.malloc(desc)
-		expect(() => wrapHeadlessEngine(fake.raw, 'test').getAudio()).toThrow(HeadlessEngineError)
 	})
 	it('throws when the WASM heap is exhausted', () => {
 		const fake = fakeRaw()

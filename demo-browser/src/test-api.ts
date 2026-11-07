@@ -85,11 +85,6 @@ export interface ViewerTestApi {
 	dmd(): VpxDmdFrame | undefined
 }
 
-const normalizePull = (pos: number, start: number, end: number): number => {
-	if (!Number.isFinite(pos) || end === start) return 0
-	return Math.min(1, Math.max(0, (pos - start) / (end - start)))
-}
-
 /** Build the dev-only test surface over a live viewer. No stored mutable state. */
 export function createTestApi(viewer: Viewer): ViewerTestApi {
 	return {
@@ -103,11 +98,7 @@ export function createTestApi(viewer: Viewer): ViewerTestApi {
 				paused: viewer.isPaused,
 				ballCount: engine?.ballCount ?? 0,
 				balls: engine?.ballPoses() ?? [],
-				plungers: (engine?.plungerPositions() ?? []).map(p => ({
-					partIdx: p.partIdx,
-					name: p.name,
-					pull: normalizePull(p.pos, p.start, p.end),
-				})),
+				plungers: engine?.plungerPulls() ?? [],
 				flippers: (engine?.flipperAngles() ?? []).map(f => ({ ...f, name: engine?.partName(f.partIdx) })),
 				scriptErrors: engine?.scriptErrorCount ?? 0,
 				catalogSize: engine?.catalogSize ?? 0,

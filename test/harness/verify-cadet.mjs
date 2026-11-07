@@ -5,13 +5,13 @@
  *  1. the force-hidden playfield decoy must stay hidden once the live sync
  *     runs (the engine reports it visible; showing it covers the base slab
  *     with a white quad and z-fights it),
- *  2. the DMD overlay stays hidden while no DMD frame has arrived, and
- *     presents the script's FlexDMD stage once one has (patch 0012),
+ *  2. the DMD overlay presents the table's default DMD (the script's
+ *     FlexDMD stage, through the display resolver) once the engine serves it,
  *  3. the lamp path must go live after coin+start (table lights work),
  *  4. the digit flashers must show live script score images, applied to
  *     the scene: the script sets UseFlexDMD=False when ShowDT=True, so
  *     no FlexDMD instance exists in desktop mode and scores go through
- *     script `Flasher.ImageA` writes on 41 digit flashers (patch 0013).
+ *     script `Flasher.ImageA` writes on 41 digit flashers (`VpxWasm_GetFlasherImage`).
  *
  * Run: node test/harness/verify-cadet.mjs [--vpx=/path/to/space_cadet.vpx]
  *   (or SPACE_CADET_VPX; default ~/Downloads/space_cadet*.vpx)
@@ -20,7 +20,7 @@
 import { existsSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { ensureVite, launchBrowser, loadPuppeteer, newPage, requireEngineAndChrome, sleep } from './utils.mjs'
+import { ensureVite, hostGpu, launchBrowser, loadPuppeteer, newPage, requireEngineAndChrome, sleep } from './utils.mjs'
 
 function resolveVpx() {
 	const cli = process.argv.find(a => a.startsWith('--vpx='))
@@ -53,7 +53,8 @@ const check = (ok, name, detail = '') => {
 const vite = await ensureVite(`/?${new URLSearchParams({ vpx: `/@fs${vpxPath}` })}`)
 let browser
 try {
-	browser = await launchBrowser(await loadPuppeteer())
+	// The lamp check plays the table: it needs frames under the engine's stall threshold.
+	browser = await launchBrowser(await loadPuppeteer(), { gpu: hostGpu() })
 	const page = await newPage(browser)
 	await page.goto(vite.url, { waitUntil: 'load', timeout: 90000 })
 	await page.waitForFunction(() => window.vpx, { timeout: 90000 })
@@ -62,6 +63,14 @@ try {
 		await window.vpx.setMode('play')
 	})
 	await page.waitForFunction(() => window.vpx.state.wasmReady, { timeout: 240000 })
+	// The overlay presents on its own rAF ticks, slow under SwiftShader: give
+	// a served DMD frame time to reach it before judging.
+	await page
+		.waitForFunction(
+			() => !window.viewer.wasmEngine?.engine?.getDmdFrame?.() || (window.viewer.dmd?.lastDmdFrameId ?? -1) >= 0,
+			{ timeout: 30000 },
+		)
+		.catch(() => {})
 	const snap = await page.evaluate(() => {
 		const v = window.viewer
 		const worldVisible = name => {
@@ -114,9 +123,7 @@ try {
 		'live sync keeps the force-hidden playfield decoy hidden',
 		`scene=${snap.decoyVisible} engine-row=${snap.decoyRowVisible}`,
 	)
-	// Artifact-aware DMD gate: pre-FlexDMD-bridge artifacts serve no frame
-	// (overlay must stay hidden); rebuilt artifacts mirror the script's
-	// FlexDMD stage through getDmdFrame (overlay must show it).
+	// A served DMD frame must reach the overlay; with no DMD source it stays hidden.
 	const bridged = snap.dmdFrame !== null
 	const dmdOk = bridged
 		? (snap.dmdVisible || []).some(x => x === true) && (snap.dmdLast ?? -1) >= 0
@@ -130,24 +137,30 @@ try {
 	await page.keyboard.press('Digit5')
 	await sleep(1500)
 	await page.keyboard.press('Digit1')
-	await sleep(5000)
-	const lamps = await page.evaluate(() => {
-		const v = window.viewer
-		const lb = v.wasmEngine?.engine?.getBuffer?.('lights')
-		if (!lb?.view) return { count: 0, nonzero: 0, med: 0 }
-		const vals = []
-		for (let i = 0; i < lb.count; i++) {
-			const v = lb.view[i * lb.stride + 1]
-			if (v !== 0) vals.push(v)
-		}
-		vals.sort((a, b) => a - b)
-		return { count: lb.count, nonzero: vals.length, med: vals.length ? vals[(vals.length / 2) | 0] : 0 }
-	})
+	// Game time trails the wall when frames are slow (upstream shifts time
+	// over stalls instead of catching up), so wait for the lamps, bounded.
+	const readLamps = () =>
+		page.evaluate(() => {
+			const v = window.viewer
+			const lb = v.wasmEngine?.engine?.getBuffer?.('lights')
+			if (!lb?.view) return { count: 0, nonzero: 0, med: 0 }
+			const vals = []
+			for (let i = 0; i < lb.count; i++) {
+				const v = lb.view[i * lb.stride + 1]
+				if (v !== 0) vals.push(v)
+			}
+			vals.sort((a, b) => a - b)
+			return { count: lb.count, nonzero: vals.length, med: vals.length ? vals[(vals.length / 2) | 0] : 0 }
+		})
 	// Magnitude as well as count: nonzero-only rows pass even when every
 	// lamp sits at a frozen near-zero residual; a started game holds inserts
 	// at base scale (median 120 on this table).
+	const live = l => l.nonzero > 0 && l.med >= 50
+	let lamps = await readLamps()
+	for (const deadline = Date.now() + 20000; !live(lamps) && Date.now() < deadline; lamps = await readLamps())
+		await sleep(500)
 	check(
-		lamps.nonzero > 0 && lamps.med >= 50,
+		live(lamps),
 		'lamps go live after coin+start',
 		`${lamps.nonzero}/${lamps.count} lit, med=${Number(lamps.med).toFixed(1)}`,
 	)

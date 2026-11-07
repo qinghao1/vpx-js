@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { expect } from 'chai'
-import { afterAll, afterEach, describe, it } from 'vitest'
+import { describe, it } from 'vitest'
 import { WasmEngine } from '../../demo-browser/src/wasm-engine.js'
 
 const QUANTUM = 1000 / 60
@@ -10,28 +10,16 @@ interface StepCall {
 	gameMs: number
 }
 
-function makeEngine(
-	audio?: { sampleRate: number; channels: number; frames: number },
-	changedLightParts: readonly number[] = [],
-) {
+function makeEngine(changedLightParts: readonly number[] = []) {
 	const steps: StepCall[] = []
 	const keys: { scancode: number; down: boolean }[] = []
 	const nudges: { angle: number; force: number }[] = []
-	const audioCalls = { info: 0, drain: 0 }
+	// The adapter advances its pacing clock, then steps the engine (which runs on its own game clock).
 	const fakeEngine = {
-		stepFrame: (gameMs: number): void => {
-			steps.push({ gameMs })
+		stepFrame: (): void => {
+			steps.push({ gameMs: engine.gameMs })
 		},
 		getBuffer: (): undefined => undefined,
-		getAudioInfo: (): { sampleRate: number; channels: number } => {
-			audioCalls.info++
-			return audio ? { sampleRate: audio.sampleRate, channels: audio.channels } : { sampleRate: 0, channels: 0 }
-		},
-		getAudio: (): { samples: Int16Array; channels: number } | undefined => {
-			audioCalls.drain++
-			if (!audio) return undefined
-			return { samples: new Int16Array(audio.frames * audio.channels), channels: audio.channels }
-		},
 		pushKey: (scancode: number, down: boolean): void => {
 			keys.push({ scancode, down })
 		},
@@ -71,7 +59,7 @@ function makeEngine(
 	const engine = new WasmEngine(host as never)
 	;(engine as unknown as { engine: unknown }).engine = fakeEngine
 	;(engine as unknown as { sync: unknown }).sync = fakeSync
-	return { engine, steps, keys, nudges, audioCalls }
+	return { engine, steps, keys, nudges }
 }
 
 describe('wasm host-owned pacing', () => {
@@ -156,7 +144,7 @@ describe('wasm host-owned pacing', () => {
 	})
 
 	it('maps changed light part indices to names, skipping unknowns', () => {
-		const { engine } = makeEngine(undefined, [7, 9])
+		const { engine } = makeEngine([7, 9])
 		;(engine as unknown as { partNames: Map<number, string> }).partNames.set(7, 'Lamp7')
 		engine.step(1000)
 		const out = engine.step(1000 + 16.7)
@@ -192,85 +180,5 @@ describe('wasm host-owned pacing', () => {
 		}
 		const engine = new WasmEngine(host as never)
 		expect(engine.step(1000)).to.deep.equal({ changedLights: [] })
-	})
-
-	it('never drains the ring pre-gesture but keeps polling the rate', () => {
-		const { engine, audioCalls } = makeEngine({ sampleRate: 44100, channels: 2, frames: 64 })
-		engine.step(1000)
-		engine.step(1000 + QUANTUM)
-		expect(audioCalls.info).to.be.greaterThan(0)
-		expect(audioCalls.drain).to.equal(0)
-	})
-
-	it('schedules drained audio once the output runs', () => {
-		const { engine, audioCalls } = makeEngine({ sampleRate: 44100, channels: 2, frames: 64 })
-		const started: number[] = []
-		;(engine as unknown as { audioCtx: unknown }).audioCtx = {
-			state: 'running',
-			currentTime: 100,
-			destination: {},
-			createBuffer: (_ch: number, frames: number, _rate: number) => ({
-				getChannelData: (_c: number) => new Float32Array(frames),
-				duration: frames / 44100,
-			}),
-			createBufferSource: () => ({
-				connect: (): void => {},
-				start: (at: number): void => {
-					started.push(at)
-				},
-			}),
-		}
-		engine.step(1000)
-		engine.step(1000 + QUANTUM)
-		expect(audioCalls.drain).to.be.greaterThan(0)
-		expect(started).to.have.length(audioCalls.drain)
-	})
-
-	describe('resumeAudio', () => {
-		const priorAudioContext = (globalThis as Record<string, unknown>).AudioContext
-		const stubContexts: { state: string; resumed: number }[] = []
-		const stubAudioContext = class {
-			state = 'suspended'
-			resumed = 0
-			destination = {}
-			constructor() {
-				stubContexts.push(this)
-			}
-			async resume(): Promise<void> {
-				this.resumed++
-				this.state = 'running'
-			}
-			async close(): Promise<void> {}
-			createGain(): { connect(o: unknown): void; gain: { value: number } } {
-				return { connect: (): void => {}, gain: { value: 1 } }
-			}
-		}
-		afterEach(() => {
-			stubContexts.length = 0
-		})
-		afterAll(() => {
-			if (priorAudioContext === undefined) delete (globalThis as Record<string, unknown>).AudioContext
-			else (globalThis as Record<string, unknown>).AudioContext = priorAudioContext
-		})
-
-		it('flushes the pre-gesture backlog once on a fresh start', () => {
-			;(globalThis as Record<string, unknown>).AudioContext = stubAudioContext
-			const { engine, audioCalls } = makeEngine({ sampleRate: 44100, channels: 2, frames: 64 })
-			engine.resumeAudio()
-			expect(audioCalls.drain).to.equal(1)
-			expect(stubContexts).to.have.length(1)
-		})
-
-		it('never flushes an already-running context', () => {
-			;(globalThis as Record<string, unknown>).AudioContext = stubAudioContext
-			const { engine, audioCalls } = makeEngine({ sampleRate: 44100, channels: 2, frames: 64 })
-			;(engine as unknown as { audioCtx: unknown }).audioCtx = {
-				state: 'running',
-				destination: {},
-				createGain: () => ({ connect: (): void => {}, gain: { value: 1 } }),
-			}
-			engine.resumeAudio()
-			expect(audioCalls.drain).to.equal(0)
-		})
 	})
 })

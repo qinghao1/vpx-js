@@ -34,7 +34,7 @@ import { MoverType, WASM_STRIDES } from './vpinball-wasm.js'
  *
  * - balls stride 16: id, pos xyz, radius, 9×orientation (row-major), color, visible
  * - movers stride 8: partIdx, type, a, b, c, d, visible, reserved
- *   - flipper: a=angleRad; plunger: a=pos,b=frameStart,c=frameEnd;
+ *   - flipper: a=angleRad; plunger: a=pull (0 at rest .. 1 fully pulled);
  *     spinner/gate: a=angleRad; bumper: a=ringOffset,b=rotX,c=rotY,d=visBits
  *     (bit0 cap, bit1 base, bit2 ring, bit3 skirt); hittarget: a=offset,b=dropped;
  *     trigger: a=offset
@@ -226,14 +226,13 @@ export class WasmSceneSync<NODE, GEOMETRY, POINT_LIGHT> {
 	}
 
 	/**
-	 * Read-only plunger pulls for harnesses: raw pos with its frame range,
-	 * so callers normalize `(pos - start) / (end - start)` themselves.
+	 * Read-only plunger pulls (0 at rest .. 1 fully pulled) for harnesses.
 	 * Public so harnesses never reach into the private row snapshots.
 	 */
-	public plungerPositions(): { partIdx: number; pos: number; start: number; end: number }[] {
-		const out: { partIdx: number; pos: number; start: number; end: number }[] = []
+	public plungerPulls(): { partIdx: number; pull: number }[] {
+		const out: { partIdx: number; pull: number }[] = []
 		for (const [partIdx, row] of this.lastMoverRows)
-			if (row[1] === MoverType.Plunger) out.push({ partIdx, pos: row[2]!, start: row[3]!, end: row[4]! })
+			if (row[1] === MoverType.Plunger) out.push({ partIdx, pull: row[2]! })
 		return out
 	}
 
@@ -419,10 +418,10 @@ export class WasmSceneSync<NODE, GEOMETRY, POINT_LIGHT> {
 				break
 			case MoverType.Plunger: {
 				const frames = Math.max(1, this.scene.plungerFrameCount(partIdx))
-				const t = row[4]! === row[3]! ? 0 : (row[2]! - row[3]!) / (row[4]! - row[3]!)
+				const pull = row[2]!
 				// A corrupt row must not poison state with NaN: skip the row.
-				if (!Number.isFinite(t)) return false
-				;(slot.state as PlungerState).frame = Math.min(frames - 1, Math.max(0, Math.round(t * (frames - 1))))
+				if (!Number.isFinite(pull)) return false
+				;(slot.state as PlungerState).frame = Math.min(frames - 1, Math.max(0, Math.round(pull * (frames - 1))))
 				break
 			}
 			case MoverType.Spinner:

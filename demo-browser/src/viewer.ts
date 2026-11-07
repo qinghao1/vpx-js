@@ -1252,7 +1252,6 @@ export class Viewer {
 			return
 		}
 		this.wasmEngine = engine
-		engine.primeAudioOnGesture()
 		this.nodeCache.clear()
 		this.buildNodeCache()
 		const ballsGroup = this._ensureBallsGroup()

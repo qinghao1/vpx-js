@@ -124,7 +124,6 @@ const TOL = {
 	audioSilenceRms: 0.005, // attract-window RMS ceiling
 	audioBurstRms: 0.005, // burst-window RMS floor (or peak, below)
 	audioBurstPeak: 0.05, // burst-window peak floor
-	audioFramesRatio: [0.5, 1.5], // drained/nominal frames per step during bursts
 	stepsPerSec: 2, // live-loop floor: the loop must keep stepping under SwiftShader jank (unit specs + paced probes pin the quanta; absolute 60 Hz is unobservable headless)
 	stepsParityRatio: [0.1, 4], // NEW/OLD cadence ratio (SwiftShader starvation x intentional catch-up clamp; floors + paced match pin correctness)
 	flipperExcursion: 0.1, // native angle units, per-side min range during taps
@@ -616,8 +615,8 @@ function abFreezeAutoplay() {
 // scripted match with paced stepping: boot -> 6x coin -> start -> plunger ->
 // free-roll -> flipper taps with drain watch + up to 2 relaunches. PinMAME
 // runs at wall pace, so every step waits out a 12 ms floor (a tight burst
-// starves its thread and the ROM never boots). One getAudio() drain per step:
-// the drained/nominal ratio is the audio-single-scheduling gate input.
+// starves its thread and the ROM never boots). The engine plays its own
+// audio: every step samples its WebAudio output through a destination tap.
 async function abNewSetup(page, repoRoot, mountName) {
 	return await page.evaluate(
 		async ({ repoRoot, vpxUrl, romUrl, mountName }) => {
@@ -631,9 +630,34 @@ async function abNewSetup(page, repoRoot, mountName) {
 					if (!r.ok) throw new Error(`fetch ${u}: ${r.status}`)
 					return new Uint8Array(await r.arrayBuffer())
 				}
+				// Tap every node the engine wires to the speakers: RMS and peak of
+				// what plays now (the engine owns its audio; nothing is drained).
+				const taps = []
+				const connect = AudioNode.prototype.connect
+				AudioNode.prototype.connect = function (destination, ...rest) {
+					if (destination instanceof AudioDestinationNode) {
+						const tap = this.context.createAnalyser()
+						tap.fftSize = 2048
+						connect.call(this, tap)
+						taps.push(tap)
+					}
+					return connect.call(this, destination, ...rest)
+				}
+				const buffer = new Float32Array(2048)
+				globalThis.__audioLevel = () => {
+					let sum = 0
+					let peak = 0
+					for (const tap of taps) {
+						tap.getFloatTimeDomainData(buffer)
+						for (const v of buffer) {
+							sum += v * v
+							peak = Math.max(peak, Math.abs(v))
+						}
+					}
+					return { rms: taps.length ? Math.sqrt(sum / (taps.length * buffer.length)) : 0, peak }
+				}
 				globalThis.__seam = seam
 				globalThis.__eng = engine
-				globalThis.__nowMs = 0
 				const rom = await get(romUrl)
 				const vpx = await get(vpxUrl)
 				o.vpxBytes = vpx.length
@@ -641,9 +665,7 @@ async function abNewSetup(page, repoRoot, mountName) {
 				o.mountName = globalThis.__mountName
 				engine.mountRom(globalThis.__mountName, rom)
 				o.mountRc = 0
-				o.audioPre = engine.getAudioInfo()
 				await engine.loadTable(vpx)
-				o.audioPost = engine.getAudioInfo()
 				o.scriptErrors = engine.getScriptErrorCount()
 				o.scriptError = (engine.getScriptError() || '').slice(0, 200)
 				try {
@@ -669,7 +691,7 @@ async function abNewChunk(page, label, opts) {
 			const seam = globalThis.__seam
 			const key = c => seam.codeToSdlScancode(c)
 			const R = { label, reqSteps: o.steps, samples: [], dmd: [], flips: [], plungers: [], events: [] }
-			const mkAudio = () => ({ frames: 0, steps: 0, rmsMax: 0, peakMax: 0, energetic: 0, rate: 0 })
+			const mkAudio = () => ({ steps: 0, rmsMax: 0, peakMax: 0, energetic: 0 })
 			const audio = mkAudio()
 			const audioEarly = mkAudio()
 			const snapBalls = () => {
@@ -712,35 +734,13 @@ async function abNewChunk(page, label, opts) {
 				}
 				return out
 			}
-			const drainAudio = () => {
-				let n = 0
-				let sum = 0
-				let peak = 0
-				try {
-					const a = eng.getAudio()
-					if (a?.samples?.length) {
-						n = a.samples.length
-						for (let i = 0; i < a.samples.length; i++) {
-							const x = a.samples[i] / 32768
-							sum += x * x
-							const av = Math.abs(x)
-							if (av > peak) peak = av
-						}
-					}
-				} catch {}
-				const rms = n > 0 ? Math.sqrt(sum / n) : 0
+			const sampleAudio = () => {
+				const { rms, peak } = globalThis.__audioLevel()
 				const tgt = o.audioMark && steps + 1 <= o.audioMark ? audioEarly : audio
-				tgt.frames += n
 				tgt.steps++
 				if (rms > tgt.rmsMax) tgt.rmsMax = +rms.toFixed(4)
 				if (peak > tgt.peakMax) tgt.peakMax = +peak.toFixed(3)
 				if (rms > 0.005 || peak > 0.05) tgt.energetic++
-				if (!tgt.rate) {
-					try {
-						tgt.rate = eng.getAudioInfo().sampleRate || 0
-					} catch {}
-				}
-				return n
 			}
 			const isShooter = r => r[1] > 800 && r[2] > 1500 && r[2] < 2100
 			if (o.press) for (const c of o.press) eng.pushKey(key(c), true)
@@ -749,9 +749,8 @@ async function abNewChunk(page, label, opts) {
 			const run = async n => {
 				for (let i = 0; i < n; i++) {
 					const w0 = Date.now()
-					globalThis.__nowMs += 16.7
-					eng.stepFrame(globalThis.__nowMs)
-					drainAudio()
+					eng.stepFrame()
+					sampleAudio()
 					steps++
 					if (o.sampleEvery && steps % o.sampleEvery === 0) R.samples.push([steps, snapBalls()])
 					if (o.flipTrace) R.flips.push(snapFlip())
@@ -793,37 +792,6 @@ async function abNewChunk(page, label, opts) {
 		},
 		{ label, o: opts },
 	)
-}
-
-async function abNewDrainTwice(page) {
-	return await page.evaluate(async () => {
-		const eng = globalThis.__eng
-		const seam = globalThis.__seam
-		const out = { first: -1, second: -1 }
-		try {
-			eng.pushKey(seam.codeToSdlScancode('Digit5'), true)
-			for (let i = 0; i < 15; i++) {
-				globalThis.__nowMs += 16.7
-				eng.stepFrame(globalThis.__nowMs)
-				eng.getAudio()
-				await new Promise(r => setTimeout(r, 12))
-			}
-			eng.pushKey(seam.codeToSdlScancode('Digit5'), false)
-			for (let i = 0; i < 60; i++) {
-				globalThis.__nowMs += 16.7
-				eng.stepFrame(globalThis.__nowMs)
-				eng.getAudio()
-				await new Promise(r => setTimeout(r, 12))
-			}
-			const a = eng.getAudio()
-			out.first = a?.samples?.length ?? 0
-			const b = eng.getAudio()
-			out.second = b?.samples?.length ?? 0
-		} catch (e) {
-			out.err = String(e?.message ?? e).slice(0, 200)
-		}
-		return out
-	})
 }
 
 // ---- OLD paced match (pre-rescope TS player, probe-owned clock) ------------
@@ -1596,21 +1564,8 @@ function summarizeMatch(traj) {
 }
 
 function summarizeAudio(traj) {
-	const names = Object.keys(traj).filter(l => /^coin[1-6]$/.test(l) || l === 'start')
-	let frames = 0
-	let steps = 0
-	let rate = 0
-	let energetic = 0
-	for (const l of names) {
-		const a = traj[l]?.audio
-		if (!a) continue
-		frames += a.frames
-		steps += a.steps
-		energetic += a.energetic
-		if (a.rate > rate) rate = a.rate
-	}
-	const early = traj.boot?.audioEarly ?? { frames: 0, steps: 0, rmsMax: 0, peakMax: 0, energetic: 0 }
-	return { burst: { frames, steps, rate, energetic }, attract: early }
+	const early = traj.boot?.audioEarly ?? { steps: 0, rmsMax: 0, peakMax: 0, energetic: 0 }
+	return { attract: early }
 }
 
 async function abPollLog(page, needle, timeoutMs) {
@@ -1706,8 +1661,6 @@ async function main() {
 						relaunches: match.relaunches,
 						notes: match.notes,
 					}
-					report.new.drainTwice = await abNewDrainTwice(pageA)
-					comment(`NEW drain-twice: ${JSON.stringify(report.new.drainTwice)}`)
 					phaseAOk = true
 				} catch (e) {
 					report.new.infraRetry = { attempt: aAttempt, error: String(e?.message ?? e).slice(0, 200) }
@@ -1899,7 +1852,7 @@ async function main() {
 	if (nM) report.new.metrics = nM
 	if (oM) report.old.metrics = oM
 	const nAudio = hasNTraj ? summarizeAudio(N.match.traj) : null
-	if (nAudio) report.new.audio = { ...nAudio, drainTwice: N.drainTwice }
+	if (nAudio) report.new.audio = nAudio
 	if (nM)
 		comment(
 			`NEW metrics: eject=${nM.eject.ok} launch=${nM.launch.ok}@${nM.launch.minY} drains=${nM.drains.length} flip=${nM.flipperExcursion} dmd=${nM.dmdLit}/${nM.dmdTransitions}`,
@@ -2182,31 +2135,10 @@ async function main() {
 		gate(hasOTraj, oldDmdMax === 0, 'deviation mock-dmd-old', `EXPECTED blank (mock emu): maxSum=${oldDmdMax}`)
 	else gate(hasOTraj && !!O.frozen, oldDmdMax > 0, 'dmd lit-old', `real emu: maxSum=${oldDmdMax}`)
 
-	const rate = nAudio?.burst?.rate ?? 0
 	if (!nAudio) {
-		for (const name of [
-			'audio attract-silence',
-			'audio coin-burst',
-			'audio start-burst',
-			'audio single-scheduling',
-			'audio no-double-play',
-		]) {
+		for (const name of ['audio attract-silence', 'audio coin-burst', 'audio start-burst'])
 			skip(name, 'phase not run')
-		}
-	} else if (!(rate > 0)) {
-		for (const name of [
-			'audio attract-silence',
-			'audio coin-burst',
-			'audio start-burst',
-			'audio single-scheduling',
-			'audio no-double-play',
-		]) {
-			skip(name, 'no audio rate from engine')
-		}
 	} else {
-		const nominal = (rate * 16.7) / 1000
-		const ratio = nAudio.burst.frames / Math.max(1, nAudio.burst.steps * nominal)
-		report.new.audio.ratio = +ratio.toFixed(3)
 		tap(
 			nAudio.attract.energetic === 0 && nAudio.attract.rmsMax <= TOL.audioSilenceRms,
 			'audio attract-silence',
@@ -2221,16 +2153,6 @@ async function main() {
 			!!startAudio && (startAudio.rmsMax > TOL.audioBurstRms || startAudio.peakMax > TOL.audioBurstPeak)
 		tap(coinEnergetic >= 4, 'audio coin-burst', `${coinEnergetic}/6 coin windows energetic`)
 		tap(startHit, 'audio start-burst', `rmsMax=${startAudio?.rmsMax} peakMax=${startAudio?.peakMax}`)
-		tap(
-			ratio >= TOL.audioFramesRatio[0] && ratio <= TOL.audioFramesRatio[1],
-			'audio single-scheduling',
-			`frames/step=${ratio.toFixed(2)}x nominal (${rate}Hz)`,
-		)
-		tap(
-			N.drainTwice?.second === 0,
-			'audio no-double-play',
-			`drainTwice=${N.drainTwice?.first}/${N.drainTwice?.second}`,
-		)
 	}
 
 	finish(report)

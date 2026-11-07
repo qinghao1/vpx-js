@@ -8,10 +8,10 @@
  */
 
 /**
- * Bridge ABI this facade speaks (`VpxWasm_GetAbiVersion`, patch 0017). Bump
+ * Bridge ABI this facade speaks (`VpxWasm_GetAbiVersion`). Bump
  * together with the bridge on any export, descriptor or row-layout change.
  */
-export const HEADLESS_ABI_VERSION = 2
+export const HEADLESS_ABI_VERSION = 3
 
 /** Per-frame state buffer kinds, mirroring `VpxWasm_GetBuffer` (see `FillBuffers`). */
 export type WasmBufferKind = 'balls' | 'movers' | 'lights' | 'prims' | 'flashers' | 'reels'
@@ -244,18 +244,16 @@ export interface DmdFrameDesc {
  * for the byte-array facade; the raw shape is exported for tests only.
  */
 export interface RawHeadlessModule {
-	/** Absent on artifacts predating patch 0017; checked once by {@link wrapHeadlessEngine}. */
+	/** Absent on the earliest artifacts; checked once by {@link wrapHeadlessEngine}. */
 	_VpxWasm_GetAbiVersion?(): number
 	_VpxWasm_Init(): number
 	_VpxWasm_MountRom(fileNamePtr: number, zipPtr: number, zipLen: number): number
 	_VpxWasm_LoadTable(vpxPtr: number, vpxLen: number): number
-	_VpxWasm_StepFrame(nowMs: number): void
+	_VpxWasm_StepFrame(): void
 	_VpxWasm_GetPartCatalogJson(): number
 	_VpxWasm_GetBuffer(kind: number): number
 	_VpxWasm_GetDmdFrame(): number
 	_VpxWasm_GetFlasherImage(partIdx: number): number
-	_VpxWasm_GetAudioInfo(): number
-	_VpxWasm_GetAudio(): number
 	_VpxWasm_PushKey(sdlScancode: number, isPressed: boolean): void
 	_VpxWasm_Nudge(angleDeg: number, force: number): void
 	_VpxWasm_SetAudioLevel(volume: number, muted: boolean): void
@@ -334,7 +332,8 @@ export interface HeadlessEngine {
 	mountRom(fileName: string, zip: Uint8Array): void
 	/** Rejects with {@link HeadlessEngineError} when the table does not load. */
 	loadTable(vpx: Uint8Array): Promise<void>
-	stepFrame(nowMs: number): void
+	/** Steps input, physics, script and plugins one frame on the engine's own game clock. */
+	stepFrame(): void
 	getPartCatalogJson(): string | undefined
 	getBuffer(kind: WasmBufferKind): { view: Float32Array; count: number; stride: number } | undefined
 	getDmdFrame(): DmdFrameDesc | undefined
@@ -344,11 +343,9 @@ export interface HeadlessEngine {
 	 * non-flasher part, or empty image.
 	 */
 	getFlasherImage(partIdx: number): string | undefined
-	getAudioInfo(): { sampleRate: number; channels: number }
-	getAudio(): { samples: Int16Array; channels: number } | undefined
 	pushKey(sdlScancode: number, isPressed: boolean): void
 	nudge(angleDeg: number, force: number): void
-	/** Overall output level for the engine's own SDL audio path (table script sounds). */
+	/** Overall output level of the engine's audio: table sounds and plugin streams (PinMAME ROM audio). */
 	setAudioLevel(volume: number, muted: boolean): void
 	getScriptErrorCount(): number
 	getScriptError(): string | undefined
@@ -442,7 +439,7 @@ export function wrapHeadlessEngine(raw: RawHeadlessModule, url: string): Headles
 					raw._free(ptr)
 				}
 			}),
-		stepFrame: nowMs => raw._VpxWasm_StepFrame(nowMs),
+		stepFrame: () => raw._VpxWasm_StepFrame(),
 		getPartCatalogJson: () => {
 			const ptr = raw._VpxWasm_GetPartCatalogJson()
 			return ptr ? raw.UTF8ToString(ptr) : undefined
@@ -490,21 +487,6 @@ export function wrapHeadlessEngine(raw: RawHeadlessModule, url: string): Headles
 			}
 			dmdMemo = { width, height, format, frameId, desc: out }
 			return out
-		},
-		getAudioInfo: () => {
-			const base = raw._VpxWasm_GetAudioInfo() >>> 2
-			return { sampleRate: word(base), channels: word(base + 1) }
-		},
-		getAudio: () => {
-			const base = raw._VpxWasm_GetAudio() >>> 2
-			const bytePtr = word(base)
-			const count = word(base + 1)
-			const channels = word(base + 2)
-			if (!bytePtr || !count) return undefined
-			// int16 samples: 2 bytes each, even start, bounded drain.
-			assertInHeap(bytePtr, count * 2, 2, 1 << 22)
-			const samples = new Int16Array(raw.HEAPU8.buffer, bytePtr, count).slice()
-			return { samples, channels }
 		},
 		pushKey: (sdlScancode, isPressed) => raw._VpxWasm_PushKey(sdlScancode, isPressed),
 		nudge: (angleDeg, force) => raw._VpxWasm_Nudge(angleDeg, force),

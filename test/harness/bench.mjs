@@ -57,7 +57,7 @@ const duration = Number(getArg(args, 'duration', '3000'))
 const warmup = Number(getArg(args, 'warmup', url.includes('walking_dead') ? '2000' : '800'))
 const outPath = getArg(args, 'out', null)
 const profile = hasFlag(args, 'profile') || hasFlag(args, 'breakdown') || !hasFlag(args, 'no-profile')
-// Breakdown assumes the WASM seam (syncAll sink, stepFrame, pumpAudio) and a
+// Breakdown assumes the WASM seam (syncAll sink, stepFrame) and a
 // TSL-composer WebGPU renderer (pipeline.render total). Other tables reuse
 // it unchanged; another backend/seam needs new wraps, not new flags.
 const breakdown = hasFlag(args, 'breakdown')
@@ -559,12 +559,10 @@ const journeyResult = await page.evaluate(
 		const engineMs = []
 		const frameMs = []
 		const frameEndMs = []
-		// Breakdown-only: per-step sync phases + applied rows, audio drain,
-		// heap trend. renderFrameMs holds one composer total per viewer frame
+		// Breakdown-only: per-step sync phases + applied rows, heap trend. renderFrameMs holds one composer total per viewer frame
 		// (see the pipeline wrap below); renderCalls counts every interior
 		// renderer.render entry for calls/frame breadth.
 		const breakdownRows = []
-		const audioMs = []
 		const heapSamples = []
 		const renderFrameMs = []
 		let renderCalls = 0
@@ -596,7 +594,7 @@ const journeyResult = await page.evaluate(
 			})
 		}
 		if (opt.profile && w?.ready) {
-			// WASM seam: whole-step cost (quanta + sync + audio) as physics;
+			// WASM seam: whole-step cost (quanta + sync) as physics;
 			// the lightmap fanout is _syncWasmTransforms minus the step, paired
 			// per frame below (single-threaded, one step per sync, same order;
 			// the lengths are asserted equal before pairing — see the jank block).
@@ -606,8 +604,7 @@ const journeyResult = await page.evaluate(
 		}
 		if (opt.breakdown && w?.ready) {
 			// Core-loop decomposition: per-phase scene-sync timings through
-			// the optional syncAll sink, plus the audio drain. w.sync and
-			// w.pumpAudio are TS-private reach-throughs, same class as
+			// the optional syncAll sink. w.sync is a TS-private reach-through, same class as
 			// v._syncWasmTransforms above — the bench is a white-box profiler.
 			const syncTarget = w.sync
 			if (patchable(syncTarget, 'syncAll')) {
@@ -634,7 +631,6 @@ const journeyResult = await page.evaluate(
 					syncTarget.syncAll = origSyncAll
 				})
 			}
-			if (patchable(w, 'pumpAudio')) timeInto(w, 'pumpAudio', audioMs)
 		}
 
 		// Render totals: the TSL composer re-enters renderer.render per
@@ -718,17 +714,16 @@ const journeyResult = await page.evaluate(
 		const fanoutMs = []
 		for (let i = 0; i < fanoutPairs; i++) fanoutMs.push(Math.max(0, animMs[i] - physicsMs[i]))
 		// Breakdown: decompose each step into bridge engine time, five sync
-		// phases, audio drain, and the residual step overhead (buffer views +
+		// phases, and the residual step overhead (buffer views +
 		// light-name mapping). All arrays push once per step in call order —
 		// pair by index, but only over pools that actually sampled: a missing
-		// wrap (no stepFrame, no pumpAudio) must shrink n, never zero it.
+		// wrap (no stepFrame) must shrink n, never zero it.
 		// Steps pair with rAF frames only while counts agree; when they
 		// diverge the jank rows are marked approximate.
 		let breakdown = null
 		if (opt.breakdown && breakdownRows.length) {
 			const pools = [physicsMs, breakdownRows]
 			if (engineMs.length) pools.push(engineMs)
-			if (audioMs.length) pools.push(audioMs)
 			const n = Math.min(...pools.map(a => a.length))
 			const rows = breakdownRows.slice(0, n)
 			const phase = key => rows.map(r => r.ms[key])
@@ -737,7 +732,7 @@ const journeyResult = await page.evaluate(
 			for (let i = 0; i < n; i++) {
 				const m = rows[i].ms
 				const syncTotal = m.balls + m.movers + m.lights + m.prims + m.flashers
-				const raw = physicsMs[i] - (engineMs[i] ?? 0) - syncTotal - (audioMs[i] ?? 0)
+				const raw = physicsMs[i] - (engineMs[i] ?? 0) - syncTotal
 				if (raw < 0) clipped++
 				residualMs.push(Math.max(0, raw))
 			}
@@ -776,7 +771,6 @@ const journeyResult = await page.evaluate(
 					heapDeltaMb: before && after ? after.mb - before.mb : null,
 					engineMs: engineMs[k] != null ? +engineMs[k].toFixed(2) : null,
 					syncMs: m ? +(m.balls + m.movers + m.lights + m.prims + m.flashers).toFixed(2) : null,
-					audioMs: audioMs[k] != null ? +audioMs[k].toFixed(2) : null,
 					stepIndexApproximate: approxSteps,
 				}
 			})
@@ -788,11 +782,9 @@ const journeyResult = await page.evaluate(
 				lights: stats(phase('lights')),
 				prims: stats(phase('prims')),
 				flashers: stats(phase('flashers')),
-				audio: stats(audioMs.slice(0, n)),
 				stepOverhead: stats(residualMs),
 				stepOverheadClipped: clipped,
 				renderCallsPerFrame: renderFrameMs.length ? +(renderCalls / renderFrameMs.length).toFixed(1) : null,
-				audioState: typeof w?.audioCtx?.state === 'string' ? w.audioCtx.state : null,
 				applied: {
 					balls: stats(applied('balls')),
 					movers: stats(applied('movers')),
@@ -1066,8 +1058,8 @@ console.log(`\n[bench] === ANALYSIS & SUGGESTIONS ===`)
 	if (pf.breakdown) {
 		const b = pf.breakdown
 		const row = s => (s ? `avg ${s.avg}ms p95 ${s.p95} max ${s.max}` : 'n/a')
-		console.log(`  step split (${b.steps} steps; residual overhead after engine + phases + audio):`)
-		console.log(`    engine ${row(pf.engineStats)} | audio ${row(b.audio)} | overhead ${row(b.stepOverhead)}${b.stepOverheadClipped ? ` (clipped ${b.stepOverheadClipped})` : ''}`)
+		console.log(`  step split (${b.steps} steps; residual overhead after engine + phases):`)
+		console.log(`    engine ${row(pf.engineStats)} | overhead ${row(b.stepOverhead)}${b.stepOverheadClipped ? ` (clipped ${b.stepOverheadClipped})` : ''}`)
 		console.log(
 			`    balls ${row(b.balls)} | movers ${row(b.movers)} | lights ${row(b.lights)} | prims ${row(b.prims)} | flashers ${row(b.flashers)}`,
 		)
@@ -1080,10 +1072,10 @@ console.log(`\n[bench] === ANALYSIS & SUGGESTIONS ===`)
 		}
 		if (b.heapStartMb != null) console.log(`    heap ${b.heapStartMb}MB -> ${b.heapEndMb}MB during profile`)
 		if (b.jank?.length) {
-			console.log(`    worst frames (frame | heapΔ | engine | sync | audio):`)
+			console.log(`    worst frames (frame | heapΔ | engine | sync):`)
 			for (const j of b.jank)
 				console.log(
-					`      ${j.frameMs}ms | ${j.heapDeltaMb ?? '?'}MB | ${j.engineMs ?? '?'}ms | ${j.syncMs ?? '?'}ms | ${j.audioMs ?? '?'}ms${j.stepIndexApproximate ? ' ~approx' : ''}`,
+					`      ${j.frameMs}ms | ${j.heapDeltaMb ?? '?'}MB | ${j.engineMs ?? '?'}ms | ${j.syncMs ?? '?'}ms${j.stepIndexApproximate ? ' ~approx' : ''}`,
 				)
 		}
 	}

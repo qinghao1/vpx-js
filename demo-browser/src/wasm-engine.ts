@@ -82,29 +82,19 @@ export class WasmEngine {
 	private engine?: HeadlessEngine
 	private ballsVisible = true
 	private destroyed = false
-	private audioCtx?: AudioContext
-	private audioGain?: GainNode
 	private _muted = false
 	private _volume = 1
 	// The engine boots with table-seeded bus volumes; push ours only after
 	// the user touches a control, so a first gesture never snaps the mix.
 	private _audioLevelDirty = false
-	private audioRate = 0
-	private audioChannels = 0
-	private audioNextStart = 0
-	private audioFailed = false
 	private dmdCache?: { frameId: number; frame: Uint8Array; width: number; height: number }
-	private audioGestureAbort?: AbortController
 	/**
-	 * Host-owned game clock (game epoch, ms). Each rAF tick advances it by
-	 * the tick's own wall delta (one stepFrame per tick), so game time tracks
-	 * the wall at any refresh rate. Physics keeps its own wall clock inside
-	 * the bridge (its epoch starts at process time, so host-epoch targets
-	 * would starve it); script and PinMAME follow the host epoch instead, so
-	 * draining buffered debt fast-forwards them (up to 8x) while physics runs
-	 * realtime — replay, not slow motion. The real physics spiral guard is
-	 * upstream's anti-hung skip (PhysicsEngine.cpp:535-539); the host cap
-	 * below only bounds per-tick bridge work.
+	 * Host pacing clock (ms). Each rAF tick advances it by the tick's own
+	 * wall delta and steps the engine once, so stepping tracks the wall at any
+	 * refresh rate and stops while paused. The engine runs physics, script
+	 * and PinMAME on its own game clock (physics catches up to the wall inside
+	 * each step; its spiral guard is upstream's anti-hung skip), so this clock
+	 * only paces steps; the caps below bound per-tick work after a stall.
 	 */
 	private _gameMs = 0
 	private debtMs = 0
@@ -129,7 +119,6 @@ export class WasmEngine {
 		this.plungerFrames.clear()
 		this.dmdCache = undefined
 		this.liveBalls.clear()
-		this.resetAudioFormat()
 		this.sync = undefined
 		// Without isolation the threaded engine aborts deep inside wasm: say why.
 		// Same predicate as the facade's environment gate (`=== false`;
@@ -203,12 +192,6 @@ export class WasmEngine {
 		return catalog
 	}
 
-	/** Forget the previous table's PCM format: the next one may run at another rate. */
-	private resetAudioFormat(): void {
-		this.audioRate = 0
-		this.audioChannels = 0
-	}
-
 	get ready(): boolean {
 		return !!this.engine && !!this.sync && !this.destroyed
 	}
@@ -233,18 +216,9 @@ export class WasmEngine {
 		return this.sync?.ballPoses() ?? []
 	}
 
-	/**
-	 * Harness read-only: live plunger pulls with part names, normalized
-	 * 0..1 downstream. Public so harnesses never read mover rows directly.
-	 */
-	public plungerPositions(): {
-		partIdx: number
-		name: string | undefined
-		pos: number
-		start: number
-		end: number
-	}[] {
-		return (this.sync?.plungerPositions() ?? []).map(p => ({ ...p, name: this.partNames.get(p.partIdx) }))
+	/** Harness read-only: live plunger pulls (0 at rest .. 1 fully pulled) with part names. */
+	public plungerPulls(): { partIdx: number; name: string | undefined; pull: number }[] {
+		return (this.sync?.plungerPulls() ?? []).map(p => ({ ...p, name: this.partNames.get(p.partIdx) }))
 	}
 
 	/** Harness read-only: host-owned game clock in ms (advances once per rAF tick while unpaused). */
@@ -312,86 +286,12 @@ export class WasmEngine {
 	}
 
 	/**
-	 * Push the current mute/level to both outputs: the WebAudio gain (PinMAME
-	 * ROM ring) and the engine's own SDL path (table script sounds). The
-	 * engine push waits for an explicit user control so table-seeded bus
-	 * volumes survive until the user touches mute or volume.
+	 * Push the current mute/level to the engine, which plays table sounds and
+	 * PinMAME ROM audio alike. The push waits for an explicit user control so
+	 * table-seeded bus volumes survive until the user touches mute or volume.
 	 */
 	private applyAudioLevel(): void {
-		if (this.audioGain && this.audioCtx) this.audioGain.gain.value = effectiveGain(this._volume, this._muted)
 		if (this._audioLevelDirty) this.engine?.setAudioLevel(effectiveGain(this._volume, false), this._muted)
-	}
-
-	/**
-	 * PinMAME ROM audio: create/resume the output context. Browsers start it
-	 * suspended until a user gesture; call from pointer/key handlers only —
-	 * never from the frame pump, so a missing gesture can't conjure contexts
-	 * (browsers cap them) or burn construction exceptions per frame.
-	 */
-	resumeAudio(): void {
-		if (this.audioFailed) return
-		try {
-			const wasRunning = this.audioCtx?.state === 'running'
-			this.audioCtx ??= new AudioContext()
-			if (this.audioCtx.state === 'suspended') void this.audioCtx.resume()
-			if (!this.audioGain) {
-				this.audioGain = this.audioCtx.createGain()
-				this.audioGain.connect(this.audioCtx.destination)
-			}
-			this.applyAudioLevel()
-			// Fresh-start only: drop the pre-gesture ring backlog (up to 4 s)
-			// so playback starts live. Never flush a running context: that
-			// would drop audible audio.
-			if (!wasRunning) this.engine?.getAudio()
-		} catch {
-			this.audioFailed = true
-			this.audioCtx = undefined
-			this.audioGain = undefined
-		}
-	}
-
-	/** Drain one PCM frame from the bridge ring into scheduled WebAudio output. */
-	private pumpAudio(): void {
-		const engine = this.engine
-		if (!engine) return
-		const info = engine.getAudioInfo()
-		if (info.sampleRate > 0) {
-			this.audioRate = info.sampleRate
-			this.audioChannels = info.channels
-		}
-		if (!this.audioRate) return
-		const ctx = this.audioCtx
-		if (!ctx || ctx.state !== 'running') return
-		// Drain only when the output runs: pre-gesture frames would be copied
-		// out of the ring and dropped. The ring keeps the newest audio (oldest
-		// drops on overflow); the gesture path flushes the backlog so the first
-		// scheduled chunk is live, not stale.
-		const frame = engine.getAudio()
-		if (!frame || !frame.samples.length) return
-		const channels = Math.min(2, Math.max(1, frame.channels || this.audioChannels || 1))
-		const frames = Math.floor(frame.samples.length / channels)
-		if (frames < 1) return
-		try {
-			const out = ctx.createBuffer(channels, frames, this.audioRate)
-			for (let c = 0; c < channels; c++) {
-				const dst = out.getChannelData(c)
-				for (let i = 0; i < frames; i++) dst[i] = (frame.samples[i * channels + c] ?? 0) / 32768
-			}
-			const src = ctx.createBufferSource()
-			src.buffer = out
-			src.connect(this.audioGain ?? ctx.destination)
-			// Back-to-back scheduling: chunks longer than the step gap would
-			// otherwise overlap, and input double-steps would pile up. Drop
-			// backlog past half a second so a stall can't queue a tail.
-			if (this.audioNextStart < ctx.currentTime) this.audioNextStart = ctx.currentTime
-			if (this.audioNextStart - ctx.currentTime > 0.5) this.audioNextStart = ctx.currentTime
-			src.start(this.audioNextStart)
-			this.audioNextStart += out.duration
-		} catch {
-			// A scheduling fault must not kill the rAF callback; the next
-			// frame drains again. Persistent failure is the gesture path's
-			// problem, surfaced via resumeAudio.
-		}
 	}
 
 	/**
@@ -459,7 +359,7 @@ export class WasmEngine {
 			if (advance > 0) {
 				this._gameMs += advance
 				this.debtMs -= advance
-				engine.stepFrame(this._gameMs)
+				engine.stepFrame()
 			}
 		}
 		const read = (kind: WasmBufferKind): Float32Array => engine.getBuffer(kind)?.view ?? EMPTY_VIEW
@@ -472,7 +372,6 @@ export class WasmEngine {
 		}
 		const counts = this.sync.syncAll(buffers)
 		this.sync.syncReels(read('reels'))
-		this.pumpAudio()
 		// The sync already visited every light row and knows which col-1
 		// intensities changed; map those straight to names instead of
 		// re-walking the buffer here.
@@ -484,25 +383,8 @@ export class WasmEngine {
 		return { changedLights, counts }
 	}
 
-	/** Prime the audio context on first user gesture (autoplay policy). */
-	primeAudioOnGesture(): void {
-		this.audioGestureAbort?.abort()
-		const abort = new AbortController()
-		this.audioGestureAbort = abort
-		const prime = (): void => this.resumeAudio()
-		window.addEventListener('pointerdown', prime, { signal: abort.signal })
-		window.addEventListener('keydown', prime, { signal: abort.signal })
-	}
-
 	async destroy(): Promise<void> {
 		this.destroyed = true
-		this.audioGestureAbort?.abort()
-		this.audioGestureAbort = undefined
-		if (this.audioCtx) void this.audioCtx.close().catch(() => {})
-		this.audioCtx = undefined
-		this.audioFailed = false
-		this.audioNextStart = 0
-		this.resetAudioFormat()
 		this.dmdCache = undefined
 		for (const id of [...this.liveBalls.keys()]) this.balls().remove(id)
 		this.liveBalls.clear()

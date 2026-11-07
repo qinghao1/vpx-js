@@ -7,11 +7,11 @@
  * Run: node demo-browser/e2e/integration.mjs [--url=/?vpx=...&rom=...] [--out=/tmp] [--gpu[=vulkan|gl]]
  * Exit: 0 pass, 77 skip (no engine artifact or Chrome), 1 fail.
  */
-import { existsSync } from 'node:fs'
 import { findWalkingDead, findWalkingDeadRom } from '../../test/harness/bench-shared.ts'
 import {
 	attachLogging,
 	ensureVite,
+	hostGpu,
 	launchBrowser,
 	loadPuppeteer,
 	newPage,
@@ -46,11 +46,9 @@ const url = process.argv.find(a => a.startsWith('--url='))?.slice(6) ?? ''
 const out = process.argv.find(a => a.startsWith('--out='))?.slice(6) || '/tmp'
 // GPU: --gpu=vulkan|gl|--gpu or USE_GPU=...; otherwise the host GPU when it
 // has one (the playable table kills SwiftShader tabs), else SwiftShader.
-// USE_SWIFTSHADER=1 forces software GL.
 const gpuArg =
 	process.argv.find(a => a.startsWith('--gpu='))?.slice(6) || (process.argv.includes('--gpu') ? 'vulkan' : null)
-const hostGpu = process.env.USE_SWIFTSHADER !== '1' && existsSync('/dev/dri/renderD128') ? 'vulkan' : null
-const gpu = gpuArg || process.env.USE_GPU || hostGpu
+const gpu = gpuArg || process.env.USE_GPU || hostGpu()
 console.log(`[integration] ${gpu ? `gpu=${gpu}` : 'SwiftShader (software GL)'}`)
 const readyTimeoutMs = Number(process.env.E2E_READY_TIMEOUT_MS) || 180_000
 // A ROM table run takes minutes; the watchdog only catches a hung browser.

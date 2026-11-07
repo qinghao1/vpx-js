@@ -4,8 +4,9 @@
  * canvas for SDL video init) through the real `loadHeadlessEngine` facade,
  * loads fixtures, steps frames on a fixed clock, and asserts engine state
  * (catalog, mover and lamp rows, script errors, teardown). With The Walking
- * Dead and its ROM it also boots PinMAME and checks the DMD, the audio drain,
- * and nudge physics on the served ball.
+ * Dead and its ROM it also boots PinMAME and checks the DMD, the engine's
+ * audio output (tapped at the page's WebAudio destination), and nudge physics
+ * on the served ball.
  *
  * Run: node test/harness/verify-headless.mjs [--rom=<zip>]
  * Exit: 0 pass, 77 skip (no engine artifact or Chrome), 1 fail.
@@ -32,6 +33,28 @@ const summary = await (async () => {
 			const sleep = ms => new Promise(r => setTimeout(r, ms))
 			const fetchBytes = async url => new Uint8Array(await (await fetch(url)).arrayBuffer())
 			try {
+				// Tap every node the engine wires to the speakers, so the checks hear
+				// what plays (the engine owns its audio; nothing is drained to JS).
+				const taps = []
+				const connect = AudioNode.prototype.connect
+				AudioNode.prototype.connect = function (destination, ...rest) {
+					if (destination instanceof AudioDestinationNode) {
+						const tap = this.context.createAnalyser()
+						tap.fftSize = 2048
+						connect.call(this, tap)
+						taps.push(tap)
+					}
+					return connect.call(this, destination, ...rest)
+				}
+				const samples = new Float32Array(2048)
+				const outputPeak = () => {
+					let peak = 0
+					for (const tap of taps) {
+						tap.getFloatTimeDomainData(samples)
+						for (const v of samples) peak = Math.max(peak, Math.abs(v))
+					}
+					return peak
+				}
 				const seam = await import(`/@fs${repoRoot}/dist-esm/lib/wasm/vpinball-wasm.js`)
 				const engine = await seam.loadHeadlessEngine('/wasm/vpinball-headless.js')
 				check(true, 'loadHeadlessEngine wraps the built artifact')
@@ -45,15 +68,13 @@ const summary = await (async () => {
 						() => 'ok',
 						e => String(e?.message ?? e),
 					)
-				// Fixed 60 Hz clock per table. PinMAME runs on its own thread at
-				// wall pace, so steps are paced in real time too (a tight burst
-				// starves it and the ROM never boots). `until` stops early.
-				let nowMs = 0
+				// About 60 steps per second: the engine (physics, PinMAME on its own
+				// thread) runs on wall time, so a tight burst of steps starves the
+				// ROM and it never boots. `until` stops early.
 				const step = async (frames, until) => {
 					for (let f = 0; f < frames; f++) {
 						const wall = Date.now()
-						nowMs += 16.7
-						engine.stepFrame(nowMs)
+						engine.stepFrame()
 						if (until?.()) return true
 						const dt = Date.now() - wall
 						if (dt < 12) await sleep(12 - dt)
@@ -73,7 +94,6 @@ const summary = await (async () => {
 				check(catalogRaw.length > 2, 'catalog JSON non-empty', `${catalogRaw.length} chars`)
 				const flipper = JSON.parse(catalogRaw || '[]').find(p => p.type === 'flipper')
 				check(!!flipper, 'catalog names a flipper', flipper ? `${flipper.name} #${flipper.idx}` : 'none')
-				nowMs = 0
 				await step(10)
 				const angleAt = () => {
 					const m = engine.getBuffer('movers')
@@ -98,7 +118,6 @@ const summary = await (async () => {
 				await engine.destroyTable()
 
 				check((await load(await fetchBytes('/test/fixtures/table-light.vpx'))) === 'ok', 'light table loads')
-				nowMs = 0
 				await step(30)
 				const lights = engine.getBuffer('lights')
 				const currents = []
@@ -122,7 +141,6 @@ const summary = await (async () => {
 					'walking-dead script runs clean',
 					engine.getScriptError() ?? '',
 				)
-				nowMs = 0
 				let firstId = -1
 				let luma = 0
 				// Boot attract starts blank: stop at the first lit DMD frame.
@@ -148,35 +166,24 @@ const summary = await (async () => {
 				const distance = (a, b) => (a && b ? Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) : Number.NaN)
 				const boot = balls()
 
-				// Audio: each step drains what the engine mixed since the last one
-				// (in bounded reads), about one frame's worth at the engine rate. A
-				// read that never runs dry would replay samples.
-				const { sampleRate, channels } = engine.getAudioInfo()
-				const audio = { steps: 0, frames: 0, loud: 0, endless: 0 }
-				const drainAudio = () => {
+				// Audio: coin and start sounds (ROM and table) play through the
+				// engine's own output; sample its peak after every step.
+				const audio = { steps: 0, loud: 0 }
+				const listen = () => {
 					audio.steps++
-					let reads = 0
-					for (let a = engine.getAudio(); a; a = reads < 64 ? engine.getAudio() : undefined) {
-						reads++
-						audio.frames += a.samples.length / Math.max(1, a.channels)
-						if (a.samples.some(s => Math.abs(s) > 0.05 * 32768)) audio.loud++
-					}
-					if (reads >= 64) audio.endless++
+					if (outputPeak() > 0.05) audio.loud++
 					return false
 				}
 				for (const code of ['Digit5', 'Digit5', 'Digit1']) {
 					engine.pushKey(seam.codeToSdlScancode(code), true)
-					await step(15, drainAudio)
+					await step(15, listen)
 					engine.pushKey(seam.codeToSdlScancode(code), false)
-					await step(120, drainAudio)
+					await step(120, listen)
 				}
-				const ratio = audio.frames / (audio.steps * ((sampleRate * 16.7) / 1000))
-				check(audio.loud > 0, 'coin and start play sound', `${audio.loud} loud reads over ${audio.steps} steps`)
-				check(audio.endless === 0, 'audio reads run dry (no sample replays)', `${audio.endless} endless drains`)
 				check(
-					ratio >= 0.5 && ratio <= 1.5,
-					'audio drains once per step at the engine rate',
-					`${ratio.toFixed(2)}x nominal (${sampleRate} Hz, ${channels} ch)`,
+					audio.loud > 0,
+					'coin and start play sound',
+					`${audio.loud} loud steps of ${audio.steps} on ${taps.length} output node(s)`,
 				)
 
 				// Nudge, as a twin pair of identical fixed-step windows from rest:

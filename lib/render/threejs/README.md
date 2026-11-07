@@ -33,7 +33,7 @@ pipeline in [`../README.md`](../README.md).
 NodeMaterial clamps `colorNode` output to `max(0)`. It needs the pipeline's float
 scene pass; the direct-render fallback's 8-bit canvas clamps it away.
 
-The headless engine plays in VR mode (bridge patch 0015), so scripts show their
+The headless engine plays in VR mode (`VpxWasm_Init`), so scripts show their
 own VR room and cabinet and hide desktop-only parts, as in native VR.
 
 Deliberate divergences from VPinball, each pinned by a spec:

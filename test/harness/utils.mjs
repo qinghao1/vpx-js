@@ -74,6 +74,14 @@ export function requireEngineAndChrome() {
 	process.exit(77)
 }
 
+/**
+ * The host GPU (Vulkan) when the machine has one, else null (SwiftShader).
+ * Legs that play a table need it: SwiftShader frames run past the engine's
+ * 100 ms stall threshold, so game time stops. USE_SWIFTSHADER=1 forces software GL.
+ */
+export const hostGpu = () =>
+	process.env.USE_SWIFTSHADER !== '1' && existsSync('/dev/dri/renderD128') ? 'vulkan' : null
+
 function gpuArgs(gpu) {
 	if (gpu === 'gl') return ['--enable-gpu', '--use-gl=angle', '--use-angle=gl']
 	if (gpu) return ['--enable-gpu', '--use-gl=angle', '--use-angle=vulkan']

@@ -174,7 +174,7 @@ describe('WASM scene sync', () => {
 		expect(state.isVisible).toBe(false)
 	})
 
-	it('maps plunger travel to mesh frames', () => {
+	it('maps plunger pull to mesh frames', () => {
 		const table = new TableBuilder().build()
 		const api = new RecordingApi()
 		const PlungerDataCtor = PlungerData as unknown as new (itemName: string) => PlungerData
@@ -185,11 +185,11 @@ describe('WASM scene sync', () => {
 			[2, slotFor({}, state, new PlungerUpdater(state, new PlungerMeshGenerator(data)))],
 		])
 		const sync = new WasmSceneSync<object, unknown, unknown>(mockScene(slots), mockBalls(), api as any, table)
-		sync.syncMovers(new Float32Array([2, MoverType.Plunger, 0, 0, 100, 0, 1, 0]))
+		sync.syncMovers(new Float32Array([2, MoverType.Plunger, 0, 0, 0, 0, 1, 0]))
 		expect(state.frame).toBe(0)
-		sync.syncMovers(new Float32Array([2, MoverType.Plunger, 100, 0, 100, 0, 1, 0]))
+		sync.syncMovers(new Float32Array([2, MoverType.Plunger, 1, 0, 0, 0, 1, 0]))
 		expect(state.frame).toBe(4)
-		sync.syncMovers(new Float32Array([2, MoverType.Plunger, 50, 0, 100, 0, 1, 0]))
+		sync.syncMovers(new Float32Array([2, MoverType.Plunger, 0.5, 0, 0, 0, 1, 0]))
 		expect(state.frame).toBe(2)
 	})
 
@@ -204,9 +204,9 @@ describe('WASM scene sync', () => {
 			[2, slotFor({}, state, new PlungerUpdater(state, new PlungerMeshGenerator(data)))],
 		])
 		const sync = new WasmSceneSync<object, unknown, unknown>(mockScene(slots), mockBalls(), api as any, table)
-		sync.syncMovers(new Float32Array([2, MoverType.Plunger, 50, 0, 100, 0, 1, 0]))
+		sync.syncMovers(new Float32Array([2, MoverType.Plunger, 0.5, 0, 0, 0, 1, 0]))
 		expect(state.frame).toBe(2)
-		sync.syncMovers(new Float32Array([2, MoverType.Plunger, Number.NaN, 0, 100, 0, 1, 0]))
+		sync.syncMovers(new Float32Array([2, MoverType.Plunger, Number.NaN, 0, 0, 0, 1, 0]))
 		expect(Number.isNaN(state.frame)).toBe(false)
 		expect(state.frame).toBe(2)
 	})
@@ -547,7 +547,7 @@ describe('WASM scene sync', () => {
 		expect(u8[201]).toBe(7)
 		expect(u8[202]).toBe(7)
 		expect(freed).toBe(200)
-		engine.stepFrame(16.7)
+		engine.stepFrame()
 		expect(engine.getPartCatalogJson()).toBe('[{"idx":0}]')
 		const movers = engine.getBuffer('movers')!
 		expect(movers.count).toBe(1)
@@ -1149,7 +1149,7 @@ describe('WASM scene sync', () => {
 			expect(sync.ballPoses()).toEqual([{ id: 7, x: 10, y: 20, z: 30 }])
 		})
 
-		it('exposes plunger travel with its frame range', () => {
+		it('exposes plunger pulls', () => {
 			const table = new TableBuilder().build()
 			const api = new RecordingApi()
 			const PlungerDataCtor = PlungerData as unknown as new (itemName: string) => PlungerData
@@ -1160,9 +1160,9 @@ describe('WASM scene sync', () => {
 				[2, slotFor({}, state, new PlungerUpdater(state, new PlungerMeshGenerator(data)))],
 			])
 			const sync = new WasmSceneSync<object, unknown, unknown>(mockScene(slots), mockBalls(), api as any, table)
-			expect(sync.plungerPositions()).toEqual([])
-			sync.syncMovers(new Float32Array([2, MoverType.Plunger, 50, 0, 100, 0, 1, 0]))
-			expect(sync.plungerPositions()).toEqual([{ partIdx: 2, pos: 50, start: 0, end: 100 }])
+			expect(sync.plungerPulls()).toEqual([])
+			sync.syncMovers(new Float32Array([2, MoverType.Plunger, 0.5, 0, 0, 0, 1, 0]))
+			expect(sync.plungerPulls()).toEqual([{ partIdx: 2, pull: 0.5 }])
 		})
 
 		it('counts applied light changes for activity signals', () => {

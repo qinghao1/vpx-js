@@ -1,7 +1,8 @@
 # `lib/wasm` — Headless-Engine Bridge Seam
 
-TypeScript side of the upstream `vpinball` headless-engine bridge
-(`src/web/vpx_wasm_bridge.cpp`, patches under `wasm/modules/headless/patches/`).
+TypeScript side of the headless-engine bridge
+(`wasm/modules/headless/bridge/vpx_wasm_bridge.cpp`, built into upstream
+`vpinball` with the patches under `wasm/modules/headless/patches/`).
 `lib/io` + `lib/vpt` parsing and the `lib/render/threejs` pipeline stay local;
 physics, scripting, audio, and ROM emulation move to upstream C++ compiled to
 WASM. This seam is the only boundary between them.
@@ -11,18 +12,19 @@ WASM. This seam is the only boundary between them.
 | File                      | Purpose                                                                                                                                                                                                                |
 | :------------------------ | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `vpinball-wasm.ts`        | C ABI surface (`VpxWasm_*`), buffer kinds/strides/tags, and `loadHeadlessEngine`, which rejects with `HeadlessEngineMissingError` when the artifact 404s (`HeadlessEngineError` otherwise). No fake engine.            |
-| `vpinball-wasm.spec.ts`   | Facade unit tests on a heap-backed fake bridge: ABI refusal, buffer/DMD/audio decoding, hostile descriptors, failure codes, load-error sorting, suspendable receiver.                                                  |
+| `vpinball-wasm.spec.ts`   | Facade unit tests on a heap-backed fake bridge: ABI refusal, buffer/DMD decoding, hostile descriptors, failure codes, load-error sorting, suspendable receiver.                                                        |
 | `wasm-scene-sync.ts`      | `WasmSceneSync`: writes WASM buffer rows into the existing `*State` objects and calls the existing `*Updater.applyState`. The host (viewer) owns scene nodes, updaters, and the lightmap fan-out. No three.js imports. |
 | `wasm-scene-sync.spec.ts` | Mocked-buffer unit tests: ball spawn/move/remove, every mover row, light rows, prim/flasher dirty rows, diff gating, phase timings, flasher image policy.                                                              |
 
 ## Constraints
 
 - `lib/render/irender-api.ts` stays generic (`<NODE, GEOMETRY, POINT_LIGHT>`); sync code never imports three.js.
-- Upstream API surface is minimal and reuses existing APIs: the part
-  getters exist only where no public accessor does (hit-object movers,
-  private animation fields); `StepHeadlessFrame` is required because
-  `FinishFrame`/`PrepareFrame` are private; input, DMD, and script-error
-  reporting reuse `m_pininput`, `m_dmdFrame`, and `m_nScriptErrorNotification`.
+- Upstream API surface is minimal and reuses existing APIs: movers read the
+  script getters (`CurrentAngle`, `CurrentAnimOffset`, `Plunger.Position`...),
+  the DMD comes from the display resolver a DMD flasher uses, input reuses
+  `m_pininput`; new accessors exist only where no public one does (primitive
+  animation frame, reel digits, last script error), and `StepHeadlessFrame`
+  because `FinishFrame`/`PrepareFrame` are private.
 - Updater overrides (`FlasherState.intensityScale/modulateVsAdd/addBlend/addBlendMode`,
   `LightState.baseIntensity/intensityScale/inPlayState`, `HitTargetState.isDropped`)
   are `?? data` fallbacks: engine state wins, authored data stays the default.
@@ -34,12 +36,12 @@ WASM. This seam is the only boundary between them.
 
 Bridge live, built from the pinned `external/vpinball` submodule — never
 from a side checkout — plus the patch series in
-`wasm/modules/headless/patches/` (one concern per patch; see `wasm/README.md`).
+`wasm/modules/headless/patches/` (see `wasm/README.md`).
 Build with `npm run build:wasm:headless`, which outputs
 `demo-browser/public/wasm/vpinball-headless.{js,wasm,data}` plus
 `build-info.json` (all committed; the `.wasm.map` stays local-only).
-`HeadlessEngine` is the only boundary: byte-array in, typed rows/DMD/PCM
-audio/script errors out. Calls that may block on engine threads (`loadTable`,
+`HeadlessEngine` is the only boundary: byte-array in, typed rows/DMD/script
+errors out. Calls that may block on engine threads (`loadTable`,
 `destroyTable`) enter WASM through `WebAssembly.promising` (JSPI).
 
 The facade checks `VpxWasm_GetAbiVersion` once per module against
@@ -50,14 +52,11 @@ export signature changes.
 Keys (`pushKey`) fire script KeyDown/KeyUp events; buffered `getDmdFrame`
 frames and solenoid motion need a scripted table plus VPinMAME.Controller.
 `getScriptErrorCount`/`getScriptError` make script health observable instead
-of silent. `getAudioInfo`/`getAudio` drain PinMAME ROM sound (int16 PCM,
-message-bus subscription, no libpinmame changes); table script sounds play
-through the engine's own miniaudio/SDL path, and the viewer unlocks both on
-first gesture. Host mute/volume fans out to both: the WebAudio gain for the
-ROM ring and `VpxWasm_SetAudioLevel` for the SDL path (table-seeded bus
-volumes hold until the user touches a control; a gesture unlocks WebAudio
-while the SDL path keeps table levels until then). The viewer wiring lives
-in `demo-browser/src/wasm-engine.ts`.
+of silent. The engine plays all its audio itself (table sounds and plugin
+streams like PinMAME ROM audio, through upstream's audio player);
+`VpxWasm_SetAudioLevel` carries host mute/volume, and table-seeded bus volumes
+hold until the user touches a control. The viewer wiring lives in
+`demo-browser/src/wasm-engine.ts`.
 
 ## Viewer wiring
 
