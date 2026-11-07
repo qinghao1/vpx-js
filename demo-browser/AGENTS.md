@@ -40,7 +40,7 @@ Requires `dist-esm` built. `server.fs.allow` covers the repo root, `~/Downloads`
 - `src/utils/candidate-resolver.ts`, `texture-filter.ts` — VPX resolution, downloads & glass-texture filtering
 - `src/env.js`, `src/utils.js` — env caps/quality flags + `$`/`fmtBytes` helpers and `utils/*` re-exports
 - `tsconfig.json` — `npm run typecheck:demo` (root); `viewer.ts` stays `@ts-nocheck`
-- `vite.config.ts` — `basicSsl`, cross-origin isolation headers, dedupes `three`/`three-mesh-bvh`, aliases `refs.node`→`refs.browser` etc., fixture + ROM middleware
+- `vite.config.ts` — `basicSsl`, cross-origin isolation headers, dedupes `three`/`three-mesh-bvh`, aliases `refs.node`→`refs.browser` etc., fixture + ROM middleware; `vite build` externals `three`/`three-mesh-bvh` to the jsDelivr import map in `index.html`
 - `e2e/integration.mjs` + `e2e/helpers.mjs` — unified E2E over `window.vpx` (waitReady → diagnostics → physics → DMD → shots), single generic harness
 
 ## Conventions

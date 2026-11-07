@@ -10,7 +10,7 @@
  *   Without --dist it builds the bundle into a temp dir first.
  * Exit: 0 pass, 77 skip (no engine artifact or Chrome), 1 fail.
  */
-import { existsSync, mkdtempSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { extname, join, resolve, sep } from 'node:path'
@@ -45,10 +45,51 @@ await new Promise(done => server.listen(0, '127.0.0.1', done))
 // own documented WebGL fallback — the same flag the renderer error suggests.
 const url = `http://localhost:${server.address().port}${BASE_PATH}?vpx=test/fixtures/table-empty.vpx&webgl`
 
+// The production bundle leaves three.js bare for the import map in
+// demo-browser/index.html; fail fast here (before launching Chrome) when the
+// map and the emitted chunks stop agreeing with each other.
+function checkDistCdn() {
+	const page = readFileSync(join(dist, 'index.html'), 'utf8')
+	const mapSource = page.match(/<script type="importmap">([\s\S]*?)<\/script>/)?.[1]
+	const map = mapSource ? JSON.parse(mapSource).imports : {}
+	const keys = ['three', 'three/webgpu', 'three/tsl', 'three/addons/', 'three/examples/jsm/', 'three-mesh-bvh']
+	check(
+		keys.every(k => typeof map[k] === 'string' && map[k].startsWith('https://cdn.jsdelivr.net/npm/')),
+		'dist index.html carries the jsDelivr three import map',
+		keys.filter(k => typeof map[k] !== 'string').join(', '),
+	)
+	const covered = spec => Object.keys(map).some(k => spec === k || (k.endsWith('/') && spec.startsWith(k)))
+	for (const file of readdirSync(join(dist, 'assets')).filter(f => f.endsWith('.js'))) {
+		const sources = readFileSync(join(dist, 'assets', file), 'utf8')
+		const bare = [...sources.matchAll(/from["']((?:three|three-mesh-bvh)(?:\/[^"']*)?)["']/g)].map(m => m[1])
+		if (/worker.*\.js$/.test(file))
+			check(bare.length === 0, `worker chunk stays bundled (${file})`, [...new Set(bare)].join(', '))
+		else
+			for (const spec of new Set(bare))
+				check(covered(spec), `chunk specifier resolves via import map (${spec})`, file)
+	}
+}
 const checks = []
 const check = (ok, name, detail = '') => {
 	checks.push({ ok, name: detail ? `${name} — ${detail}` : name })
 	console.log(`${ok ? '✓' : '✗'} ${name}${detail ? ` — ${detail}` : ''}`)
+}
+function finish() {
+	const passed = checks.filter(c => c.ok).length
+	console.log(`${passed}/${checks.length} pages checks passed`)
+	if (passed !== checks.length) {
+		// Surface failing check names as a CI annotation (visible without opening the job log).
+		const escapeAnnotation = s => s.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')
+		console.log(
+			`::error::${escapeAnnotation(
+				`pages-e2e failed: ${checks
+					.filter(c => !c.ok)
+					.map(c => c.name)
+					.join(' | ')}`,
+			)}`,
+		)
+		process.exit(1)
+	}
 }
 
 async function visit(browser, errors) {
@@ -72,6 +113,9 @@ async function visit(browser, errors) {
 	const isolated = await waitFor(() => page.evaluate(() => crossOriginIsolated && !!window.vpx), { timeoutMs: 30000 })
 	return { page, isolated, loads: () => navigations }
 }
+
+checkDistCdn()
+if (checks.some(c => !c.ok)) finish()
 
 const browser = await launchBrowser(await loadPuppeteer())
 try {
@@ -112,18 +156,4 @@ try {
 	await browser.close()
 	server.close()
 }
-const passed = checks.filter(c => c.ok).length
-console.log(`${passed}/${checks.length} pages checks passed`)
-if (passed !== checks.length) {
-	// Surface failing check names as a CI annotation (visible without opening the job log).
-	const escapeAnnotation = s => s.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')
-	console.log(
-		`::error::${escapeAnnotation(
-			`pages-e2e failed: ${checks
-				.filter(c => !c.ok)
-				.map(c => c.name)
-				.join(' | ')}`,
-		)}`,
-	)
-	process.exit(1)
-}
+finish()

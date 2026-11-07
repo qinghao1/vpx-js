@@ -7,6 +7,24 @@
 		<!-- empty favicon: silence /favicon.ico 404s; the demo needs no icon asset -->
 		<link rel="icon" href="data:,">
 		<link rel="stylesheet" href="./src/styles/app.css">
+		<!-- three.js + three-mesh-bvh load from jsDelivr (the CDN in the official three.js docs).
+			Pin matches demo-browser/package.json; `vite build` leaves these bare (see vite.config.ts),
+			so this map resolves them at runtime. The Vite dev server still uses local node_modules. -->
+		<script type="importmap">
+		{
+			"imports": {
+				"three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js",
+				"three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.webgpu.js",
+				"three/tsl": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.tsl.js",
+				"three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/",
+				"three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/",
+				"three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.9.17/build/index.module.js"
+			}
+		}
+		</script>
+		<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+		<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.webgpu.js">
+		<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.core.js">
 		<script>
 		window.global = window
 		window.process = window.process || {

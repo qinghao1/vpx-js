@@ -34,7 +34,6 @@ export default defineConfig({
 	resolve: {
 		dedupe: ['three', 'three/webgpu', 'three/tsl', 'three-mesh-bvh'],
 		alias: [
-			{ find: 'three-mesh-bvh', replacement: resolve(__dirname, 'node_modules/three-mesh-bvh/src/index.js') },
 			{ find: /^.*refs\.node\.js(\?.*)?$/, replacement: resolve(repoRoot, 'dist-esm/lib/refs.browser.js') },
 			{
 				find: /^.*binary-reader\.node\.js(\?.*)?$/,
@@ -142,5 +141,12 @@ export default defineConfig({
 		},
 	],
 	worker: { format: 'es' },
-	build: { target: 'esnext', assetsInlineLimit: 0 },
+	build: {
+		target: 'esnext',
+		assetsInlineLimit: 0,
+		// Prod loads three.js from the jsDelivr import map in index.html; leave those
+		// specifiers bare. Dev still resolves local node_modules (optimizeDeps/dedupe above).
+		// Worker chunks must stay bundled; verify-pages.mjs fails the build if one keeps a bare three import.
+		rollupOptions: { external: [/^three($|\/)/, /^three-mesh-bvh($|\/)/] },
+	},
 })
