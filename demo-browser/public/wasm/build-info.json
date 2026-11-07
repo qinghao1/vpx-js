@@ -1,17 +1,18 @@
 {
-  "vpinball": "64a480a96d1b972711fbb8eea014654c779b1e23",
+  "vpinball": "2ad1916b29284ca463dab8fec1039dde14561008",
   "emsdk": "6.0.13",
   "buildType": "Release",
   "inputs": {
-    "bridge/vpx_wasm_bridge.cpp": "821a20774479a3a320b65d1b3f08f1b20b1bdfabe220a6ebc17b1a3d8c042111",
-    "patches/0001-headless-player.patch": "077d7f10471d3c3af050d8d7281c2a72f7b5555487a9fe577139a13d296a15d2",
-    "patches/0002-player-state-accessors.patch": "2e5f7667f707ccf2dd4df086e6c671694a39cb66d9d32b9dc31d8a740c1da919",
-    "patches/0003-vpx-js-headless-target.patch": "6e1f745b171b34ac0b378b0837c58899bbbd130eeabbc978de67cdda570cb380"
+    "bridge/vpx_wasm_bridge.cpp": "256d30fac61e0f1dc6da8944be8123b61c8b444485067827bc332278d6cc774f",
+    "patches/0001-headless-player.patch": "453825a7735063092314dbc8c9826130b099d3719aea7d112b0592678bbf8ab5",
+    "patches/0002-player-state-accessors.patch": "a199ca770652667fb809312eb8b36f41ed99113340bdc10424c3a19959db5d18",
+    "patches/0003-vpx-js-headless-target.patch": "f4a9370a80a0e53e5ca6e40d1b0dc45bdc50fd7e52e27ee75305f4253047fb47",
+    "patches/0004-standalone-dispatch-omitted-arguments.patch": "e5a194a112b41377f95beb079fcecccd4fde3f459b721102594c1bc45cb51007"
   },
   "untrackedInputs": [],
   "artifacts": {
-    "vpinball-headless.js": "576f0c19d90f48c0c58af3bb393b1c766a119aa01b87a192032e6405299e19f8",
-    "vpinball-headless.wasm": "2b8722abe911cc7fe3aed8b361193999a6d66fb1fdbd626dd4becee4400018e0",
-    "vpinball-headless.data": "5d897efd2b5c4aeabe8a638d7c3c27ec863e63b2be25c862abfd8831222adb43"
+    "vpinball-headless.js": "390a3cd4fd241eca14e6bdac60ceed7e8448ba28a047a6b91da7e6e8d96bc407",
+    "vpinball-headless.wasm": "49169c32481a0cfee42a5d93eb974a3e109d0e463aa483558b9abf20a0d67450",
+    "vpinball-headless.data": "ce29182a740d840e5eccb8a3c31a0cbb7f75b9b0ec64b7cf37420cf4b3c847b1"
   }
 }
