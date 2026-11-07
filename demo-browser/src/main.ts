@@ -1,18 +1,23 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 import { crossOriginIsolate, showIsolationNotice } from './cross-origin-isolation.js'
-import { isDev } from './env.js'
+import { isDev, isLowQuality } from './env.js'
 import { initHelp } from './ui/help-dialog.js'
 import { initTableBrowser } from './ui/table-browser.js'
 import { Viewer } from './viewer.js'
 
 function parseViewerOptions(search: string) {
 	const params = new URLSearchParams(search)
+	// MSAA render targets are the first thing to OOM on phones, so
+	// low-quality devices default off; ?aa / ?noaa force it on / off.
+	let antialias = !isLowQuality()
+	if (params.has('aa')) antialias = true
+	else if (params.has('noaa')) antialias = false
 	return {
 		vpx: params.get('vpx') || params.get('table'),
 		rom: params.get('rom'),
 		viewerMode: params.get('mode') === 'play' ? 'play' : 'viewer',
-		antialias: !params.has('noaa'),
+		antialias,
 		batched: !params.has('nobatched'),
 		forceWebGL: params.has('webgl'),
 	}

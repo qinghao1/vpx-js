@@ -210,6 +210,8 @@ export class Viewer {
 		this.overlays = [this.dmd, this.backglass]
 		attachInput(this)
 		addEventListener('resize', () => this._onResize())
+		window.visualViewport?.addEventListener('resize', () => this._onResize())
+		addEventListener('orientationchange', () => this._onResize())
 		addEventListener('popstate', () => {
 			if (this.viewerMode === 'play') this._switchToViewer()
 		})
@@ -252,41 +254,14 @@ export class Viewer {
 		return muted
 	}
 	// Chrome over engine-owned mute/level: per-load engine state, so each table starts fresh.
+	// The button is always a mute toggle; the slider (desktop hover/focus
+	// overlay only, hidden on touch and small screens) never affects layout.
 	_setupSoundControls() {
 		this._syncSoundChrome()
 		const btn = this.dom.soundBtn
 		const slider = this.dom.soundVolume
-		const group = btn?.closest?.('.sound-control')
 		const toggle = () => this.toggleSoundMuted()
-		if (btn) {
-			// Touch (no-hover): the first tap only reveals the slider so the
-			// tap that opens the control never flips mute by accident.
-			const reveal = () => {
-				if (
-					group &&
-					!group.classList.contains('expanded') &&
-					typeof window.matchMedia === 'function' &&
-					window.matchMedia('(hover: none)').matches
-				) {
-					group.classList.add('expanded')
-					return true
-				}
-				return false
-			}
-			const onToggle = () => {
-				if (reveal()) return
-				toggle()
-			}
-			btn.addEventListener('click', onToggle)
-		}
-		// Touch (no-hover) support: tapping the icon reveals the slider until
-		// the next tap outside the control. Desktop hover/:focus-within needs no JS.
-		if (group) {
-			const collapseOutside = e => {
-				if (e.target instanceof Node && !group.contains(e.target)) group.classList.remove('expanded')
-			}
-			document.addEventListener('pointerdown', collapseOutside)
-		}
+		if (btn) btn.addEventListener('click', toggle)
 		if (slider) {
 			const onSlider = () => {
 				if (!this.wasmEngine) return
@@ -368,13 +343,32 @@ export class Viewer {
 		if (Number.isFinite(table.data.bloomStrength)) this.renderPipeline.updateBloomStrength(table.data.bloomStrength)
 	}
 	async _createRenderer() {
-		const renderer = new THREE.WebGPURenderer({
-			canvas: this.dom.canvas,
-			antialias: this.options.antialias,
-			powerPreference: 'high-performance',
-			forceWebGL: this.options.forceWebGL,
-		})
-		await renderer.init()
+		// Low-power GPUs (phones, integrated graphics) get the cheaper path:
+		// no MSAA target and a low-power queue. Desktop keeps the request.
+		// (WebGL2 never gets MSAA here, so ?aa is ignored with ?webgl.)
+		if (this.options.forceWebGL && this.options.antialias)
+			this.log('Ignoring ?aa: the WebGL2 path renders without antialiasing', 'warn')
+		const boot = async forceWebGL => {
+			const renderer = new THREE.WebGPURenderer({
+				canvas: this.dom.canvas,
+				antialias: forceWebGL ? false : this.options.antialias,
+				powerPreference: isLowQuality() ? 'low-power' : 'high-performance',
+				forceWebGL,
+			})
+			await renderer.init()
+			return renderer
+		}
+		let renderer
+		try {
+			renderer = await boot(this.options.forceWebGL)
+		} catch (e) {
+			// One generic retry on the WebGL2 path: a phone without WebGPU
+			// (or a broken WebGPU driver) still renders instead of stranding
+			// the canvas on its blue clear color.
+			if (this.options.forceWebGL) throw e
+			this.log(`WebGPU start failed (${e?.message ?? e}) — retrying on WebGL2`, 'warn')
+			renderer = await boot(true)
+		}
 
 		renderer.setPixelRatio(getTargetPixelRatio(this.viewerMode))
 		renderer.outputColorSpace = THREE.SRGBColorSpace
@@ -472,8 +466,11 @@ export class Viewer {
 	}
 	_onResize() {
 		this.invalidate()
-		const width = innerWidth
-		const height = innerHeight
+		// visualViewport tracks the URL-bar-collapsed size on mobile; the
+		// layout viewport lags it and leaves a wrong-aspect frame behind.
+		const viewport = window.visualViewport
+		const width = Math.max(1, Math.round(viewport?.width ?? innerWidth))
+		const height = Math.max(1, Math.round(viewport?.height ?? innerHeight))
 		this.camera.aspect = width / height
 		this.camera.updateProjectionMatrix()
 		const pixelRatio = getTargetPixelRatio(this.viewerMode)
@@ -571,21 +568,28 @@ export class Viewer {
 			await this._bootEngine()
 		} catch (e) {
 			this.log(`Play load failed: ${e.message}`, 'error')
-			this._revertFailedPlay()
+			this._revertFailedPlay().catch(err => this.log(`Play revert failed: ${err?.message ?? err}`, 'error'))
 		}
 	}
-	/** A failed engine boot must not strand the viewer in play mode with no engine. */
-	_revertFailedPlay() {
-		if (this.viewerMode === 'play' && !this.wasmEngine?.ready) this._leavePlay()
+	/** A failed boot must not strand the play camera with no engine behind it. */
+	async _revertFailedPlay() {
+		if (this.viewerMode !== 'play' || this.wasmEngine?.ready) return
+		this._leavePlay()
+		await this._restoreViewerCamera()
 	}
 	async _switchToViewer() {
 		if (this.viewerMode !== 'play') return
 		this._leavePlay()
+		await this._restoreViewerCamera()
+	}
+	/** Tween back to the overview framing after leaving play mode. */
+	async _restoreViewerCamera() {
 		if (!this.tableGroup) return
 		const target = computeViewerFraming(this.tableGroup)
 		await this._animateCameraTo(target, CAM_ANIM.durationMode)
 		if (this.viewerMode !== 'viewer') return
 		syncRoom(this.scene, this.tableGroup, target.center, target.size)
+		this.invalidate()
 	}
 	/** Shared play-mode teardown: viewer chrome, pixel ratio, cabinet flippers, released keys, mode event. */
 	_leavePlay() {
@@ -1158,7 +1162,7 @@ export class Viewer {
 			// A broken engine must not unmount a built scene: stay viewer-only
 			// so the table still renders and orbits; play entry retries the boot.
 			this.log(`Engine failed to start: ${e?.message ?? e}`, 'error')
-			this._revertFailedPlay()
+			this._revertFailedPlay().catch(err => this.log(`Play revert failed: ${err?.message ?? err}`, 'error'))
 		}
 		if (gen !== this._loadId) return
 		this._loading(100, 'Ready!', 'Ready to play')
