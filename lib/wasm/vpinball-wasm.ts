@@ -530,13 +530,21 @@ export function loadHeadlessEngine(url = 'wasm/vpinball-headless.js'): Promise<H
 	return engine
 }
 
-/** Fail fast when the host page cannot run the threaded engine (every facade consumer needs this). */
+/** A module declaring one 64-bit memory: validates only where the engine supports memory64. */
+const MEMORY64_PROBE = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 5, 3, 1, 4, 1])
+
+/** Fail fast when the host cannot run the threaded wasm64 engine (every facade consumer needs this). */
 function checkHostEnvironment(url: string): void {
 	const isolated = (globalThis as { crossOriginIsolated?: unknown }).crossOriginIsolated
 	if (isolated === false)
 		throw new HeadlessEngineError(
 			'environment',
 			`${url} needs a cross-origin-isolated page (SharedArrayBuffer): serve COOP/COEP headers`,
+		)
+	if (!WebAssembly.validate(MEMORY64_PROBE))
+		throw new HeadlessEngineError(
+			'environment',
+			`${url} needs WebAssembly memory64 (Chrome/Edge 137+, Firefox 153+; not Safari)`,
 		)
 }
 

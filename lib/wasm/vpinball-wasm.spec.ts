@@ -499,4 +499,16 @@ describe('loadHeadlessEngine environment guard', () => {
 			globalThis.fetch = priorFetch
 		}
 	})
+	it('rejects with op environment without memory64', async () => {
+		const validate = WebAssembly.validate
+		WebAssembly.validate = () => false
+		try {
+			await expect(loadHeadlessEngine('test-env-guard-no-memory64.js')).rejects.toMatchObject({
+				op: 'environment',
+				cause: expect.stringContaining('memory64'),
+			})
+		} finally {
+			WebAssembly.validate = validate
+		}
+	})
 })

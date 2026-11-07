@@ -1,22 +1,22 @@
-From 5237f98d2eedfb96ced34373b2577fd8dda942c3 Mon Sep 17 00:00:00 2001
+From c7f4fb8ebd68635d401437cce70522cbfb6da8fb Mon Sep 17 00:00:00 2001
 From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
 Date: Sat, 7 Nov 2026 12:00:00 -0500
 Subject: [PATCH] vpx-js: vpinball-headless wasm target
 
 Builds the headless player (ENABLE_HEADLESS) around the vpx-js embedding
 bridge, given as -DVPX_HEADLESS_BRIDGE=<source path>, as an ES module with a
-sidecar source map, lowered to a 32-bit memory. Its data package keeps the
+sidecar source map. Its data package keeps the
 assets the player loads and drops those a headless player does without.
 Local to vpx-js, not meant for upstream.
 ---
- make/CMakeLists_app.txt | 53 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
+ make/CMakeLists_app.txt | 50 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
 
 diff --git a/make/CMakeLists_app.txt b/make/CMakeLists_app.txt
-index b6c89f3fa..1428e83f0 100644
+index b6c89f3fa..d6d70a3de 100644
 --- a/make/CMakeLists_app.txt
 +++ b/make/CMakeLists_app.txt
-@@ -1040,4 +1040,57 @@ elseif(PLATFORM STREQUAL "wasm")
+@@ -1040,4 +1040,54 @@ elseif(PLATFORM STREQUAL "wasm")
        SUFFIX ".html"
     )
  
@@ -46,11 +46,8 @@ index b6c89f3fa..1428e83f0 100644
 +         # wrapped too, so the wasm64 host passes and receives plain numbers.
 +         -sJSPI_EXPORTS=VpxWasm_LoadTable,VpxWasm_DestroyTable
 +         -sSIGNATURE_CONVERSIONS=VpxWasm_MountRom:_pp_,VpxWasm_LoadTable:_p_,VpxWasm_GetPartCatalogJson:p,VpxWasm_GetBuffer:p_,VpxWasm_GetDmdFrame:p,VpxWasm_GetFlasherImage:p_,VpxWasm_GetScriptError:p
-+         # 64-bit code on a 32-bit memory (Binaryen lowering): runs on engines without
-+         # memory64 (Safari) and skips its bounds checks; the heap stays under 4GB.
-+         -sMEMORY64=2
 +         -sALLOW_MEMORY_GROWTH=1
-+         -sMAXIMUM_MEMORY=4GB
++         -sMAXIMUM_MEMORY=16GB
 +         -sINITIAL_MEMORY=512MB
 +         -sSTACK_SIZE=8MB
 +         -sDEFAULT_PTHREAD_STACK_SIZE=2MB

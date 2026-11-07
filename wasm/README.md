@@ -19,15 +19,12 @@ of the bridge is `lib/wasm/`.
 The engine is committed rather than fetched (no LFS — Pages cannot serve it —
 no Release assets, no per-push rebuild) so Pages deploys and
 `verify:engine-manifest` need no auth, toolchain, or submodule checkout.
-The build compiles 64-bit code like upstream's web build (`-DARCH=wasm64`)
-and lowers it to a 32-bit memory (`-sMEMORY64=2`, heap under 4GB), so it runs
-on engines without memory64 (Safari) and without memory64's bounds-check
-cost. Every bridge export that takes or returns a pointer is listed in
-`-sSIGNATURE_CONVERSIONS` (0003) so the host passes and receives plain
-numbers; add new ones there, or JS receives a BigInt. Load and teardown are
-`-sJSPI_EXPORTS` and return promises. Emscripten is deprecating `MEMORY64=2`
-(emscripten#27952); the pinned emsdk keeps it, so revisit the lowering before
-bumping emsdk.
+The build targets wasm64 (memory64) like upstream's web build
+(`-DARCH=wasm64`), so it needs a memory64 browser (README.md). Every bridge
+export that takes or returns a pointer is listed in `-sSIGNATURE_CONVERSIONS`
+(0003) so the host passes and receives plain numbers; add new ones there, or
+JS receives a BigInt. Load and teardown are `-sJSPI_EXPORTS` and return
+promises.
 
 The engine uses pthreads, so its page must be cross-origin isolated: a server
 you control sends `Cross-Origin-Opener-Policy: same-origin` and

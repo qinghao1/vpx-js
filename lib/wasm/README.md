@@ -83,7 +83,7 @@ asserts ready, catalog, zero script errors, tick + input; the gameplay legs
 
 The threaded engine needs a cross-origin-isolated page (`COOP`/`COEP` from
 server headers, or the `VITE_COI_SW=1` service worker on static hosts) and a
-browser with WebAssembly JSPI (`WebAssembly.promising`); the viewer renders
-through WebGPU. `loadHeadlessEngine` fails fast with `HeadlessEngineError`
-(`op: 'environment'`) without isolation, and the viewer adapter refuses to
-start with `WasmEngineStartError` without JSPI.
+browser with WebAssembly JSPI (`WebAssembly.promising`) and memory64; the
+viewer renders through WebGPU. `loadHeadlessEngine` fails fast with
+`HeadlessEngineError` (`op: 'environment'`) without isolation or memory64, and
+the viewer adapter refuses to start with `WasmEngineStartError` without JSPI.

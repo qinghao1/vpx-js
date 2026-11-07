@@ -124,9 +124,7 @@ export class WasmEngine {
 		// Table load/teardown suspend on engine threads (JSPI): without it the
 		// factory fails at instantiate with a raw TypeError, so say why.
 		if (typeof (WebAssembly as unknown as { promising?: unknown }).promising !== 'function')
-			throw new WasmEngineStartError(
-				'This browser lacks WebAssembly JSPI (Chrome/Edge 137+, Firefox 153+, Safari 27+)',
-			)
+			throw new WasmEngineStartError('This browser lacks WebAssembly JSPI (Chrome/Edge 137+, Firefox 153+)')
 		// Page-relative so subpath deploys work: document.baseURI resolves
 		// against the page, unlike a module-relative URL under `/@fs/`. The
 		// module is shared page-wide; this instance owns its table from here.

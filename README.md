@@ -29,7 +29,7 @@ Fork of [`vpdb/vpx-js`](https://github.com/vpdb/vpx-js) by [freezy](https://gith
 
 `vpx-js` is not published to npm (`private`). Build `dist-esm/` with `npm run build`, then deep-import modules from it (or import `lib/` source directly under `tsx`/vite).
 
-Requirements: Node `>=24` (`bash` ≥ 4 for the WASM rebuild), and emsdk 6.0.13 only to rebuild the headless engine (`npm run build:wasm:headless`, see `wasm/README.md`). Play needs a JSPI browser: Chrome/Edge 137+, Firefox 153+, or Safari 27+.
+Requirements: Node `>=24` (`bash` ≥ 4 for the WASM rebuild), and emsdk 6.0.13 only to rebuild the headless engine (`npm run build:wasm:headless`, see `wasm/README.md`). Play needs WebAssembly JSPI and memory64: Chrome/Edge 137+ or Firefox 153+ (Safari lacks memory64).
 
 ```bash
 npm ci
