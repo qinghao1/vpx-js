@@ -1,6 +1,6 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
-import { crossOriginIsolate } from './cross-origin-isolation.js'
+import { crossOriginIsolate, showIsolationNotice } from './cross-origin-isolation.js'
 import { isDev } from './env.js'
 import { createTestApi } from './test-api.js'
 import { initHelp } from './ui/help-dialog.js'
@@ -19,7 +19,7 @@ function parseViewerOptions(search: string) {
 	}
 }
 
-if (import.meta.env.VITE_COI_SW) await crossOriginIsolate()
+if (import.meta.env.VITE_COI_SW && !(await crossOriginIsolate())) showIsolationNotice()
 
 const options = parseViewerOptions(location.search)
 const viewer = new Viewer(options)
