@@ -1,5 +1,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 // Every tracked source file starts with its GPL copyright line(s) (AGENTS.md).
+// Generated emscripten output under demo-browser/public/wasm/ carries no
+// copyright header and is never hand-edited, so it is excluded below.
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 

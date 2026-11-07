@@ -7,7 +7,7 @@ ESM-only Visual Pinball headless-WASM port (Node `>=24`, TypeScript 7, `tsc`/`Bi
 ```bash
 npm ci
 npm run build              # tsc → dist-esm (= build:esm; required before demo-browser)
-npm run build:wasm:headless # emscripten headless build (needs emsdk; artifact → demo-browser/public/wasm/)
+npm run build:wasm:headless # emscripten headless build (needs emsdk; artifact → demo-browser/public/wasm/ — committed, rebuild+commit together, CI checks build-info.json)
 npx tsc --noEmit           # typecheck
 npx biome check .          # lint/format (tabs, width 120)
 npm test                   # vitest --coverage
@@ -24,7 +24,7 @@ Node via `fnm` — `.nvmrc` `24`, `.node-version` `24.19.0`. Activate with `eval
 - `test/fixtures/*.vpx` + `test/harness/` + `lib/**/*.spec.ts`
 - `wasm/modules/headless/` (patches) + `external/vpinball` (pinned submodule) → `npm run build:wasm:headless` → `demo-browser/public/wasm/` (see `wasm/README.md`)
 - `demo-browser/` — local static Three.js WebGPU viewer + E2E (`demo-browser/e2e/`)
-- `dist-esm/`, `coverage/`, `node_modules/`, `*.vpx` — ignored, do not commit
+- `dist-esm/`, `coverage/`, `node_modules/`, `*.vpx` — ignored, do not commit (`demo-browser/public/wasm/` is the exception: js/wasm/data + build-info.json are tracked, everything else there ignored)
 
 ## Conventions
 

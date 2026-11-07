@@ -44,10 +44,11 @@ jobs:
       - name: Build dist-esm
         run: npm run build:esm
       # The engine ships as a committed release build
-      # (demo-browser/public/wasm/ + build-info.json provenance). Rebuilding
-      # emscripten third-party libs from scratch on every deploy is slow and
-      # flaky, so CI verifies the manifest matches the tree instead — a
-      # mismatch means the inputs changed without a local rebuild.
+      # (demo-browser/public/wasm/, with build-info.json provenance).
+      # Rebuilding it on every deploy needs emsdk plus the submodule and is
+      # slow and flaky, so CI verifies the manifest matches the tree instead —
+      # a mismatch means the inputs changed without a local rebuild.
+      # (Rationale lives in wasm/README.md.)
       - name: Verify committed engine manifest
         run: npm run verify:engine-manifest
       - name: Install demo dependencies

@@ -5,9 +5,11 @@ IFS=$'\n\t'
 # Headless-engine builder — compiles vpinball-headless from the pinned
 # external/vpinball submodule plus the in-repo bridge patches, and deploys
 #   demo-browser/public/wasm/vpinball-headless.{js,wasm,wasm.map,data}
-# (gitignored). The .wasm.map sidecar (bridge-wasm-source-maps patch,
-# -gsource-map) is what makes a SIGILL in the shipped engine debuggable;
-# the build fails if it is missing.
+# (committed release build + build-info.json provenance — rebuild and commit
+# them together; CI verifies the manifest instead of rebuilding).
+# The .wasm.map sidecar (bridge-wasm-source-maps patch, -gsource-map) is
+# what makes a SIGILL in the shipped engine debuggable; the build fails if
+# it is missing. Only js/wasm/data ship to Pages (the map stays local).
 # Patches live in wasm/modules/headless/patches/ and apply idempotently,
 # pinmame-style: never hand-edit external/vpinball, change the patch files.
 #   npm run build:wasm:headless          # release (default)
@@ -83,7 +85,7 @@ else
       applied_all=false
       # Present, tracked, and unmodified against HEAD counts as pristine.
       if git -C "$VPINBALL" ls-files --error-unmatch -- "$f" >/dev/null 2>&1 \
-        && [[ -e "$VPINBALL/$f" ]] && git -C "$VPINBALL" diff --quiet -- "$f" >/dev/null 2>&1; then
+        && [[ -e "$VPINBALL/$f" ]] && git -C "$VPINBALL" diff HEAD --quiet -- "$f" >/dev/null 2>&1; then
         : # pristine
       elif [[ ! -e "$VPINBALL/$f" ]] && ! git -C "$VPINBALL" ls-files --error-unmatch -- "$f" >/dev/null 2>&1; then
         : # pristine (series-created file absent)
@@ -95,7 +97,7 @@ else
   # Any other worktree modification outside the series also means "broken".
   state=broken
   if [[ "$applied_all" == true ]]; then
-    extra=$(git -C "$VPINBALL" diff --name-only | grep -vxF -f <(printf '%s\n' "${touched[@]}") || true)
+    extra=$(git -C "$VPINBALL" diff HEAD --name-only | grep -vxF -f <(printf '%s\n' "${touched[@]}") || true)
     [[ -z "$extra" ]] && state=applied || state=broken
   elif [[ "$pristine_all" == true ]]; then
     state=pristine
@@ -179,6 +181,14 @@ emsdk_ver="$(emcc --version 2>/dev/null | head -n1 | grep -oE '[0-9]+\.[0-9]+\.[
     if (( i > 0 )); then printf ', '; fi
     printf '"%s"' "${untracked[$i]}"
   done
-  printf ']\n}\n'
+  # Byte identity of the shipped files, so a stale or hand-replaced binary
+  # cannot pass on matching inputs alone. Map omitted: local-only debug aid.
+  printf '],\n  "artifacts": {\n'
+  artifacts=(vpinball-headless.js vpinball-headless.wasm vpinball-headless.data)
+  for i in "${!artifacts[@]}"; do
+    if (( i < ${#artifacts[@]} - 1 )); then comma=","; else comma=""; fi
+    printf '    "%s": "%s"%s\n' "${artifacts[$i]}" "$(sha256sum "$OUT_DIR/${artifacts[$i]}" | cut -d' ' -f1)" "$comma"
+  done
+  printf '  }\n}\n'
 } > "$OUT_DIR/build-info.json"
 log "manifest: $OUT_DIR/build-info.json"

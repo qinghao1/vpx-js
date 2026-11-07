@@ -21,5 +21,10 @@
     "0016-bridge-wasm-source-maps.patch": "a73fdae0af6d35531fd816f796d3a3b4fc8108a929f55ddc4f1c6656d5b80400",
     "0017-bridge-abi-version-catalog-escape-reset.patch": "263c181429725c0d544e009601a15118da2e7ae6ff0fd09f36dc0cab633dea5b"
   },
-  "untrackedPatches": []
+  "untrackedPatches": [],
+  "artifacts": {
+    "vpinball-headless.js": "c2321cc918ded2d33a66b6db0bd72ad72f69f8c702048079607bfee2a530a7dd",
+    "vpinball-headless.wasm": "35d3abeb3bd19da9cd8cf3bd91c4c0f06065dd4b1195deb06b168dde5827da05",
+    "vpinball-headless.data": "086a299fb4257ed43e6dec2550fe7dfdbbfe3914a139e8d8191607966768b389"
+  }
 }

@@ -57,9 +57,10 @@ async function visit(browser, errors) {
 	page.on('framenavigated', frame => {
 		if (frame === page.mainFrame()) {
 			navigations++
-			// Judge the settled page: a torn-down load's teardown noise (e.g. a
-			// GL context lost to the service-worker install reload) must not
-			// fail the final load — a real defect reproduces there too.
+			// Judge the settled load: teardown noise from a replaced load
+			// (e.g. a GL context lost to the service-worker install reload)
+			// must not fail its replacement. Note errors[] spans both visits,
+			// so first-visit-only errors are intentionally not gated.
 			errors.length = 0
 		}
 	})
@@ -85,7 +86,7 @@ try {
 		: null
 	check(
 		engine?.wasmReady === true,
-		'threaded engine boots on the static host',
+		'threaded engine boots on the static host (WebGL fallback)',
 		engine
 			? `wasmReady=${engine.wasmReady} catalog=${engine.catalogSize} scriptErrors=${engine.scriptErrors} table=${engine.tableName} load=${engine.loadState}`
 			: 'no state',
@@ -114,12 +115,15 @@ try {
 const passed = checks.filter(c => c.ok).length
 console.log(`${passed}/${checks.length} pages checks passed`)
 if (passed !== checks.length) {
-	// Surface failing check names as a CI annotation (job logs need auth).
+	// Surface failing check names as a CI annotation (visible without opening the job log).
+	const escapeAnnotation = s => s.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')
 	console.log(
-		`::error::pages-e2e failed: ${checks
-			.filter(c => !c.ok)
-			.map(c => c.name)
-			.join(' | ')}`,
+		`::error::${escapeAnnotation(
+			`pages-e2e failed: ${checks
+				.filter(c => !c.ok)
+				.map(c => c.name)
+				.join(' | ')}`,
+		)}`,
 	)
 	process.exit(1)
 }

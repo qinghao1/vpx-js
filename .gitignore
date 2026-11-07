@@ -16,7 +16,6 @@ demo-browser/.vite/
 demo-browser/public/wasm/*
 !demo-browser/public/wasm/vpinball-headless.js
 !demo-browser/public/wasm/vpinball-headless.wasm
-!demo-browser/public/wasm/vpinball-headless.wasm.map
 !demo-browser/public/wasm/vpinball-headless.data
 !demo-browser/public/wasm/build-info.json
 demo-browser/public/ab-tmp/
