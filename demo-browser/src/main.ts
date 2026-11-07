@@ -28,7 +28,8 @@ const viewer = new Viewer(options)
 // Dev and localhost handles for humans and e2e: the viewer for scene
 // inspection, `vpx` for the typed test surface.
 if (isDev) {
-	// Lazy so the e2e surface never ships in the prod bundle; a static import would include it.
+	// Dynamic import keeps the e2e surface out of the main bundle; the chunk
+	// is only fetched on dev/localhost (`isDev`), never on the public site.
 	const { createTestApi } = await import('./test-api.js')
 	Object.assign(window, { viewer, vpx: createTestApi(viewer) })
 }

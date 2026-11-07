@@ -12,9 +12,9 @@ Play real Visual Pinball tables in your browser. No install, no build — just o
 2. Click **Open .vpx** and pick a `.vpx` table file from your computer, or append `?vpx=<name|path|URL>` to the address bar to load a hosted table. The table name is mirrored into `?vpx=` so a hosted table URL can be bookmarked or shared; a table picked from disk isn't uploaded, so its link only works for fetchable (hosted or `?vpx=/@fs/…`) paths — re-pick the file after reload.
 3. Click the table (the ▶ Play tip follows your cursor over it) to enter play mode, or open the link with `&mode=play`. The in-demo help dialog lists the keyboard controls.
 
-URL knobs: `?vpx=<name|path|URL>` (`table=` alias), `?rom=<path|URL>`, `?mode=play|viewer` (default `viewer`), `?noaa` (no antialiasing), `?nobatched`, `?webgl` (force WebGL2) — see `demo-browser/AGENTS.md`. Try `?vpx=test/fixtures/table-empty.vpx` on the dev server.
+URL knobs: `?vpx=<name|path|URL>` (`table=` alias), `?rom=<path|URL>`, `?mode=play|viewer` (default `viewer`), `?noaa` (no antialiasing), `?nobatched` (skip static-mesh batching), `?webgl` (force WebGL2) — see `demo-browser/AGENTS.md`. Try `?vpx=test/fixtures/table-empty.vpx` on the dev server.
 
-Real-machine tables also need their game ROM file (`Open .zip ROM`, drag & drop, or `?rom=`); without the right ROM the table still renders but the game logic cannot boot — check the log for engine/script errors. Tables are emulated in-browser, including PinMAME ROM emulation. The viewer defaults to WebGPU; if the GPU cannot start, the log suggests retrying with `?webgl` (or `?noaa`), which forces the three.js WebGL2 backend.
+Real-machine tables also need their game ROM file (`Open .zip ROM`, drag & drop, or `?rom=`); without the right ROM the table still renders but the game logic cannot boot — check the log for engine/script errors. Tables are emulated in-browser, including PinMAME ROM emulation. The viewer defaults to WebGPU; if the GPU cannot start, the log suggests retrying with `?webgl` (forces the three.js WebGL2 backend) or `?noaa` (disables antialiasing).
 
 ## What it is
 

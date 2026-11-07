@@ -15,8 +15,9 @@ export const TRANSMISSION_HEIGHT = 48
 // Native (fs_basic.sc) adds the bulb buffer only to non-opaque pixels (color.a < 1.0).
 // Texels at or above this cutoff count as opaque; the epsilon below strict 1.0 absorbs
 // filtering and half-float precision around fully opaque art.
-// Shares the 0.999 cutout in resolveTransparency (primitive-material-protocol.ts):
-// one rule for playfield-cap/fade, not a coincidence.
+// Keep in sync with the 0.999 cutout in `resolveTransparency`
+// (primitive-material-protocol.ts): both treat alpha ≥ 0.999 as opaque so
+// the CPU flag and this GPU gate agree.
 export const TRANSMISSION_OPAQUE_CUTOFF = 0.999
 
 let texture: DataTexture | null = null

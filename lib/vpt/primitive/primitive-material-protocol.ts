@@ -158,8 +158,8 @@ export function updatePrimitiveAdditive(mat: unknown, opts: PrimitiveAdditiveUpd
 }
 
 /**
- * three.js `SRGBToLinear` / `LinearToSRGB` verbatim (rearranged constants,
- * truncated `0.41666` exponent — `three/build/three.core.js`). A textbook
+ * three.js `SRGBToLinear` / `LinearToSRGB` verbatim (truncated `0.41666`
+ * exponent — `three/build/three.core.js`). A textbook
  * gamma fit differs in the last ulp and flips `.5`-boundary channels, so
  * `multiplyHex` below must use these exact forms to agree with
  * `new Color(a).multiply(new Color(b)).getHex()` — locked by the protocol
@@ -196,9 +196,9 @@ export interface ClassicMaterialFlags {
 export const NORMAL_BLENDING = 1
 
 /**
- * Classic-material alpha flags for alpha-only updates (the opacity value
- * itself lives in applyColor). Shares the creation/BDL rule: the 0.999
- * cutout from `resolveTransparency` plus the additive-blend keep-out.
+ * Alpha-only update for classic materials (BDL/additive opacity is driven by
+ * `applyColor`'s uniforms). Shares the creation/BDL rule: the 0.999 cutout
+ * from `resolveTransparency` plus the additive-blend keep-out.
  */
 export function syncClassicAlphaFlags(material: ClassicMaterialFlags | null | undefined, dynamicOpacity: number): void {
 	if (!material) return

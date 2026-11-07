@@ -73,4 +73,12 @@ describe('syncClassicAlphaFlags', () => {
 		expect(() => syncClassicAlphaFlags(null, 1)).not.toThrow()
 		expect(() => syncClassicAlphaFlags(undefined, 1)).not.toThrow()
 	})
+	it('locks the shared 0.999 cutout', () => {
+		const opaque = { opacity: 0, transparent: true, depthWrite: false, depthTest: true, blending: 1 }
+		syncClassicAlphaFlags(opaque, 0.999)
+		expect(opaque).toMatchObject({ opacity: 0.999, transparent: false, depthWrite: true })
+		const faded = { opacity: 1, transparent: false, depthWrite: true, depthTest: true, blending: 1 }
+		syncClassicAlphaFlags(faded, 0.998)
+		expect(faded).toMatchObject({ opacity: 0.998, transparent: true, depthWrite: false })
+	})
 })
