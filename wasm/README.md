@@ -7,8 +7,9 @@ That directory is a committed release build — CI never rebuilds it, it
 verifies `build-info.json` provenance instead (`npm run
 verify:engine-manifest`) and boots the engine (`npm run verify:pages`). So
 after changing the submodule pin or any patch, rebuild locally and commit the
-binaries together with the code change. The TypeScript side of the bridge is
-`lib/wasm/`.
+binaries together with the code change, from a clean patch dir — the build
+applies every on-disk patch, and the manifest refuses uncommitted ones. The
+TypeScript side of the bridge is `lib/wasm/`.
 
 The engine uses pthreads, so its page must be cross-origin isolated: a server
 you control sends `Cross-Origin-Opener-Policy: same-origin` and

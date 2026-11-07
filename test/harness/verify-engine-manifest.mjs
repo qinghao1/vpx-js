@@ -66,6 +66,8 @@ if (info) {
 		else if (recorded[file] !== hash) fail(`patch ${file} changed since the engine was built`)
 	for (const file of Object.keys(recorded))
 		if (!(file in onDisk)) fail(`patch ${file} recorded in build-info.json but missing from the tree`)
+	for (const file of info.untrackedPatches ?? [])
+		fail(`engine was built with uncommitted patch ${file} — rebuild from a clean tree`)
 }
 
 if (failures.length > 0) {

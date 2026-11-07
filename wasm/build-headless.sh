@@ -162,6 +162,23 @@ emsdk_ver="$(emcc --version 2>/dev/null | head -n1 | grep -oE '[0-9]+\.[0-9]+\.[
     if (( i < ${#series[@]} - 1 )); then comma=","; else comma=""; fi
     printf '    "%s": "%s"%s\n' "$name" "$hash" "$comma"
   done
-  printf '  }\n}\n'
+  # Releasable builds come from a clean patch dir: the build itself applies
+  # every on-disk patch, so record any outside git — the verifier refuses a
+  # dirty build's manifest, forcing a rebuild after commit (or removal).
+  shopt -s nullglob
+  present=("$PATCH_DIR"/*.patch)
+  shopt -u nullglob
+  declare -A seen
+  for p in "${series[@]}"; do seen["$(basename "$p")"]=1; done
+  untracked=()
+  for p in "${present[@]}"; do
+    [[ -n "${seen[$(basename "$p")]:-}" ]] || untracked+=("$(basename "$p")")
+  done
+  printf '  },\n  "untrackedPatches": ['
+  for i in "${!untracked[@]}"; do
+    if (( i > 0 )); then printf ', '; fi
+    printf '"%s"' "${untracked[$i]}"
+  done
+  printf ']\n}\n'
 } > "$OUT_DIR/build-info.json"
 log "manifest: $OUT_DIR/build-info.json"
