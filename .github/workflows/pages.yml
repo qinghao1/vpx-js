@@ -29,10 +29,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout with submodules
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
       - name: Setup node
         uses: actions/setup-node@v4
         with:
@@ -41,32 +39,17 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             demo-browser/package-lock.json
-      - name: Setup emsdk
-        uses: mymindstorm/setup-emsdk@v14
-        with:
-          version: 6.0.13
-      - name: Submodule revisions for the wasm cache key
-        id: sub
-        run: |
-          echo "vpinball=$(git rev-parse HEAD:external/vpinball)" >> "$GITHUB_OUTPUT"
-      # Libs and their generated headers travel together: build-headless.sh
-      # skips external.sh only when both are present. Exact key only — a
-      # partial restore would mix libs from another submodule revision.
-      # The bridge patches touch only src/, make/ and plugins/, never the
-      # libs, so they stay out of the key (else every patch edit voids it).
-      - name: Cache third-party wasm libs
-        uses: actions/cache@v4
-        with:
-          path: |
-            external/vpinball/third-party/build-libs
-            external/vpinball/third-party/include
-          key: wasm-libs-${{ runner.os }}-emsdk-6.0.13-vp-${{ steps.sub.outputs.vpinball }}
       - name: Install root dependencies
         run: npm ci
       - name: Build dist-esm
         run: npm run build:esm
-      - name: Build headless engine
-        run: wasm/build-headless.sh
+      # The engine ships as a committed release build
+      # (demo-browser/public/wasm/ + build-info.json provenance). Rebuilding
+      # emscripten third-party libs from scratch on every deploy is slow and
+      # flaky, so CI verifies the manifest matches the tree instead — a
+      # mismatch means the inputs changed without a local rebuild.
+      - name: Verify committed engine manifest
+        run: npm run verify:engine-manifest
       - name: Install demo dependencies
         run: npm ci
         working-directory: demo-browser

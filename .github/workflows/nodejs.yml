@@ -9,8 +9,8 @@ concurrency:
 jobs:
   check:
     # Lint, typecheck, unit tests, and the harness legs that need no engine
-    # artifact, VPX, ROM, or browser. The browser legs run in pages.yml, which
-    # builds the engine.
+    # artifact, VPX, ROM, or browser. The browser legs run in pages.yml
+    # against the committed engine build (see verify:engine-manifest).
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,6 +20,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build:esm
+      - run: npm run verify:engine-manifest
       - run: npm run check
       - run: npm run verify:table
       - run: npm run verify:play-room
