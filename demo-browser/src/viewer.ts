@@ -1,19 +1,17 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 // @ts-nocheck — viewer is a DOM/three coordinator over loosely-typed runtime
 // subsystems (wasm engine, controls); strict-typing it is a separate migration.
-// Viewer coordinator - delegates to subsystems
 
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import * as THREE from 'three/webgpu'
 import { BrowserBinaryReader } from '../../dist-esm/lib/io/binary-reader.js'
-import { setGlobalEmissionScale } from '../../dist-esm/lib/render/threejs/material-shared.js'
+import { RE_VR, setGlobalEmissionScale } from '../../dist-esm/lib/render/threejs/material-shared.js'
 import {
 	isPrimitiveNodeMaterial,
 	setPrimitiveMap,
 	setPrimitiveTransmissionArea,
 } from '../../dist-esm/lib/render/threejs/nodes/primitive-bdl-node.js'
 import { isBakedNodeMaterial, setBakedMap } from '../../dist-esm/lib/render/threejs/nodes/unshaded-baked-node.js'
-import { RE_VR } from '../../dist-esm/lib/render/threejs/scene-classify.js'
 import {
 	batchStaticOpaques as _batchStaticOpaques,
 	optimizeScene as _optimizeScene,
@@ -811,7 +809,6 @@ export class Viewer {
 			{
 				applyMaterials: true,
 				applyTextures: texLoader,
-				optimizeTextures: false,
 			},
 			(this.gate ??= new AnimationGate()),
 		)

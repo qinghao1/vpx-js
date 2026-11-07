@@ -9,7 +9,7 @@ import {
 	createVrMaterialResolver,
 } from './baked-materials.js'
 import { resolveButtonCode } from './cabinet-buttons.js'
-import { cloneMaterialForWrite } from './material-shared.js'
+import { cloneMaterialForWrite, RE_VR } from './material-shared.js'
 import { isPrimitiveNodeMaterial } from './nodes/primitive-bdl-node.js'
 import { RenderOrder } from './render-order.js'
 import {
@@ -22,7 +22,6 @@ import {
 	pendingOf,
 	RE_NON_OPAQUE,
 	RE_RAMP_FAMILY,
-	RE_VR,
 } from './scene-classify.js'
 import {
 	applyAuthorDebugPass,

@@ -192,7 +192,6 @@ export function initTableBrowser(viewer: BrowserViewer, syncParam: (key: Kind, v
 				)
 			} else {
 				dialog.close()
-				syncParam('vpx', url)
 				viewer.load(url).catch(error => console.error('[catalog] table load failed', error))
 			}
 		})

@@ -3,7 +3,6 @@ import type * as THREE from 'three'
 import { resolveButtonCode } from './cabinet-buttons.js'
 import { isBaked, pendingMapOf, RE_BAKE_MAP, RE_BAKE_MAT, RE_VR } from './material-shared.js'
 
-export { RE_BAKE_MAP, RE_BAKE_MAT, RE_VR }
 export const RE_ALPHA_MESH = /armp|ramp|bat_|non[_-]?opaque|plastic|gate/i
 const RE_CAB = /vrcab|cabinet|lockbar|pincab|backbox|coindoor/i
 

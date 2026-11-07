@@ -15,11 +15,11 @@ URL options (all optional):
 - `vpx=<name|path|url>` (alias `table`) — table to load, e.g. `?vpx=/test/fixtures/table-empty.vpx` or `?vpx=/@fs/path/to/table.vpx`
 - `rom=<path|url>` — PinMAME ROM zip for that table, e.g. `&rom=/@fs/path/to/rom.zip`
 - `mode=play|viewer` — start mode (default `viewer`)
-- `noaa` — no antialiasing; `nobatched` — skip static-mesh batching; `webgl` — force three's WebGL2 backend (default: WebGPU, falling back to WebGL2 when unavailable)
+- `noaa` — no antialiasing; `nobatched` — skip static-mesh batching; `webgl` — force three's WebGL2 backend (default: WebGPU, manual fallback via `?webgl` when unavailable)
 
 Tables and ROMs also load by drag & drop, the file pickers, or the table browser. A ROM belongs to the table on screen (or the one dropped with it): it reboots that table's engine, and a new table without one clears it. Opened files mirror their file name into `?vpx`/`?rom` (page-relative on reload).
 
-Requires `dist-esm` built. `server.fs.allow` covers the repo root, `~/Downloads`, `~/.pinmame/roms` (`strict:false`, COOP/COEP/CORP, `assetsInclude` `*.vpx/*.wasm/*.zip`); the ROM middleware also resolves `~/pinmame/roms` (non-dot) and `public/pinmame/roms/`. The engine artifact is served from `public/wasm/`. `public/test/fixtures/table-empty.vpx` is a tracked copy of `test/fixtures/table-empty.vpx` so static builds ship the default table; keep the two identical.
+Requires `dist-esm` built. `server.fs.allow` covers the repo root, `~/Downloads`, `~/.pinmame/roms` (`strict:false`, COOP/COEP/CORP, `assetsInclude` `*.vpx/*.wasm/*.zip`); the ROM middleware also resolves `~/pinmame/roms` (non-dot) and `public/pinmame/roms/` (full lookup order: `test/harness/README.md`). The engine artifact is served from `public/wasm/`. `public/test/fixtures/table-empty.vpx` is a tracked copy of `test/fixtures/table-empty.vpx` so static builds ship the default table; keep the two identical.
 
 ## Structure
 
@@ -55,4 +55,4 @@ Requires `dist-esm` built. `server.fs.allow` covers the repo root, `~/Downloads`
 npx tsx demo-browser/e2e/integration.mjs '--url=https://localhost:3000/?vpx=/test/fixtures/table-empty.vpx&mode=play' --out=/tmp
 ```
 
-Without `--url` it runs `table-empty.vpx` and, when `findWalkingDead()`/`findWalkingDeadRom()` find them, The Walking Dead with its ROM (`twd` label: every gameplay leg required). That run boots PinMAME, so it catches engine aborts on real tables; it uses the host GPU when one exists (`USE_SWIFTSHADER=1` forces software GL). It tests whatever engine `public/wasm/` holds. Also via `test/harness/verify-browser.ts` and `verify-all.ts`. On bug fixes, add regression test — `lib/**/*.spec.ts` for unit, `demo-browser/e2e/integration.mjs` for E2E.
+Without `--url` it runs `table-empty.vpx` and, when `findWalkingDead()`/`findWalkingDeadRom()` find them, The Walking Dead with its ROM (`twd` label: every gameplay leg required). That run boots PinMAME, so it catches engine aborts on real tables; it uses the host GPU when one exists (`USE_SWIFTSHADER=1` forces software GL). It tests whatever engine `public/wasm/` holds. Also via `npm run verify:browser` (`demo-browser/e2e/integration.mjs`) and `verify-all.ts`. On bug fixes, add regression test — `lib/**/*.spec.ts` for unit, `demo-browser/e2e/integration.mjs` for E2E.

@@ -1,6 +1,7 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 import * as THREE from 'three'
 import { resolveButtonCode } from './cabinet-buttons.js'
+import { RE_VR } from './material-shared.js'
 import { getSlots } from './material-slots.js'
 import { isBulbGlowMaterial } from './nodes/bulb-glow-node.js'
 import { RenderOrder } from './render-order.js'
@@ -17,7 +18,6 @@ import {
 	pendingOf,
 	RE_NON_OPAQUE,
 	RE_RAMP_FAMILY,
-	RE_VR,
 } from './scene-classify.js'
 
 export const RE_KEEP_DARK =

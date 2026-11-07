@@ -18,7 +18,7 @@ if (!vpx) {
 console.log(`Harness — vpx: ${vpx} ${(fs.statSync(vpx).size / 1024 / 1024).toFixed(1)} MB`)
 const table = await Table.load(new NodeBinaryReader(vpx), { skipTextures: false } as any)
 console.log(`Table: ${Object.keys(table.items).length} items, ${Object.keys(table.textures).length} textures`)
-const api = new ThreeRenderApi({ applyMaterials: true, applyTextures: true, optimizeTextures: false } as any)
+const api = new ThreeRenderApi({ applyMaterials: true, applyTextures: true } as any)
 const group = (await table.generateTableNode(api, {
 	exportPlayfield: true,
 	exportPrimitives: true,

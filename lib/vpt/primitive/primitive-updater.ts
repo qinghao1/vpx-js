@@ -1,9 +1,5 @@
 // Copyright (C) 2019 freezy <freezy@vpdb.io> — GPL-2.0 — see LICENSE
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-// `Color` is pure linear-space colorimetry (no renderer); the hex it yields
-// is backend-neutral, so this stays while the sRGB↔linear round-trip must
-// match the renderer exactly.
-import { Color, NormalBlending } from 'three'
 import { Matrix3D } from '../../math/matrix.js'
 import type { IRenderApi } from '../../render/irender-api.js'
 import { Vertex3DNoTex2 } from '../../util/vertex.js'
@@ -15,9 +11,11 @@ import type { PrimitiveData } from './primitive-data.js'
 import {
 	getPrimitiveKind,
 	isPrimitiveNodeMaterial,
+	multiplyHex,
 	PRIMITIVE_ADDITIVE_KIND,
 	PRIMITIVE_BDL_KIND,
 	resolveTransparency,
+	syncClassicAlphaFlags,
 	updatePrimitiveAdditive,
 	updatePrimitiveBdl,
 } from './primitive-material-protocol.js'
@@ -271,7 +269,7 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 		const hexKey = base * 0x1000000 + prim
 		if (hexKey !== this.lastHexKey) {
 			this.lastHexKey = hexKey
-			this.lastHex = new Color(base).multiply(new Color(prim)).getHex()
+			this.lastHex = multiplyHex(base, prim)
 		}
 		const hex = this.lastHex
 		// Upstream applies the controller link *or* the lightmap, never both
@@ -361,14 +359,7 @@ export class PrimitiveUpdater extends ItemUpdater<PrimitiveState> {
 			if (!mat || isPrimitiveNodeMaterial(mat)) continue
 			const rawAlpha = this.state.alpha ?? this.data.alpha
 			const dynamicOpacity = Math.min(1, Math.max(0, rawAlpha * ALPHA_SCALE))
-			// Same shared rule as creation/BDL (file part is empty here, so this only
-			// centralizes the 0.999 cutout with the fade term).
-			const { opacity, transparent } = resolveTransparency(undefined, null, dynamicOpacity)
-			mat.opacity = opacity
-			mat.transparent = transparent
-			mat.depthWrite = !mat.transparent
-			mat.depthTest = true
-			if (mat.blending !== NormalBlending && !mat.userData?.__addBlend) mat.blending = NormalBlending
+			syncClassicAlphaFlags(mat, dynamicOpacity)
 		}
 	}
 

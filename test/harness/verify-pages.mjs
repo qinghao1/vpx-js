@@ -51,7 +51,6 @@ const check = (ok, name, detail = '') => {
 	console.log(`${ok ? '✓' : '✗'} ${name}${detail ? ` — ${detail}` : ''}`)
 }
 
-// Open `url` in a new tab; `loads()` counts the main-frame navigations so far.
 async function visit(browser, errors) {
 	const page = await newPage(browser)
 	let navigations = 0

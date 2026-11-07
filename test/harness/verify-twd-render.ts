@@ -70,7 +70,7 @@ console.log(`# vpx: ${vpxPath}`)
 
 const table = await Table.load(new NodeBinaryReader(vpxPath), { skipTextures: false } as any)
 const loader = new ThreeTextureLoaderNode()
-const api = new ThreeRenderApi({ applyMaterials: true, applyTextures: loader as any, optimizeTextures: false } as any)
+const api = new ThreeRenderApi({ applyMaterials: true, applyTextures: loader as any } as any)
 const group = (await (table as any).generateTableNode(api, {
 	...defaultGenOpts(),
 	preloadTextures: false,

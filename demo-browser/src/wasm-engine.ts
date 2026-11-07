@@ -35,7 +35,7 @@ export interface WasmEngineLoad {
 	rom?: { name: string; zip: Uint8Array }
 }
 
-/** Error thrown when the caller forced `?engine=wasm` but the WASM engine failed to start. */
+/** Error thrown when the WASM engine failed to start. */
 export class WasmEngineStartError extends Error {}
 
 /** The instance whose table is loaded in the shared engine module. */

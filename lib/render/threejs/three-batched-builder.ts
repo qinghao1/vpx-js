@@ -12,9 +12,9 @@ import {
 } from 'three'
 import { isLowQuality } from '../../util/quality.js'
 import type { Table } from '../../vpt/table/table.js'
-import { normalizePendingKeys, pendingMapOf } from './material-shared.js'
+import { normalizePendingKeys, pendingMapOf, RE_VR } from './material-shared.js'
 import { mergeBulbGlowQuads } from './nodes/bulb-glow-node.js'
-import { isButtonLike, isCabName, RE_VR } from './scene-classify.js'
+import { isButtonLike, isCabName } from './scene-classify.js'
 import type { ThreeRenderApi } from './three-render-api.js'
 
 // Buckets below this vertex count cost more in BatchedMesh bookkeeping than one

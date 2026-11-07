@@ -36,7 +36,7 @@ describe('regression: artifact postprocess', { timeout: 20_000 }, () => {
 	}
 	it.skipIf(!walkingDeadVpx)('underwall playfield surfaces must stay hidden (no vertical artifact)', async () => {
 		const table = await loadWalkingDeadTable()
-		const api = new ThreeRenderApi({ applyMaterials: true, applyTextures: true, optimizeTextures: false } as any)
+		const api = new ThreeRenderApi({ applyMaterials: true, applyTextures: true } as any)
 		const group = (await (table as any).generateTableNode(api, {
 			exportPlayfield: true,
 			exportPrimitives: true,
@@ -69,7 +69,7 @@ describe('regression: artifact postprocess', { timeout: 20_000 }, () => {
 	})
 	it.skipIf(!walkingDeadVpx)('ramp BM stays visible before streaming (no dark hole)', async () => {
 		const table = await loadWalkingDeadTable()
-		const api = new ThreeRenderApi({ applyMaterials: true, applyTextures: true, optimizeTextures: false } as any)
+		const api = new ThreeRenderApi({ applyMaterials: true, applyTextures: true } as any)
 		const group = (await (table as any).generateTableNode(api, {
 			exportPlayfield: true,
 			exportPrimitives: true,
@@ -262,7 +262,6 @@ describe('regression: artifact postprocess', { timeout: 20_000 }, () => {
 			const api = new ThreeRenderApi({
 				applyMaterials: true,
 				applyTextures: true,
-				optimizeTextures: false,
 			} as any)
 			const group = (await (table as any).generateTableNode(api, {
 				exportPlayfield: true,

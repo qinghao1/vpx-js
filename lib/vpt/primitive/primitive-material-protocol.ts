@@ -156,3 +156,56 @@ export function updatePrimitiveAdditive(mat: unknown, opts: PrimitiveAdditiveUpd
 		;((userData.__uFlat as { value: ProtocolColor }).value as ProtocolColor).set(tint).multiplyScalar(intensity)
 	}
 }
+
+/**
+ * three.js `SRGBToLinear` / `LinearToSRGB` verbatim (rearranged constants,
+ * truncated `0.41666` exponent — `three/build/three.core.js`). A textbook
+ * gamma fit differs in the last ulp and flips `.5`-boundary channels, so
+ * `multiplyHex` below must use these exact forms to agree with
+ * `new Color(a).multiply(new Color(b)).getHex()` — locked by the protocol
+ * spec, which uses three itself as the oracle.
+ */
+const srgbToLinear = (c: number): number => (c < 0.04045 ? c * 0.0773993808 : (c * 0.9478672986 + 0.0521327014) ** 2.4)
+const linearToSrgb = (c: number): number => (c < 0.0031308 ? c * 12.92 : 1.055 * c ** 0.41666 - 0.055)
+
+/** Backend-neutral multiply of two sRGB hex colors in linear light. */
+export function multiplyHex(base: number, prim: number): number {
+	const channel = (shift: number): number => {
+		const b = srgbToLinear(((base >> shift) & 255) / 255)
+		const p = srgbToLinear(((prim >> shift) & 255) / 255)
+		return Math.round(Math.min(255, Math.max(0, linearToSrgb(b * p) * 255)))
+	}
+	return channel(16) * 65536 + channel(8) * 256 + channel(0)
+}
+
+/** Minimal classic-material surface the updater drives. */
+export interface ClassicMaterialFlags {
+	opacity: number
+	transparent: boolean
+	depthWrite: boolean
+	depthTest: boolean
+	blending: number
+	userData?: { __addBlend?: unknown }
+}
+
+/**
+ * three.js `NormalBlending` enum value. The Blending constants are stable
+ * public API (`NoBlending: 0, NormalBlending: 1, …`), so the protocol names
+ * the value instead of importing three — locked by the protocol spec.
+ */
+export const NORMAL_BLENDING = 1
+
+/**
+ * Classic-material alpha flags for alpha-only updates (the opacity value
+ * itself lives in applyColor). Shares the creation/BDL rule: the 0.999
+ * cutout from `resolveTransparency` plus the additive-blend keep-out.
+ */
+export function syncClassicAlphaFlags(material: ClassicMaterialFlags | null | undefined, dynamicOpacity: number): void {
+	if (!material) return
+	const { opacity, transparent } = resolveTransparency(undefined, null, dynamicOpacity)
+	material.opacity = opacity
+	material.transparent = transparent
+	material.depthWrite = !transparent
+	material.depthTest = true
+	if (material.blending !== NORMAL_BLENDING && !material.userData?.__addBlend) material.blending = NORMAL_BLENDING
+}

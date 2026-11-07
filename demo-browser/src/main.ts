@@ -2,7 +2,6 @@
 
 import { crossOriginIsolate, showIsolationNotice } from './cross-origin-isolation.js'
 import { isDev } from './env.js'
-import { createTestApi } from './test-api.js'
 import { initHelp } from './ui/help-dialog.js'
 import { initTableBrowser } from './ui/table-browser.js'
 import { Viewer } from './viewer.js'
@@ -28,7 +27,11 @@ const options = parseViewerOptions(location.search)
 const viewer = new Viewer(options)
 // Dev and localhost handles for humans and e2e: the viewer for scene
 // inspection, `vpx` for the typed test surface.
-if (isDev) Object.assign(window, { viewer, vpx: createTestApi(viewer) })
+if (isDev) {
+	// Lazy so the e2e surface never ships in the prod bundle; a static import would include it.
+	const { createTestApi } = await import('./test-api.js')
+	Object.assign(window, { viewer, vpx: createTestApi(viewer) })
+}
 initHelp()
 
 /** The viewer reports a failed load on its loading card and log; this keeps the rejection handled. */
