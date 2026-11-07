@@ -73,6 +73,7 @@ import { attachInput } from './input.js'
 import type { DirtyOverlay } from './overlays/dirty-overlay.js'
 import { type Chrome, initChrome } from './ui/chrome.js'
 import { createLog, type PageLog } from './ui/page-log.js'
+import { createFrameMeter } from './utils/frame-meter.js'
 import {
 	$,
 	computeTexMem,
@@ -1844,17 +1845,7 @@ export class Viewer {
 		this.renderer?.setAnimationLoop(this._loop)
 	}
 	_createLoop() {
-		// FPS counts only back-to-back presents, so neither the HUD nor quality
-		// adaptation averages in the idle gaps of the dirty-gated loop (a window
-		// without any reads as idle, 0). Longer gaps are stalls (hidden tab,
-		// blocked main thread), not frames.
-		const WINDOW_MS = 500
-		const MAX_FRAME_GAP_MS = 250
-		let frames = 0
-		let busyMs = 0
-		let lastTick = 0
-		let lastPresented = false
-		let windowStart = performance.now()
+		const meter = createFrameMeter(performance.now())
 		return timestamp => {
 			if (this.isPaused) this.wasmEngine?.resetStepClock(timestamp)
 			// Dirty-gated present: idle frames skip the present (and its matrix
@@ -1885,27 +1876,15 @@ export class Viewer {
 			if (dirty) {
 				if (stateDirty) this.renderApi?.flushMatrixUpdates(this.tableGroup)
 				this._present()
-				const gap = timestamp - lastTick
-				if (lastPresented && gap < MAX_FRAME_GAP_MS) {
-					frames++
-					busyMs += gap
-				}
 				// three resets `info` at the top of every loop frame, so sample right after a present.
 				const info = this.renderer?.info.render
 				if (info) this._frameStats = { draws: info.drawCalls, triangles: info.triangles }
 			}
-			lastPresented = dirty
-			lastTick = timestamp
-			// The HUD refreshes on every window, so mode/pause/engine state shows while idle too;
-			// quality adapts only on windows that were mostly rendering.
-			if (timestamp - windowStart >= WINDOW_MS) {
-				const fps = busyMs > 0 ? Math.round((frames * 1000) / busyMs) : 0
-				this.chrome.updateHud(fps)
-				if (busyMs >= WINDOW_MS / 2) this._adaptQuality(fps, timestamp)
-				frames = 0
-				busyMs = 0
-				windowStart = timestamp
-			}
+			// The HUD refreshes on every window, so mode/pause/engine state shows while idle too.
+			const reading = meter(timestamp, dirty)
+			if (!reading) return
+			this.chrome.updateHud(reading.fps)
+			if (reading.busy) this._adaptQuality(reading.fps, timestamp)
 		}
 	}
 	_present() {

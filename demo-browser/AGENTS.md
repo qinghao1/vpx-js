@@ -38,7 +38,7 @@ Requires `dist-esm` built. `server.fs.allow` covers the repo root, `~/Downloads`
 - `src/ui/chrome.ts` — wires the static chrome to the viewer: toolbar (controls, reset, full screen, sound, exit), HUD (FPS readout → stats card, Copy log), app shortcuts (`` ` ``/F2 stats, M mute, ?/H controls), play-mode screen wake lock; the frame loop feeds it via `chrome.updateHud(fps)`
 - `src/ui/stats-overlay.ts`, `help-dialog.ts`, `page-log.ts`, `src/overlays/dirty-overlay.ts` — stats card cells, controls dialog, in-memory page log (console-mirrored, no `console`/`fetch`/`XHR` monkey-patch), dirty-gated present loop
 - `src/ui/table-browser.ts` — Virtual Pinball Spreadsheet table/ROM browser (`lib/emu/vps-catalog.ts`)
-- `src/utils/candidate-resolver.ts`, `texture-filter.ts` — VPX resolution, downloads & glass-texture filtering
+- `src/utils/candidate-resolver.ts`, `texture-filter.ts`, `frame-meter.ts` — VPX resolution, downloads & glass-texture filtering, FPS of the dirty-gated loop (HUD + quality adaptation)
 - `src/env.js`, `src/utils.js` — env caps/quality flags + `$`/`fmtBytes` helpers and `utils/*` re-exports
 - `tsconfig.json` — `npm run typecheck:demo` (root); `viewer.ts` stays `@ts-nocheck`
 - `vite.config.ts` — `basicSsl`, cross-origin isolation headers, dedupes `three`/`three-mesh-bvh`, aliases `refs.node`→`refs.browser` etc., fixture + ROM middleware; `vite build` externals `three`/`three-mesh-bvh` to the jsDelivr import map in `index.html`

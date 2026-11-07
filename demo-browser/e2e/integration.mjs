@@ -21,12 +21,14 @@ import {
 	backboxChecks,
 	ballChecks,
 	cameraTransitionChecks,
+	chromeChecks,
 	DEFAULT_PAGE,
 	diagnostics,
 	dmdLitChecks,
 	dmdVisibleChecks,
 	glRendererInfo,
 	hideOverlays,
+	layoutChecks,
 	pageLog,
 	physicsChecks,
 	playfieldLightsCheck,
@@ -200,7 +202,11 @@ async function runOne(targetUrl, label) {
 	results.runErrors = runErrors.length === 0 && scriptErrors.length === 0
 	for (const e of runErrors.slice(0, 10)) console.log(`[integration:${label}] pageerror[run] ${e.message}`)
 	for (const t of scriptErrors.slice(0, 10)) console.log(`[integration:${label}] console[run] ${t.slice(0, 300)}`)
-	if (!hasRom(targetUrl)) results.romUrl = await leg(label, 'romUrl', () => romUrlChecks(page))
+	results.chrome = await leg(label, 'chrome', () => chromeChecks(page))
+	if (!hasRom(targetUrl)) {
+		results.layout = await leg(label, 'layout', () => layoutChecks(browser, targetUrl))
+		results.romUrl = await leg(label, 'romUrl', () => romUrlChecks(page))
+	}
 	await page.close().catch(() => {})
 	const optional = hasRom(targetUrl) ? OPTIONAL_WITH_ROM : OPTIONAL_WITHOUT_ROM
 	const ok = Object.entries(results).every(([name, v]) => v === true || (v === 'skip' && optional.has(name)))

@@ -1289,3 +1289,121 @@ export const romUrlChecks = async page => {
 	const afterPlay = await rom()
 	return { pass: inPlay === 'placeholder.zip' && afterPlay === 'placeholder.zip', inPlay, afterPlay }
 }
+
+/**
+ * HUD and focus: a clicked chrome button must hand focus back (a focused
+ * button owns Enter, the plunger), the mode badge must survive mode switches,
+ * and the stats must be the last presented frame's draws and triangles.
+ */
+export const chromeChecks = async page => {
+	await page.evaluate(async () => {
+		document.getElementById('hud').hidden = false
+		await window.vpx.setMode('play')
+	})
+	await page.click('#hud-toggle')
+	await page.evaluate(() => {
+		const v = window.viewer
+		const calls = (window.__sentKeys = [])
+		const send = v._sendKey
+		v._sendKey = (code, down) => {
+			calls.push(`${code}${down ? '+' : '-'}`)
+			return send.call(v, code, down)
+		}
+		window.__restoreSendKey = () => {
+			v._sendKey = send
+		}
+	})
+	await page.keyboard.press('Enter')
+	const result = await page.evaluate(async () => {
+		window.__restoreSendKey()
+		const focus = document.activeElement
+		await window.vpx.setMode('viewer')
+		window.viewer.invalidate()
+		await new Promise(r => setTimeout(r, 700))
+		const badge = document.querySelector('[data-stat="mode"]')
+		const cell = name => Number.parseFloat(document.querySelector(`[data-stat="${name}"]`).textContent)
+		return {
+			enterSent: window.__sentKeys.includes('Enter+'),
+			focusOnButton: focus?.tagName === 'BUTTON',
+			panelOpen: !document.getElementById('debug-panel').hidden,
+			badge: { state: badge.dataset.state, visible: badge.checkVisibility() },
+			draws: cell('draws'),
+			triangles: cell('triangles'),
+		}
+	})
+	await page.evaluate(() => {
+		document.getElementById('hud-toggle').click()
+		document.getElementById('hud').hidden = true
+	})
+	return {
+		...result,
+		pass:
+			result.enterSent &&
+			!result.focusOnButton &&
+			result.panelOpen &&
+			result.badge.state === 'viewer' &&
+			result.badge.visible &&
+			result.draws > 0 &&
+			result.triangles > 0,
+	}
+}
+
+/**
+ * Responsive chrome: at phone (touch) and desktop sizes, in viewer and play
+ * with the stats card open, every visible control stays on screen and no
+ * two overlap.
+ */
+export const layoutChecks = async (browser, url) => {
+	const viewports = [
+		{ width: 320, height: 568, isMobile: true, hasTouch: true },
+		{ width: 390, height: 844, isMobile: true, hasTouch: true },
+		{ width: 844, height: 390, isMobile: true, hasTouch: true },
+		{ width: 1280, height: 800 },
+	]
+	const failures = []
+	for (const viewport of viewports) {
+		const page = await browser.newPage()
+		try {
+			await page.setViewport(viewport)
+			await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 })
+			const { ready } = await waitReady(page, 60000)
+			if (!ready) {
+				failures.push(`${viewport.width}x${viewport.height}: not ready`)
+				continue
+			}
+			for (const mode of ['viewer', 'play']) {
+				const problems = await page.evaluate(async mode => {
+					await window.vpx.setMode(mode)
+					const panel = document.getElementById('debug-panel')
+					if (panel.hidden) document.getElementById('hud-toggle').click()
+					await new Promise(r => setTimeout(r, 300))
+					const boxes = [...document.querySelectorAll('#topbar button, #dock button, #debug-panel')]
+						.filter(el => el.checkVisibility())
+						.map(el => ({ id: el.id || el.textContent.trim(), rect: el.getBoundingClientRect(), el }))
+					const out = []
+					for (const { id, rect } of boxes)
+						if (rect.left < 0 || rect.top < 0 || rect.right > innerWidth || rect.bottom > innerHeight)
+							out.push(`${id} off screen`)
+					for (let i = 0; i < boxes.length; i++)
+						for (let j = i + 1; j < boxes.length; j++) {
+							const a = boxes[i]
+							const b = boxes[j]
+							if (a.el.contains(b.el) || b.el.contains(a.el)) continue
+							if (
+								a.rect.left < b.rect.right &&
+								b.rect.left < a.rect.right &&
+								a.rect.top < b.rect.bottom &&
+								b.rect.top < a.rect.bottom
+							)
+								out.push(`${a.id} overlaps ${b.id}`)
+						}
+					return out
+				}, mode)
+				for (const p of problems) failures.push(`${viewport.width}x${viewport.height} ${mode}: ${p}`)
+			}
+		} finally {
+			await page.close().catch(() => {})
+		}
+	}
+	return { pass: failures.length === 0, failures }
+}
