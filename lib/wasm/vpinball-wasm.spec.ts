@@ -48,7 +48,7 @@ function fakeRaw(): { raw: RawHeadlessModule; malloc: (bytes: Uint8Array) => num
 		_VpxWasm_SetAudioLevel: () => {},
 		_VpxWasm_GetScriptErrorCount: () => 0,
 		_VpxWasm_GetScriptError: () => 0,
-		_VpxWasm_DestroyTable: () => {},
+		_VpxWasm_DestroyTable: async () => {},
 		_malloc: (size: number) => {
 			const ptr = top
 			top += size
@@ -67,7 +67,16 @@ function fakeRaw(): { raw: RawHeadlessModule; malloc: (bytes: Uint8Array) => num
 	return { raw, malloc }
 }
 
-/** Craft a DMD descriptor: 5 words (bytePtr, w, h, format, frameId) + pixel bytes. */
+/** A bridge descriptor: a 64-bit heap offset, then u32 fields (`BridgeBufferView`, `BridgeDmdFrame`). */
+function descriptor(bytePtr: number | bigint, ...fields: number[]): Uint8Array {
+	const desc = new Uint8Array(8 + 4 * fields.length)
+	const view = new DataView(desc.buffer)
+	view.setBigUint64(0, BigInt(bytePtr), true)
+	fields.forEach((field, i) => view.setUint32(8 + 4 * i, field, true))
+	return desc
+}
+
+/** Craft a DMD descriptor (bytePtr, w, h, format, frameId) + pixel bytes. */
 function dmdPtr(
 	fake: ReturnType<typeof fakeRaw>,
 	width: number,
@@ -75,16 +84,7 @@ function dmdPtr(
 	format: number,
 	pixels: Uint8Array,
 ): number {
-	const { raw, malloc } = fake
-	const bytePtr = malloc(pixels)
-	const desc = new Uint8Array(20)
-	const view = new DataView(desc.buffer)
-	view.setUint32(0, bytePtr, true)
-	view.setUint32(4, width, true)
-	view.setUint32(8, height, true)
-	view.setUint32(12, format, true)
-	view.setUint32(16, 7, true)
-	return malloc(desc)
+	return fake.malloc(descriptor(fake.malloc(pixels), width, height, format, 7))
 }
 
 describe('codeToSdlScancode', () => {
@@ -180,16 +180,11 @@ describe('ABI version', () => {
 })
 
 describe('getBuffer', () => {
-	/** Craft a GetBuffer descriptor: 3 words (bytePtr, count, stride) + row bytes. */
+	/** Craft a GetBuffer descriptor (bytePtr, count, stride) + row bytes. */
 	const bufPtr = (fake: ReturnType<typeof fakeRaw>, count: number, stride: number): number => {
 		const rows = new Float32Array(count * stride)
 		for (let i = 0; i < rows.length; i++) rows[i] = i
-		const bytePtr = fake.malloc(new Uint8Array(rows.buffer))
-		const desc = new Uint8Array(12)
-		new DataView(desc.buffer).setUint32(0, bytePtr, true)
-		new DataView(desc.buffer).setUint32(4, count, true)
-		new DataView(desc.buffer).setUint32(8, stride, true)
-		return fake.malloc(desc)
+		return fake.malloc(descriptor(fake.malloc(new Uint8Array(rows.buffer)), count, stride))
 	}
 	it('returns rows for a matching stride', () => {
 		const fake = fakeRaw()
@@ -212,14 +207,15 @@ describe('getBuffer', () => {
 		expect(view?.stride).toBe(WASM_STRIDES.reels)
 		expect(Array.from(view?.view ?? [])).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
 	})
-	/** A GetBuffer descriptor only: 3 words (bytePtr, count, stride). */
-	const descPtr = (fake: ReturnType<typeof fakeRaw>, bytePtr: number, count: number): number => {
-		const desc = new Uint8Array(12)
-		new DataView(desc.buffer).setUint32(0, bytePtr, true)
-		new DataView(desc.buffer).setUint32(4, count, true)
-		new DataView(desc.buffer).setUint32(8, WASM_STRIDES.movers, true)
-		return fake.malloc(desc)
-	}
+	/** A GetBuffer descriptor only (bytePtr, count, stride). */
+	const descPtr = (fake: ReturnType<typeof fakeRaw>, bytePtr: number | bigint, count: number): number =>
+		fake.malloc(descriptor(bytePtr, count, WASM_STRIDES.movers))
+	it('reads the full 64-bit row pointer, not just its low word', () => {
+		const fake = fakeRaw()
+		const rows = fake.malloc(new Uint8Array(4 * WASM_STRIDES.movers))
+		fake.raw._VpxWasm_GetBuffer = () => descPtr(fake, (1n << 32n) + BigInt(rows), 1)
+		expect(() => wrapHeadlessEngine(fake.raw, 'test').getBuffer('movers')).toThrow(`range ${2 ** 32 + rows}+`)
+	})
 	it('maps an empty buffer to undefined', () => {
 		const fake = fakeRaw()
 		fake.raw._VpxWasm_GetBuffer = () => descPtr(fake, 0, 0)
@@ -298,25 +294,13 @@ describe('hostile descriptors', () => {
 	it('rejects unknown DMD formats instead of misdecoding them', () => {
 		const fake = fakeRaw()
 		const pixels = fake.malloc(new Uint8Array(128 * 32))
-		const desc = new Uint8Array(20)
-		const view = new DataView(desc.buffer)
-		view.setUint32(0, pixels, true)
-		view.setUint32(4, 128, true)
-		view.setUint32(8, 32, true)
-		view.setUint32(12, DmdFrameFormat.Srgb565, true)
-		view.setUint32(16, 3, true)
+		const desc = descriptor(pixels, 128, 32, DmdFrameFormat.Srgb565, 3)
 		fake.raw._VpxWasm_GetDmdFrame = () => fake.malloc(desc)
 		expect(wrapHeadlessEngine(fake.raw, 'test').getDmdFrame()).toBeUndefined()
 	})
 	it('throws on absurd DMD dimensions instead of allocating', () => {
 		const fake = fakeRaw()
-		const desc = new Uint8Array(20)
-		const view = new DataView(desc.buffer)
-		view.setUint32(0, 1024, true)
-		view.setUint32(4, 1 << 30, true)
-		view.setUint32(8, 1, true)
-		view.setUint32(12, DmdFrameFormat.Srgb888, true)
-		view.setUint32(16, 3, true)
+		const desc = descriptor(1024, 1 << 30, 1, DmdFrameFormat.Srgb888, 3)
 		fake.raw._VpxWasm_GetDmdFrame = () => fake.malloc(desc)
 		expect(() => wrapHeadlessEngine(fake.raw, 'test').getDmdFrame()).toThrow(HeadlessEngineError)
 	})
@@ -346,7 +330,7 @@ describe('bridge failure codes', () => {
 	it('rejects with a typed error when the table does not load', async () => {
 		const fake = fakeRaw()
 		let freed = 0
-		fake.raw._VpxWasm_LoadTable = () => -4
+		fake.raw._VpxWasm_LoadTable = async () => -4
 		fake.raw._free = () => void freed++
 		await expect(wrapHeadlessEngine(fake.raw, 'test').loadTable(new Uint8Array([1]))).rejects.toMatchObject({
 			op: 'loadTable',
@@ -378,83 +362,23 @@ describe('romMountFileName', () => {
 	})
 })
 
-describe('suspendable receiver', () => {
-	it('calls table load/teardown on the module receiver', async () => {
+describe('JSPI exports', () => {
+	it('awaits the load and checks its bridge code', async () => {
 		const fake = fakeRaw()
-		let loadReceiver: unknown
-		let destroyReceiver: unknown
-		fake.raw._VpxWasm_LoadTable = function (this: unknown) {
-			loadReceiver = this
-			return 0
-		}
-		fake.raw._VpxWasm_DestroyTable = function (this: unknown) {
-			destroyReceiver = this
+		fake.raw._VpxWasm_LoadTable = async () => -4
+		await expect(wrapHeadlessEngine(fake.raw, 'test').loadTable(new Uint8Array([1]))).rejects.toMatchObject({
+			op: 'loadTable',
+		})
+	})
+	it('keeps serving tables after a load that traps', async () => {
+		const fake = fakeRaw()
+		fake.raw._VpxWasm_LoadTable = async () => {
+			throw new WebAssembly.RuntimeError('unreachable')
 		}
 		const engine = wrapHeadlessEngine(fake.raw, 'test')
+		await expect(engine.loadTable(new Uint8Array([1]))).rejects.toBeInstanceOf(WebAssembly.RuntimeError)
+		fake.raw._VpxWasm_LoadTable = async () => 0
 		await expect(engine.loadTable(new Uint8Array([1]))).resolves.toBeUndefined()
-		await engine.destroyTable()
-		expect(loadReceiver).toBe(fake.raw)
-		expect(destroyReceiver).toBe(fake.raw)
-	})
-
-	it('falls back to a sync call only when promising rejects a non-wasm fake', async () => {
-		const prior = (WebAssembly as Record<string, unknown>).promising
-		;(WebAssembly as Record<string, unknown>).promising = () => {
-			throw new TypeError('not a wasm export')
-		}
-		try {
-			const fake = fakeRaw()
-			fake.raw._VpxWasm_LoadTable = () => 0
-			await expect(wrapHeadlessEngine(fake.raw, 'test').loadTable(new Uint8Array([1]))).resolves.toBeUndefined()
-		} finally {
-			;(WebAssembly as Record<string, unknown>).promising = prior
-		}
-	})
-	it('rethrows real failures from WebAssembly.promising instead of hiding them', () => {
-		const prior = (WebAssembly as Record<string, unknown>).promising
-		;(WebAssembly as Record<string, unknown>).promising = () => {
-			throw new RangeError('boom')
-		}
-		try {
-			expect(() => wrapHeadlessEngine(fakeRaw().raw, 'test')).toThrow(RangeError)
-		} finally {
-			;(WebAssembly as Record<string, unknown>).promising = prior
-		}
-	})
-
-	// `WebAssembly.promising` rejects closures over an export, so the wrapper
-	// must hand it the genuine export (identity-checked here), applied on the
-	// module receiver; otherwise table load traps with SuspendError whenever
-	// the bridge actually suspends (fast load right after init).
-	it('hands the raw export to WebAssembly.promising on the module receiver', async () => {
-		const prior = (WebAssembly as Record<string, unknown>).promising
-		const seen: unknown[] = []
-		// The stub honors the receiver the wrapper applies, so the assertion
-		// below observes the wrapper's own forwarding, not the stub's.
-		;(WebAssembly as Record<string, unknown>).promising = (fn: (...args: unknown[]) => unknown) => {
-			seen.push(fn)
-			return function (this: unknown, ...args: unknown[]) {
-				return Promise.resolve(fn.apply(this, args))
-			}
-		}
-		try {
-			const fake = fakeRaw()
-			let loadReceiver: unknown
-			fake.raw._VpxWasm_LoadTable = function (this: unknown) {
-				loadReceiver = this
-				return 0
-			}
-			const engine = wrapHeadlessEngine(fake.raw, 'test')
-			await expect(engine.loadTable(new Uint8Array([1]))).resolves.toBeUndefined()
-			// Both suspendable call sites wrap eagerly at wrap time.
-			expect(seen).toHaveLength(2)
-			expect(seen[0]).toBe(fake.raw._VpxWasm_LoadTable)
-			expect(seen[1]).toBe(fake.raw._VpxWasm_DestroyTable)
-			expect(loadReceiver).toBe(fake.raw)
-		} finally {
-			if (prior === undefined) delete (WebAssembly as Record<string, unknown>).promising
-			else (WebAssembly as Record<string, unknown>).promising = prior
-		}
 	})
 })
 
@@ -527,36 +451,29 @@ describe('loadHeadlessEngine', () => {
 
 describe('table session queue', () => {
 	it('never enters LoadTable while a teardown is still suspended', async () => {
-		const prior = (WebAssembly as Record<string, unknown>).promising
 		const fake = fakeRaw()
 		const entered: string[] = []
-		fake.raw._VpxWasm_DestroyTable = () => void entered.push('destroy')
+		let resume = (): void => {}
+		// Teardown suspends until `resume`, like a JSPI export blocked on an engine thread.
+		fake.raw._VpxWasm_DestroyTable = () =>
+			new Promise<void>(done => {
+				resume = () => {
+					entered.push('destroy')
+					done()
+				}
+			})
 		fake.raw._VpxWasm_LoadTable = () => {
 			entered.push('load')
-			return 0
+			return Promise.resolve(0)
 		}
-		let resume = (): void => {}
-		// Teardown suspends until `resume`; everything else returns at once.
-		;(WebAssembly as Record<string, unknown>).promising =
-			(fn: (...args: unknown[]) => unknown) =>
-			(...args: unknown[]) =>
-				fn === fake.raw._VpxWasm_DestroyTable
-					? new Promise(done => {
-							resume = () => done(fn(...args))
-						})
-					: Promise.resolve(fn(...args))
-		try {
-			const engine = wrapHeadlessEngine(fake.raw, 'test')
-			const destroyed = engine.destroyTable()
-			const loaded = engine.loadTable(new Uint8Array([1]))
-			await new Promise(done => setTimeout(done, 0))
-			expect(entered).toEqual([])
-			resume()
-			await Promise.all([destroyed, loaded])
-			expect(entered).toEqual(['destroy', 'load'])
-		} finally {
-			;(WebAssembly as Record<string, unknown>).promising = prior
-		}
+		const engine = wrapHeadlessEngine(fake.raw, 'test')
+		const destroyed = engine.destroyTable()
+		const loaded = engine.loadTable(new Uint8Array([1]))
+		await new Promise(done => setTimeout(done, 0))
+		expect(entered).toEqual([])
+		resume()
+		await Promise.all([destroyed, loaded])
+		expect(entered).toEqual(['destroy', 'load'])
 	})
 })
 

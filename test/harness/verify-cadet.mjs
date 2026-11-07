@@ -108,6 +108,7 @@ try {
 		const dmd = eng?.getDmdFrame?.()
 		return {
 			scriptErrors: v.wasmEngine?.scriptErrorCount,
+			scriptError: eng?.getScriptError?.(),
 			decoyRowVisible,
 			decoyVisible: worldVisible('primitive-playfield_mesh'),
 			baseVisible: worldVisible('playfield_base'),
@@ -116,7 +117,11 @@ try {
 			dmdVisible: (v.dmdMeshes || []).map(m => !!m.visible),
 		}
 	})
-	check(snap.scriptErrors === 0, 'engine boots with zero script errors', `errors=${snap.scriptErrors}`)
+	check(
+		snap.scriptErrors === 0,
+		'engine boots with zero script errors',
+		`errors=${snap.scriptErrors}${snap.scriptError ? ` last=${JSON.stringify(snap.scriptError)}` : ''}`,
+	)
 	check(snap.baseVisible === true, 'playfield base renders', `visible=${snap.baseVisible}`)
 	check(
 		snap.decoyVisible === false,

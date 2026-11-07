@@ -19,10 +19,15 @@ of the bridge is `lib/wasm/`.
 The engine is committed rather than fetched (no LFS — Pages cannot serve it —
 no Release assets, no per-push rebuild) so Pages deploys and
 `verify:engine-manifest` need no auth, toolchain, or submodule checkout.
-The build targets `-DARCH=wasm32`, which pins `external/vpinball` to
-`64a480a9`: upstream moved its web build to wasm64 (memory64) and dropped the
-wasm32 toolchain right after (`f4a28d2d`), so following upstream master means
-porting the bridge and `lib/wasm` to 64-bit pointers first.
+The build compiles 64-bit code like upstream's web build (`-DARCH=wasm64`)
+and lowers it to a 32-bit memory (`-sMEMORY64=2`, heap under 4GB), so it runs
+on engines without memory64 (Safari) and without memory64's bounds-check
+cost. Every bridge export that takes or returns a pointer is listed in
+`-sSIGNATURE_CONVERSIONS` (0003) so the host passes and receives plain
+numbers; add new ones there, or JS receives a BigInt. Load and teardown are
+`-sJSPI_EXPORTS` and return promises. Emscripten is deprecating `MEMORY64=2`
+(emscripten#27952); the pinned emsdk keeps it, so revisit the lowering before
+bumping emsdk.
 
 The engine uses pthreads, so its page must be cross-origin isolated: a server
 you control sends `Cross-Origin-Opener-Policy: same-origin` and
@@ -48,14 +53,19 @@ state through upstream's public API (script getters, the display resolver,
 part data):
 
 - `0001-headless-player` — `ENABLE_HEADLESS` builds run the player without
-  rendering (Noop backend, no render thread or swap chain, no textures, no
-  display) and step it from the host (`Player::StepHeadlessFrame`).
+  rendering (Noop backend, no render thread or swap chain, no table textures,
+  no display, no canvas) and step it from the host (`Player::StepHeadlessFrame`).
 - `0002-player-state-accessors` — `Primitive::GetCurrentFrame`,
   `DispReel::GetReelValue`, `Player::m_lastScriptError`.
 - `0003-vpx-js-headless-target` — the `vpinball-headless` CMake target around
-  the bridge (`-DVPX_HEADLESS_BRIDGE=<source>`). Local only.
+  the bridge (`-DVPX_HEADLESS_BRIDGE=<source>`). Local only. Its data package
+  keeps every asset the player loads and drops those a headless player does
+  without (UI font, HRTF, web assets, table templates).
+- `0004-standalone-dispatch-omitted-arguments` — script calls that leave out an
+  optional argument (`Play a, , c`, a bare `Debug.Print`) get its default
+  instead of a type mismatch (the generated Invoke proxies).
 
-0001 and 0002 are written for upstream (one PR each); 0003 stays here. The
+0001, 0002 and 0004 are written for upstream (one PR each); 0003 stays here. The
 numbered file names are the series order, and the files are byte exact
 (`.gitattributes`: CRLF upstream sources stay CRLF). The build applies the
 series to a throwaway worktree, compares contents, and classifies the

@@ -2,16 +2,17 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
 
 /**
- * TypeScript side of the headless-engine bridge (`src/web/vpx_wasm_bridge.cpp`,
- * patches under `wasm/modules/headless/patches/`). Without the built artifact
- * every entry point here throws or rejects instead of using a fake engine.
+ * TypeScript side of the headless-engine bridge
+ * (`wasm/modules/headless/bridge/vpx_wasm_bridge.cpp`, built by the target in
+ * `wasm/modules/headless/patches/`). Without the built artifact every entry
+ * point here throws or rejects instead of using a fake engine.
  */
 
 /**
  * Bridge ABI this facade speaks (`VpxWasm_GetAbiVersion`). Bump
  * together with the bridge on any export, descriptor or row-layout change.
  */
-export const HEADLESS_ABI_VERSION = 3
+export const HEADLESS_ABI_VERSION = 4
 
 /** Per-frame state buffer kinds, mirroring `VpxWasm_GetBuffer` (see `FillBuffers`). */
 export type WasmBufferKind = 'balls' | 'movers' | 'lights' | 'prims' | 'flashers' | 'reels'
@@ -239,16 +240,18 @@ export interface DmdFrameDesc {
 }
 
 /**
- * Raw emscripten module surface of `vpinball-headless` (see `vpx_wasm_bridge.cpp`): exported
- * `VpxWasm_*` functions plus the heap views. Use {@link wrapHeadlessEngine}
- * for the byte-array facade; the raw shape is exported for tests only.
+ * Raw emscripten module surface of `vpinball-headless` (see `vpx_wasm_bridge.cpp`):
+ * exported `VpxWasm_*` functions, pointers as numbers, plus the heap views. Use
+ * {@link wrapHeadlessEngine} for the byte-array facade; the raw shape is
+ * exported for tests only.
  */
 export interface RawHeadlessModule {
 	/** Absent on the earliest artifacts; checked once by {@link wrapHeadlessEngine}. */
 	_VpxWasm_GetAbiVersion?(): number
 	_VpxWasm_Init(): number
 	_VpxWasm_MountRom(fileNamePtr: number, zipPtr: number, zipLen: number): number
-	_VpxWasm_LoadTable(vpxPtr: number, vpxLen: number): number
+	/** JSPI export: may block on engine threads. */
+	_VpxWasm_LoadTable(vpxPtr: number, vpxLen: number): Promise<number>
 	_VpxWasm_StepFrame(): void
 	_VpxWasm_GetPartCatalogJson(): number
 	_VpxWasm_GetBuffer(kind: number): number
@@ -259,36 +262,14 @@ export interface RawHeadlessModule {
 	_VpxWasm_SetAudioLevel(volume: number, muted: boolean): void
 	_VpxWasm_GetScriptErrorCount(): number
 	_VpxWasm_GetScriptError(): number
-	_VpxWasm_DestroyTable(): void
+	/** JSPI export: may block on engine threads. */
+	_VpxWasm_DestroyTable(): Promise<void>
 	_malloc(size: number): number
 	_free(ptr: number): void
 	UTF8ToString(ptr: number): string
 	readonly HEAPU8: Uint8Array
 	readonly HEAPU32: Uint32Array
 	readonly HEAPF32: Float32Array
-}
-
-/**
- * Calls that may block on engine threads (table load/teardown) must enter
- * WASM through `WebAssembly.promising` (JSPI); plain calls trap with
- * SuspendError. `promising` only accepts a genuine WASM export — a closure
- * over one is rejected — so callers pass the raw export plus the module
- * receiver instead of an arrow. Non-wasm fakes (unit tests) fall back to a
- * resolved call on the same receiver.
- */
-const suspendable = <A extends unknown[], R>(fn: (...args: A) => R, recv?: unknown): ((...args: A) => Promise<R>) => {
-	const promising = (WebAssembly as unknown as { promising?: unknown }).promising
-	if (typeof promising === 'function') {
-		try {
-			const wrapped = (promising as (fn: (...args: A) => R) => (...args: A) => Promise<R>)(fn)
-			return (...args) => wrapped.apply(recv, args)
-		} catch (error) {
-			// `promising` rejects a non-wasm fake with a TypeError; anything
-			// else is a real failure, so only fakes fall back to a sync call.
-			if (!(error instanceof TypeError)) throw error
-		}
-	}
-	return (...args) => Promise.resolve(fn.apply(recv, args))
 }
 
 /** Facade operations that can fail with a {@link HeadlessEngineError}. */
@@ -385,10 +366,6 @@ export function wrapHeadlessEngine(raw: RawHeadlessModule, url: string): Headles
 		raw.HEAPU8.set(bytes, ptr)
 		return { ptr, len: bytes.length }
 	}
-	// Arrow wrappers keep the module receiver (`promising` suspending calls
-	// enter through the genuine export, applied on that receiver).
-	const loadTableAsync = suspendable(raw._VpxWasm_LoadTable, raw)
-	const destroyTableAsync = suspendable(raw._VpxWasm_DestroyTable, raw)
 	// One module serves table after table. Load and teardown may suspend
 	// (JSPI), so queue them: a teardown never interleaves with the next load.
 	let queue: Promise<unknown> = Promise.resolve()
@@ -398,6 +375,8 @@ export function wrapHeadlessEngine(raw: RawHeadlessModule, url: string): Headles
 		return run
 	}
 	const word = (index: number): number => raw.HEAPU32[index] ?? 0
+	// Descriptors start with a 64-bit heap offset (little-endian, two u32 words), then u32 fields.
+	const offset = (index: number): number => word(index) + word(index + 1) * 2 ** 32
 	// Last published DMD frame: frameId is the bridge change counter.
 	let dmdMemo: { width: number; height: number; format: number; frameId: number; desc: DmdFrameDesc } | undefined
 	// The ABI check rules out layout drift, so a descriptor outside the live
@@ -408,11 +387,11 @@ export function wrapHeadlessEngine(raw: RawHeadlessModule, url: string): Headles
 		throw new HeadlessEngineError('readDescriptor', `range ${bytePtr}+${bytes} is outside the engine heap`)
 	}
 	const readView = (kind: WasmBufferKind) => {
-		const base = raw._VpxWasm_GetBuffer(WASM_BUFFER_IDS[kind]) >>> 2
-		const ptr = word(base)
+		const base = raw._VpxWasm_GetBuffer(WASM_BUFFER_IDS[kind]) / 4
+		const ptr = offset(base)
 		if (!ptr) return undefined
-		const count = word(base + 1)
-		const stride = word(base + 2)
+		const count = word(base + 2)
+		const stride = word(base + 3)
 		assertInHeap(ptr, count * stride * 4, 4, 1 << 24)
 		return { view: floatRowView(raw.HEAPF32.buffer, ptr, count, stride), count, stride }
 	}
@@ -434,7 +413,7 @@ export function wrapHeadlessEngine(raw: RawHeadlessModule, url: string): Headles
 				dmdMemo = undefined
 				const { ptr, len } = copyIn(vpx)
 				try {
-					checkBridgeCode('loadTable', await loadTableAsync(ptr, len))
+					checkBridgeCode('loadTable', await raw._VpxWasm_LoadTable(ptr, len))
 				} finally {
 					raw._free(ptr)
 				}
@@ -451,14 +430,14 @@ export function wrapHeadlessEngine(raw: RawHeadlessModule, url: string): Headles
 				dmdMemo = undefined
 				return undefined
 			}
-			const base = desc >>> 2
-			const bytePtr = word(base)
-			const width = word(base + 1)
-			const height = word(base + 2)
-			const format = word(base + 3)
+			const base = desc / 4
+			const bytePtr = offset(base)
+			const width = word(base + 2)
+			const height = word(base + 3)
+			const format = word(base + 4)
 			// frameId is the bridge's change counter: same id means same
 			// pixels, so skip the heap copy on static frames.
-			const frameId = word(base + 4)
+			const frameId = word(base + 5)
 			if (
 				dmdMemo &&
 				dmdMemo.width === width &&
@@ -503,7 +482,7 @@ export function wrapHeadlessEngine(raw: RawHeadlessModule, url: string): Headles
 		destroyTable: () =>
 			serialized(async () => {
 				dmdMemo = undefined
-				await destroyTableAsync()
+				await raw._VpxWasm_DestroyTable()
 			}),
 	}
 }

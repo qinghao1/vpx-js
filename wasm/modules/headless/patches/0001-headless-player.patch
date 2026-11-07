@@ -1,4 +1,4 @@
-From 961d4cd788d9573fcfa99fb0b72106a69cd4db4a Mon Sep 17 00:00:00 2001
+From 70b997f384a17c91cf2709aff2a8c69b01c4c966 Mon Sep 17 00:00:00 2001
 From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
 Date: Sat, 7 Nov 2026 12:00:00 -0500
 Subject: [PATCH] Headless player: run the game without rendering
@@ -14,21 +14,23 @@ Player::StepHeadlessFrame() and reads the state it needs from the parts.
   no render thread, frames submitted by the renderer execute inline
 - The player skips the 3D scene and texture loading, and runs without display
 - Windows count as focused, like VR ones, so play is never paused for focus
+- Closing the playfield window skips the canvas style reset when the module
+  has no canvas, as a headless one does
 - Accessing a uniform missing from a shader does nothing (reads return a
   neutral value), as the Noop backend reports none. Other builds still
   assert, except for the stereo only 'layer' uniform as before
 
-Builds without ENABLE_HEADLESS are unchanged.
+Builds without ENABLE_HEADLESS behave the same.
 ---
  src/core/player.cpp           | 25 +++++++++++++++---
  src/core/player.h             |  4 +++
  src/renderer/RenderDevice.cpp | 27 ++++++++++++++++---
  src/renderer/Shader.h         | 49 +++++++++++++++++++++++++----------
- src/renderer/Window.cpp       |  3 +++
- 5 files changed, 87 insertions(+), 21 deletions(-)
+ src/renderer/Window.cpp       | 10 +++++--
+ 5 files changed, 92 insertions(+), 23 deletions(-)
 
 diff --git a/src/core/player.cpp b/src/core/player.cpp
-index c0022be98..270f908ca 100644
+index 6fd6216f3..da8a69659 100644
 --- a/src/core/player.cpp
 +++ b/src/core/player.cpp
 @@ -132,7 +132,9 @@ Player::Player(PinTable *const table, const PlayMode playMode, LoadProgress &loa
@@ -41,7 +43,7 @@ index c0022be98..270f908ca 100644
     }
     if (const char* const drv = SDL_GetCurrentVideoDriver()) {
        PLOGI << "SDL video driver: " << drv;
-@@ -459,7 +461,7 @@ void Player::LockRenderThread()
+@@ -461,7 +463,7 @@ void Player::LockRenderThread()
  {
  // Wait for any pending render frame to be finished, then acquire the frame mutex on the game thread.
  // This gives the game thread exclusive access to all the render data (mutual exclusion).
@@ -50,7 +52,7 @@ index c0022be98..270f908ca 100644
     while (m_renderer->m_renderDevice->m_framePending || !m_renderer->m_renderDevice->m_frameMutex.try_lock())
     {
        ProcessOSMessages();
-@@ -469,9 +471,18 @@ void Player::LockRenderThread()
+@@ -471,9 +473,18 @@ void Player::LockRenderThread()
  #endif
  }
  
@@ -70,7 +72,7 @@ index c0022be98..270f908ca 100644
     m_frameMutexHeld = false;
     m_renderer->m_renderDevice->m_frameMutex.unlock();
  #endif
-@@ -698,6 +709,7 @@ void Player::InitTableSession(const bool isInitial)
+@@ -700,6 +711,7 @@ void Player::InitTableSession(const bool isInitial)
  
     //----------------------------------------------------------------------------------
  
@@ -78,7 +80,7 @@ index c0022be98..270f908ca 100644
     if (isInitial)
     {
        // Preload all textures and images: upload textures that are flagged in the used textures
-@@ -968,6 +980,7 @@ void Player::InitTableSession(const bool isInitial)
+@@ -970,6 +982,7 @@ void Player::InitTableSession(const bool isInitial)
        }
  #endif
     }
@@ -86,7 +88,7 @@ index c0022be98..270f908ca 100644
  
     //----------------------------------------------------------------------------------
  
-@@ -2600,7 +2613,7 @@ void Player::PrepareFrame()
+@@ -2604,7 +2617,7 @@ void Player::PrepareFrame()
        m_renderer->m_gpu_profiler.BeginFrame(m_renderer->m_renderDevice->GetCoreDevice());
     #endif
     
@@ -95,7 +97,7 @@ index c0022be98..270f908ca 100644
     // Since the script can be somewhat lengthy, we do an additional sync here
     UpdateGameLogic();
     #endif
-@@ -2614,7 +2627,9 @@ void Player::PrepareFrame()
+@@ -2618,7 +2631,9 @@ void Player::PrepareFrame()
     #endif
  
     // Prepare main 3D scene frame, then apply screenspace transforms, including ancillary window rendering (MSAA, AO, AA, stereo, ball motion blur, tonemapping, dithering, bloom,...)
@@ -105,7 +107,7 @@ index c0022be98..270f908ca 100644
  
     m_physics->ResetPerFrameStats();
  
-@@ -2627,7 +2642,9 @@ void Player::PrepareFrame()
+@@ -2631,7 +2646,9 @@ void Player::PrepareFrame()
  
  void Player::SubmitFrame()
  {
@@ -117,10 +119,10 @@ index c0022be98..270f908ca 100644
        m_renderer->m_renderDevice->m_framePending = true;
        m_renderer->m_renderDevice->m_frameReadySem.release();
 diff --git a/src/core/player.h b/src/core/player.h
-index 33208ecf0..7de6ce5dd 100644
+index 1b3b93863..6b337913c 100644
 --- a/src/core/player.h
 +++ b/src/core/player.h
-@@ -193,6 +193,10 @@ public:
+@@ -194,6 +194,10 @@ public:
     void GameLoop();
  
     void UpdateGameLogic();
@@ -132,7 +134,7 @@ index 33208ecf0..7de6ce5dd 100644
     VideoSyncMode GetVideoSyncMode() const { return m_playMode == Player::PlayMode::CaptureAttract ? VideoSyncMode::VSM_NONE : m_videoSyncMode; }
     void SetVideoSyncMode(VideoSyncMode mode) { m_videoSyncMode = mode; }
 diff --git a/src/renderer/RenderDevice.cpp b/src/renderer/RenderDevice.cpp
-index 7bdee85f8..9bfa693d7 100644
+index c5e22e974..cadbcded3 100644
 --- a/src/renderer/RenderDevice.cpp
 +++ b/src/renderer/RenderDevice.cpp
 @@ -591,6 +591,10 @@ void RenderDevice::RenderThread(RenderDevice* rd, bgfx::Init init)
@@ -146,7 +148,7 @@ index 7bdee85f8..9bfa693d7 100644
  #if defined(__STANDALONE__) && !defined(_WIN32) // bgfx/GLES lockup workaround for Android, not needed on Windows
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
  #endif
-@@ -1424,8 +1428,12 @@ RenderDevice::RenderDevice(
+@@ -1467,8 +1471,12 @@ RenderDevice::RenderDevice(
     if (!backendMatched && !gfxBackend.empty() && gfxBackend != "Default"s) {
        PLOGW << "Ignoring unknown or unsupported graphics backend '" << gfxBackend << "' (case sensitive), using platform default. Valid values: " << validBackends;
     }
@@ -159,7 +161,7 @@ index 7bdee85f8..9bfa693d7 100644
     if (g_pplayer->m_vrDevice == nullptr)
     {
        // Requested only: BGFX may fall back to another backend if the requested one cannot initialize. The
-@@ -1440,7 +1448,9 @@ RenderDevice::RenderDevice(
+@@ -1483,7 +1491,9 @@ RenderDevice::RenderDevice(
     init.swapChain.width = swapchainWnd->GetPixelWidth();
     init.swapChain.height = swapchainWnd->GetPixelHeight();
     init.platformData.context = nullptr;
@@ -170,7 +172,7 @@ index 7bdee85f8..9bfa693d7 100644
     if (SDL_GetCurrentVideoDriver() == "x11"sv) {
        init.swapChain.ndt = SDL_GetPointerProperty(SDL_GetWindowProperties(swapchainWnd->GetCore()), SDL_PROP_WINDOW_X11_DISPLAY_POINTER, NULL);
        init.swapChain.nwh = (void*)SDL_GetNumberProperty(SDL_GetWindowProperties(swapchainWnd->GetCore()), SDL_PROP_WINDOW_X11_WINDOW_NUMBER, 0);
-@@ -1472,8 +1482,12 @@ RenderDevice::RenderDevice(
+@@ -1515,8 +1525,12 @@ RenderDevice::RenderDevice(
  
     ResetActiveView();
  
@@ -184,7 +186,7 @@ index 7bdee85f8..9bfa693d7 100644
  #ifdef __EMSCRIPTEN__
     // The render thread owns the canvas (transferred as an OffscreenCanvas) since it is the one creating the WebGPU surface
     CanvasRenderHost::Get().Run([this, init] { RenderThread(this, init); });
-@@ -1489,6 +1503,7 @@ RenderDevice::RenderDevice(
+@@ -1532,6 +1546,7 @@ RenderDevice::RenderDevice(
        Sleep(0);
  #endif
     }
@@ -192,7 +194,7 @@ index 7bdee85f8..9bfa693d7 100644
     m_useLowPrecision = bgfx::getRendererType() == bgfx::RendererType::OpenGLES;
  
  #elif defined(ENABLE_OPENGL)
-@@ -1984,7 +1999,7 @@ RenderDevice::RenderDevice(
+@@ -2027,7 +2042,7 @@ RenderDevice::RenderDevice(
  
  RenderDevice::~RenderDevice()
  {
@@ -201,7 +203,7 @@ index 7bdee85f8..9bfa693d7 100644
        // Suspend rendering before deleting anything that could be used
        m_renderDeviceAlive = false;
        m_frameReadySem.release();
-@@ -2047,6 +2062,9 @@ RenderDevice::~RenderDevice()
+@@ -2090,6 +2105,9 @@ RenderDevice::~RenderDevice()
     if (bgfx::isValid(m_srgbMipmapProgram))
        bgfx::destroy(m_srgbMipmapProgram);
  
@@ -211,7 +213,7 @@ index 7bdee85f8..9bfa693d7 100644
     // Shutdown BGFX once all native resources have been cleaned up
     m_rendererInitialized.release();
     while (!m_renderDeviceAlive)
-@@ -2064,6 +2082,7 @@ RenderDevice::~RenderDevice()
+@@ -2107,6 +2125,7 @@ RenderDevice::~RenderDevice()
     if (m_renderThread.joinable())
        m_renderThread.join();
  #endif
@@ -219,7 +221,7 @@ index 7bdee85f8..9bfa693d7 100644
  
  #elif defined(ENABLE_OPENGL)
     m_quadPNTDynMeshBuffer = nullptr;
-@@ -2814,7 +2833,7 @@ void RenderDevice::SubmitRenderFrame()
+@@ -2858,7 +2877,7 @@ void RenderDevice::SubmitRenderFrame()
  {
     // A pending command dependency is only valid for the frame being recorded: drop it to avoid keeping a pointer on a recycled pass
     m_nextRenderCommandDependency = nullptr;
@@ -229,10 +231,10 @@ index 7bdee85f8..9bfa693d7 100644
     if (!CanvasRenderHost::Get().IsCurrentThread())
  #else
 diff --git a/src/renderer/Shader.h b/src/renderer/Shader.h
-index b11af9459..7b5894294 100644
+index e17364d43..19491327d 100644
 --- a/src/renderer/Shader.h
 +++ b/src/renderer/Shader.h
-@@ -621,6 +621,17 @@ public:
+@@ -622,6 +622,17 @@ public:
        return m_state.data() + m_stateOffsets[static_cast<unsigned int>(uniformName)];
     }
  
@@ -250,7 +252,7 @@ index b11af9459..7b5894294 100644
     void CopyTo(const bool copyTo, ShaderState* const other)
     {
        assert(other->m_stateOffsets == m_stateOffsets);
-@@ -642,7 +653,8 @@ public:
+@@ -643,7 +654,8 @@ public:
     {
        assert(Shader::GetCurrentShader() == nullptr);
        assert(static_cast<unsigned int>(uniformName) < static_cast<unsigned int>(ShaderUniform::COUNT));
@@ -260,7 +262,7 @@ index b11af9459..7b5894294 100644
        assert(ShaderUniformDef::coreUniforms[static_cast<unsigned int>(uniformName)].type == ShaderUniformType::Bool);
        assert(ShaderUniformDef::coreUniforms[static_cast<unsigned int>(uniformName)].count == 1);
        *(bool*)(m_state.data() + m_stateOffsets[static_cast<unsigned int>(uniformName)]) = b;
-@@ -652,9 +664,8 @@ public:
+@@ -653,9 +665,8 @@ public:
     {
        assert(Shader::GetCurrentShader() == nullptr);
        assert(static_cast<unsigned int>(uniformName) < static_cast<unsigned int>(ShaderUniform::COUNT));
@@ -272,7 +274,7 @@ index b11af9459..7b5894294 100644
        assert(ShaderUniformDef::coreUniforms[static_cast<unsigned int>(uniformName)].type == ShaderUniformType::Int);
        assert(ShaderUniformDef::coreUniforms[static_cast<unsigned int>(uniformName)].count == 1);
        *(int*)(m_state.data() + m_stateOffsets[static_cast<unsigned int>(uniformName)]) = i;
-@@ -664,7 +675,8 @@ public:
+@@ -665,7 +676,8 @@ public:
     {
        assert(Shader::GetCurrentShader() == nullptr);
        assert(static_cast<unsigned int>(uniformName) < static_cast<unsigned int>(ShaderUniform::COUNT));
@@ -282,7 +284,7 @@ index b11af9459..7b5894294 100644
        assert(ShaderUniformDef::coreUniforms[static_cast<unsigned int>(uniformName)].type == ShaderUniformType::Float);
        assert(ShaderUniformDef::coreUniforms[static_cast<unsigned int>(uniformName)].count == 1);
        if (m_useLowPrecision)
-@@ -677,7 +689,8 @@ public:
+@@ -678,7 +690,8 @@ public:
     {
        assert(Shader::GetCurrentShader() == nullptr);
        assert(static_cast<unsigned int>(uniformName) < static_cast<unsigned int>(ShaderUniform::COUNT));
@@ -292,7 +294,7 @@ index b11af9459..7b5894294 100644
        assert(ShaderUniformDef::coreUniforms[static_cast<unsigned int>(uniformName)].type == ShaderUniformType::Float);
        assert(ShaderUniformDef::coreUniforms[static_cast<unsigned int>(uniformName)].count == 1);
        return *(float*)(m_state.data() + m_stateOffsets[static_cast<unsigned int>(uniformName)]);
-@@ -687,7 +700,8 @@ public:
+@@ -688,7 +701,8 @@ public:
     {
        assert(Shader::GetCurrentShader() == nullptr);
        assert(static_cast<unsigned int>(uniformName) < static_cast<unsigned int>(ShaderUniform::COUNT));
@@ -302,7 +304,7 @@ index b11af9459..7b5894294 100644
        assert(ShaderUniformDef::coreUniforms[static_cast<unsigned int>(uniformName)].type == ShaderUniformType::Float2 || ShaderUniformDef::coreUniforms[static_cast<unsigned int>(uniformName)].type == ShaderUniformType::Float3
           || ShaderUniformDef::coreUniforms[static_cast<unsigned int>(uniformName)].type == ShaderUniformType::Float4
           || ShaderUniformDef::coreUniforms[static_cast<unsigned int>(uniformName)].type == ShaderUniformType::Float4v);
-@@ -742,7 +756,8 @@ public:
+@@ -743,7 +757,8 @@ public:
     vec4 GetVector(const ShaderUniform uniformName) const
     {
        assert(static_cast<unsigned int>(uniformName) < static_cast<unsigned int>(ShaderUniform::COUNT));
@@ -312,7 +314,7 @@ index b11af9459..7b5894294 100644
        assert(ShaderUniformDef::coreUniforms[static_cast<unsigned int>(uniformName)].type == ShaderUniformType::Float2 || ShaderUniformDef::coreUniforms[static_cast<unsigned int>(uniformName)].type == ShaderUniformType::Float3
           || ShaderUniformDef::coreUniforms[static_cast<unsigned int>(uniformName)].type == ShaderUniformType::Float4
           || ShaderUniformDef::coreUniforms[static_cast<unsigned int>(uniformName)].type == ShaderUniformType::Float4v);
-@@ -761,7 +776,8 @@ public:
+@@ -762,7 +777,8 @@ public:
     {
        assert(Shader::GetCurrentShader() == nullptr);
        assert(static_cast<unsigned int>(uniformName) < static_cast<unsigned int>(ShaderUniform::COUNT));
@@ -322,7 +324,7 @@ index b11af9459..7b5894294 100644
        assert(ShaderUniformDef::coreUniforms[static_cast<unsigned int>(uniformName)].type == ShaderUniformType::Float3x4
           || ShaderUniformDef::coreUniforms[static_cast<unsigned int>(uniformName)].type == ShaderUniformType::Float4x3
           || ShaderUniformDef::coreUniforms[static_cast<unsigned int>(uniformName)].type == ShaderUniformType::Float4x4);
-@@ -789,7 +805,11 @@ public:
+@@ -790,7 +806,11 @@ public:
     const Matrix3D& GetMatrix(const ShaderUniform uniformName) const
     {
        assert(static_cast<unsigned int>(uniformName) < static_cast<unsigned int>(ShaderUniform::COUNT));
@@ -335,7 +337,7 @@ index b11af9459..7b5894294 100644
        assert(ShaderUniformDef::coreUniforms[static_cast<unsigned int>(uniformName)].type == ShaderUniformType::Float3x4
           || ShaderUniformDef::coreUniforms[static_cast<unsigned int>(uniformName)].type == ShaderUniformType::Float4x3
           || ShaderUniformDef::coreUniforms[static_cast<unsigned int>(uniformName)].type == ShaderUniformType::Float4x4);
-@@ -801,7 +821,8 @@ public:
+@@ -802,7 +822,8 @@ public:
     {
        assert(Shader::GetCurrentShader() == nullptr);
        assert(static_cast<unsigned int>(uniformName) < static_cast<unsigned int>(ShaderUniform::COUNT));
@@ -345,7 +347,7 @@ index b11af9459..7b5894294 100644
        assert(ShaderUniformDef::coreUniforms[static_cast<unsigned int>(uniformName)].type == ShaderUniformType::DataBlock);
        if (m_useLowPrecision)
        {
-@@ -835,7 +856,8 @@ public:
+@@ -836,7 +857,8 @@ public:
        #elif defined(ENABLE_DX9)
        ShaderUniform alias = m_shader->m_uniform_desc[static_cast<unsigned int>(uniformName)].tex_alias;
        #endif
@@ -355,7 +357,7 @@ index b11af9459..7b5894294 100644
        int* dst = reinterpret_cast<int*>(m_state.data() + m_stateOffsets[static_cast<unsigned int>(alias)]);
  
        int pos = (*dst) & 0xFF;
-@@ -886,7 +908,8 @@ public:
+@@ -887,7 +909,8 @@ public:
     const std::shared_ptr<const Sampler> GetTexture(const ShaderUniform uniformName) const
     {
        assert(static_cast<unsigned int>(uniformName) < static_cast<unsigned int>(ShaderUniform::COUNT));
@@ -366,10 +368,24 @@ index b11af9459..7b5894294 100644
        assert(ShaderUniformDef::coreUniforms[static_cast<unsigned int>(uniformName)].count == 1);
        const int pos = (*(int*)(m_state.data() + m_stateOffsets[static_cast<unsigned int>(uniformName)])) & 0xFF;
 diff --git a/src/renderer/Window.cpp b/src/renderer/Window.cpp
-index 95da8d0f9..214796bf9 100644
+index 79a42408e..4ff8e3721 100644
 --- a/src/renderer/Window.cpp
 +++ b/src/renderer/Window.cpp
-@@ -369,6 +369,9 @@ void Window::RaiseAndFocus()
+@@ -319,8 +319,11 @@ Window::~Window()
+ #ifdef __EMSCRIPTEN__
+    if (m_windowId == VPXWindowId::VPXWINDOW_Playfield)
+       MAIN_THREAD_EM_ASM({
+-         Module.canvas.style.removeProperty('width');
+-         Module.canvas.style.removeProperty('height');
++         if (Module.canvas) // Absent in a headless module, which presents nothing
++         {
++            Module.canvas.style.removeProperty('width');
++            Module.canvas.style.removeProperty('height');
++         }
+       });
+ #endif
+ }
+@@ -383,6 +386,9 @@ void Window::RaiseAndFocus()
  }
  
  bool Window::IsFocused() const {

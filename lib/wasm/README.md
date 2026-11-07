@@ -12,7 +12,7 @@ WASM. This seam is the only boundary between them.
 | File                      | Purpose                                                                                                                                                                                                                |
 | :------------------------ | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `vpinball-wasm.ts`        | C ABI surface (`VpxWasm_*`), buffer kinds/strides/tags, and `loadHeadlessEngine`, which rejects with `HeadlessEngineMissingError` when the artifact 404s (`HeadlessEngineError` otherwise). No fake engine.            |
-| `vpinball-wasm.spec.ts`   | Facade unit tests on a heap-backed fake bridge: ABI refusal, buffer/DMD decoding, hostile descriptors, failure codes, load-error sorting, suspendable receiver.                                                        |
+| `vpinball-wasm.spec.ts`   | Facade unit tests on a heap-backed fake bridge: ABI refusal, buffer/DMD decoding, hostile descriptors, failure codes, load-error sorting, JSPI exports.                                                                |
 | `wasm-scene-sync.ts`      | `WasmSceneSync`: writes WASM buffer rows into the existing `*State` objects and calls the existing `*Updater.applyState`. The host (viewer) owns scene nodes, updaters, and the lightmap fan-out. No three.js imports. |
 | `wasm-scene-sync.spec.ts` | Mocked-buffer unit tests: ball spawn/move/remove, every mover row, light rows, prim/flasher dirty rows, diff gating, phase timings, flasher image policy.                                                              |
 
@@ -42,7 +42,8 @@ Build with `npm run build:wasm:headless`, which outputs
 `build-info.json` (all committed; the `.wasm.map` stays local-only).
 `HeadlessEngine` is the only boundary: byte-array in, typed rows/DMD/script
 errors out. Calls that may block on engine threads (`loadTable`,
-`destroyTable`) enter WASM through `WebAssembly.promising` (JSPI).
+`destroyTable`) are JSPI exports that return promises; pointers cross as
+numbers (see `wasm/README.md`).
 
 The facade checks `VpxWasm_GetAbiVersion` once per module against
 `HEADLESS_ABI_VERSION`; a mismatch throws `HeadlessEngineError` (`op: 'abi'`)

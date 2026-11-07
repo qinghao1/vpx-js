@@ -1,4 +1,4 @@
-From 6291521010f04a67527fbd8c7b28460428aba352 Mon Sep 17 00:00:00 2001
+From e7e2f5f1668f1df55f32373266cb59621bcde6d7 Mon Sep 17 00:00:00 2001
 From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
 Date: Sat, 7 Nov 2026 12:00:00 -0500
 Subject: [PATCH] Player: expose primitive animation frame, EM reel digits and
@@ -17,10 +17,10 @@ Read-only state a host embedding the player needs to mirror a running table:
  4 files changed, 5 insertions(+), 1 deletion(-)
 
 diff --git a/src/core/player.cpp b/src/core/player.cpp
-index 270f908ca..43dcd8c1b 100644
+index da8a69659..943775399 100644
 --- a/src/core/player.cpp
 +++ b/src/core/player.cpp
-@@ -1662,7 +1662,8 @@ void Player::OnScriptError(ScriptInterpreter::ErrorType type, int line, int colu
+@@ -1666,7 +1666,8 @@ void Player::OnScriptError(ScriptInterpreter::ErrorType type, int line, int colu
  
     const string errorType = (type == ScriptInterpreter::ErrorType::Runtime) ? "Runtime" : "Compile";
     const string desc = string_from_utf8_or_cp1252(description.c_str(), description.length());
@@ -31,10 +31,10 @@ index 270f908ca..43dcd8c1b 100644
     {
        m_liveUI->PushNotification(errorType + " error: " + desc, 5000);
 diff --git a/src/core/player.h b/src/core/player.h
-index 7de6ce5dd..044ee4b6d 100644
+index 6b337913c..c94882d63 100644
 --- a/src/core/player.h
 +++ b/src/core/player.h
-@@ -397,6 +397,7 @@ public:
+@@ -399,6 +399,7 @@ public:
  
     CComObject<ScriptInterpreter>* m_scriptInterpreter = nullptr;
     unsigned int m_nScriptErrorNotification = 0;

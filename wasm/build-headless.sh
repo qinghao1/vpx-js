@@ -22,7 +22,8 @@ readonly ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly VPINBALL="$ROOT/external/vpinball"
 readonly PATCH_DIR="$ROOT/wasm/modules/headless/patches"
 readonly BRIDGE="$ROOT/wasm/modules/headless/bridge/vpx_wasm_bridge.cpp"
-readonly BUILD_DIR="$VPINBALL/build/wasm-wasm32"
+readonly ARCH="wasm64"
+readonly BUILD_DIR="$VPINBALL/build/wasm-$ARCH"
 readonly OUT_DIR="$ROOT/demo-browser/public/wasm"
 
 log() { printf '[headless] %s\n' "$*"; }
@@ -128,15 +129,15 @@ if (( CLEAN )); then
 fi
 
 # Third-party wasm libs + their headers (cached per lib; re-runs are cheap).
-# external.sh copies this header last, so its presence means both the
-# build-libs and the generated (untracked) third-party/include are complete.
-if [[ ! -f "$VPINBALL/third-party/include/spatialaudio/SpatialaudioConfig.h" ]]; then
+# external.sh copies these two last: the arch's libs and the shared headers are complete.
+if [[ ! -f "$VPINBALL/third-party/build-libs/wasm-$ARCH/libspatialaudio.a" \
+  || ! -f "$VPINBALL/third-party/include/spatialaudio/SpatialaudioConfig.h" ]]; then
   log "building third-party wasm libs (one-time; cached per lib)"
-  (cd "$VPINBALL" && BUILD_TYPE="$BUILD_TYPE" bash platforms/wasm-wasm32/external.sh)
+  (cd "$VPINBALL" && BUILD_TYPE="$BUILD_TYPE" bash "platforms/wasm-$ARCH/external.sh")
 fi
 
 log "configuring ($BUILD_TYPE)"
-emcmake cmake -DPLATFORM=wasm -DARCH=wasm32 "-DCMAKE_BUILD_TYPE=$BUILD_TYPE" "-DVPX_HEADLESS_BRIDGE=$BRIDGE" -B "$BUILD_DIR" -S "$VPINBALL" >/dev/null
+emcmake cmake -DPLATFORM=wasm "-DARCH=$ARCH" "-DCMAKE_BUILD_TYPE=$BUILD_TYPE" "-DVPX_HEADLESS_BRIDGE=$BRIDGE" -B "$BUILD_DIR" -S "$VPINBALL" >/dev/null
 log "building vpinball-headless — $(emcc --version 2>/dev/null | head -n1)"
 JOBS="${JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
 cmake --build "$BUILD_DIR" --target vpinball-headless --parallel "$JOBS"

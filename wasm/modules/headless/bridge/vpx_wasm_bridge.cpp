@@ -10,11 +10,13 @@
 #include "core/stdafx.h"
 
 #include <chrono>
+#include <cstddef>
 #include <cstring>
 #include <filesystem>
 #include <string>
 #include <vector>
 
+#include "core/SettingsService.h"
 #include "core/VPApp.h"
 #include "core/extern.h"
 #include "core/player.h"
@@ -38,6 +40,7 @@
 #include "physics/hitball.h"
 #include "ui/VPXFileFeedback.h"
 
+#include <SDL3/SDL_hints.h>
 #include <emscripten.h>
 
 namespace
@@ -78,22 +81,26 @@ std::string g_catalog;
 std::string g_flasherImage;
 std::vector<float> g_buf[BufferKinds];
 
+// Descriptors the host reads as little-endian u32 words: a 64-bit heap
+// offset, then 32-bit fields.
 struct BridgeBufferView
 {
-   int ptr;
-   int count;
-   int stride;
+   uint64_t ptr;
+   int32_t count;
+   int32_t stride;
 };
+static_assert(sizeof(BridgeBufferView) == 16 && offsetof(BridgeBufferView, count) == 8);
 BridgeBufferView g_view;
 
 struct BridgeDmdFrame
 {
-   int ptr;
-   int width;
-   int height;
-   int format; // CTLPI_DISPLAY_FORMAT_LUM32F or _SRGB888
-   int frameId;
+   uint64_t ptr;
+   int32_t width;
+   int32_t height;
+   int32_t format; // CTLPI_DISPLAY_FORMAT_LUM32F or _SRGB888
+   int32_t frameId;
 };
+static_assert(sizeof(BridgeDmdFrame) == 24 && offsetof(BridgeDmdFrame, width) == 8);
 BridgeDmdFrame g_dmd;
 std::vector<uint8_t> g_dmdRgb; // SRGB565 frames widened to SRGB888
 
@@ -350,20 +357,27 @@ extern "C"
 
 // Bump on any change to the exported functions, descriptor structs or buffer
 // row layouts; vpx-js refuses an engine whose version differs
-// (HEADLESS_ABI_VERSION in lib/wasm/vpinball-wasm.ts).
-EMSCRIPTEN_KEEPALIVE int VpxWasm_GetAbiVersion() { return 3; }
+// (HEADLESS_ABI_VERSION in lib/wasm/vpinball-wasm.ts). Exports that take or
+// return pointers are listed in SIGNATURE_CONVERSIONS and the ones that may
+// block in JSPI_EXPORTS (the vpinball-headless target, patch 0003), so the
+// host sees plain numbers and promises.
+EMSCRIPTEN_KEEPALIVE int VpxWasm_GetAbiVersion() { return 4; }
 
 EMSCRIPTEN_KEEPALIVE int VpxWasm_Init()
 {
    if (g_app)
       return 0;
-   // Play in VR mode: scripts read RenderingMode = 2 and show their own room and cabinet.
-   Settings::SetStandalone_RenderingModeOverride_Default(2);
-   // No B2S window exists: the host shows the table's own desktop backdrop. Hint
-   // controller.vbs off B2S, or B2SOn scripts hide their EM reels and backdrop items.
-   Settings::SetController_ForceDisableB2S_Default(true);
+   // The engine presents nothing: keep SDL's window off the host page's canvas.
+   SDL_SetHint(SDL_HINT_EMSCRIPTEN_CANVAS_SELECTOR, "#vpx-headless-none");
    g_app = new VPApp();
    g_app->InitInstance(true);
+   // App-level values, inherited by every table's settings:
+   Settings &settings = g_settingsService.GetAppSettings();
+   // Play in VR mode: scripts read RenderingMode = 2 and show their own room and cabinet.
+   settings.SetStandalone_RenderingModeOverride(2, false);
+   // No B2S window exists: the host shows the table's own desktop backdrop. Hint
+   // controller.vbs off B2S, or B2SOn scripts hide their EM reels and backdrop items.
+   settings.SetController_ForceDisableB2S(true, false);
    return 0;
 }
 
@@ -412,7 +426,7 @@ EMSCRIPTEN_KEEPALIVE const BridgeBufferView *VpxWasm_GetBuffer(int kind)
 {
    if (kind < 0 || kind >= BufferKinds)
       return nullptr;
-   g_view.ptr = g_buf[kind].empty() ? 0 : (int)(intptr_t)g_buf[kind].data();
+   g_view.ptr = g_buf[kind].empty() ? 0 : (uint64_t)(uintptr_t)g_buf[kind].data();
    g_view.count = (int)(g_buf[kind].size() / STRIDES[kind]);
    g_view.stride = STRIDES[kind];
    return &g_view;
@@ -471,7 +485,7 @@ EMSCRIPTEN_KEEPALIVE const BridgeDmdFrame *VpxWasm_GetDmdFrame()
    }
    else if (format != CTLPI_DISPLAY_FORMAT_LUM32F && format != CTLPI_DISPLAY_FORMAT_SRGB888)
       return nullptr;
-   g_dmd = { (int)(intptr_t)pixels, (int)width, (int)height, (int)format, (int)dmd.state.frameId };
+   g_dmd = { (uint64_t)(uintptr_t)pixels, (int32_t)width, (int32_t)height, (int32_t)format, (int32_t)dmd.state.frameId };
    return &g_dmd;
 }
 

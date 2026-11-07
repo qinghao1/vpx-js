@@ -1,0 +1,276 @@
+From c5394c8c6be2782df1eb5467167331a2c44cf2f6 Mon Sep 17 00:00:00 2001
+From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
+Date: Sat, 7 Nov 2026 12:00:00 -0500
+Subject: [PATCH] Standalone dispatch: omitted optional arguments keep their
+ default
+
+A script call that leaves out an argument (`LightSeq.Play SeqRandom, 50, ,
+1000`) passes VT_ERROR/DISP_E_PARAMNOTFOUND in its slot. Since 8db5f784 the
+generated Invoke proxies return conversion failures to the script, so that
+marker now fails the call with a type mismatch instead of the parameter
+keeping its [defaultvalue], as COM dispatch does.
+
+The generator fetches every argument through one path: typed
+[defaultvalue]/[optional] parameters map the marker to their default
+(ArgOrDefault), optional VARIANT parameters still receive it, as their
+methods expect, and a present argument that does not convert still fails
+the call. An optional VARIANT* parameter left out entirely (a bare
+`Debug.Print`) no longer reads before an empty argument array.
+---
+ .../generated/vpinball_standalone_i_proxy.cpp | 57 ++++++++++---------
+ .../java/org/vpinball/IDLParserToCpp.java     | 40 +++++--------
+ 2 files changed, 44 insertions(+), 53 deletions(-)
+
+diff --git a/src/core/generated/vpinball_standalone_i_proxy.cpp b/src/core/generated/vpinball_standalone_i_proxy.cpp
+index 5a3a52c4e..dc3980f83 100644
+--- a/src/core/generated/vpinball_standalone_i_proxy.cpp
++++ b/src/core/generated/vpinball_standalone_i_proxy.cpp
+@@ -28,6 +28,9 @@
+ #include "parts/timer.h"
+ #include "parts/trigger.h"
+ 
++// A script argument left out (`Play a, , c`) is passed as VT_ERROR/DISP_E_PARAMNOTFOUND
++static VARIANT* ArgOrDefault(VARIANT* arg, VARIANT* def) { return (V_VT(arg) == VT_ERROR && V_ERROR(arg) == DISP_E_PARAMNOTFOUND) ? def : arg; }
++
+ STDMETHODIMP Collection::GetIDsOfNames(REFIID /*riid*/, LPOLESTR* rgszNames, UINT cNames, LCID lcid, DISPID* rgDispId) {
+ 	static struct {
+ 		const WCHAR *name;
+@@ -3486,35 +3489,35 @@ STDMETHODIMP ScriptGlobalTable::Invoke(DISPID dispIdMember, REFIID /*riid*/, LCI
+ 				VARIANT var1;
+ 				V_VT(&var1) = VT_I4;
+ 				V_I4(&var1) = 1;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var1, (index > 0) ? &pDispParams->rgvarg[--index] : &var1, 0, VT_I4);
++				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var1, (index > 0) ? ArgOrDefault(&pDispParams->rgvarg[--index], &var1) : &var1, 0, VT_I4);
+ 				VARIANT var2;
+ 				V_VT(&var2) = VT_R4;
+ 				V_R4(&var2) = 1;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var2, (index > 0) ? &pDispParams->rgvarg[--index] : &var2, 0, VT_R4);
++				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var2, (index > 0) ? ArgOrDefault(&pDispParams->rgvarg[--index], &var2) : &var2, 0, VT_R4);
+ 				VARIANT var3;
+ 				V_VT(&var3) = VT_R4;
+ 				V_R4(&var3) = 0;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var3, (index > 0) ? &pDispParams->rgvarg[--index] : &var3, 0, VT_R4);
++				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var3, (index > 0) ? ArgOrDefault(&pDispParams->rgvarg[--index], &var3) : &var3, 0, VT_R4);
+ 				VARIANT var4;
+ 				V_VT(&var4) = VT_R4;
+ 				V_R4(&var4) = 0;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var4, (index > 0) ? &pDispParams->rgvarg[--index] : &var4, 0, VT_R4);
++				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var4, (index > 0) ? ArgOrDefault(&pDispParams->rgvarg[--index], &var4) : &var4, 0, VT_R4);
+ 				VARIANT var5;
+ 				V_VT(&var5) = VT_I4;
+ 				V_I4(&var5) = 0;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var5, (index > 0) ? &pDispParams->rgvarg[--index] : &var5, 0, VT_I4);
++				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var5, (index > 0) ? ArgOrDefault(&pDispParams->rgvarg[--index], &var5) : &var5, 0, VT_I4);
+ 				VARIANT var6;
+ 				V_VT(&var6) = VT_BOOL;
+ 				V_BOOL(&var6) = 0;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var6, (index > 0) ? &pDispParams->rgvarg[--index] : &var6, 0, VT_BOOL);
++				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var6, (index > 0) ? ArgOrDefault(&pDispParams->rgvarg[--index], &var6) : &var6, 0, VT_BOOL);
+ 				VARIANT var7;
+ 				V_VT(&var7) = VT_BOOL;
+ 				V_BOOL(&var7) = 1;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var7, (index > 0) ? &pDispParams->rgvarg[--index] : &var7, 0, VT_BOOL);
++				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var7, (index > 0) ? ArgOrDefault(&pDispParams->rgvarg[--index], &var7) : &var7, 0, VT_BOOL);
+ 				VARIANT var8;
+ 				V_VT(&var8) = VT_R4;
+ 				V_R4(&var8) = 0;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var8, (index > 0) ? &pDispParams->rgvarg[--index] : &var8, 0, VT_R4);
++				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var8, (index > 0) ? ArgOrDefault(&pDispParams->rgvarg[--index], &var8) : &var8, 0, VT_R4);
+ 				if (FAILED(hrConv)) {
+ 					hres = hrConv;
+ 					if (puArgErr) *puArgErr = (UINT)index;
+@@ -3548,7 +3551,7 @@ STDMETHODIMP ScriptGlobalTable::Invoke(DISPID dispIdMember, REFIID /*riid*/, LCI
+ 				VARIANT var1;
+ 				V_VT(&var1) = VT_R4;
+ 				V_R4(&var1) = 1;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var1, (index > 0) ? &pDispParams->rgvarg[--index] : &var1, 0, VT_R4);
++				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var1, (index > 0) ? ArgOrDefault(&pDispParams->rgvarg[--index], &var1) : &var1, 0, VT_R4);
+ 				if (FAILED(hrConv)) {
+ 					hres = hrConv;
+ 					if (puArgErr) *puArgErr = (UINT)index;
+@@ -4049,7 +4052,7 @@ STDMETHODIMP ScriptGlobalTable::Invoke(DISPID dispIdMember, REFIID /*riid*/, LCI
+ 				VARIANT var0;
+ 				V_VT(&var0) = VT_I4;
+ 				V_I4(&var0) = 1;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var0, (index > 0) ? &pDispParams->rgvarg[--index] : &var0, 0, VT_I4);
++				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var0, (index > 0) ? ArgOrDefault(&pDispParams->rgvarg[--index], &var0) : &var0, 0, VT_I4);
+ 				if (FAILED(hrConv)) {
+ 					hres = hrConv;
+ 					if (puArgErr) *puArgErr = (UINT)index;
+@@ -4068,7 +4071,7 @@ STDMETHODIMP ScriptGlobalTable::Invoke(DISPID dispIdMember, REFIID /*riid*/, LCI
+ 				VARIANT var0;
+ 				V_VT(&var0) = VT_I4;
+ 				V_I4(&var0) = 0;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var0, (index > 0) ? &pDispParams->rgvarg[--index] : &var0, 0, VT_I4);
++				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var0, (index > 0) ? ArgOrDefault(&pDispParams->rgvarg[--index], &var0) : &var0, 0, VT_I4);
+ 				if (FAILED(hrConv)) {
+ 					hres = hrConv;
+ 					if (puArgErr) *puArgErr = (UINT)index;
+@@ -4764,11 +4767,11 @@ STDMETHODIMP ScriptGlobalTable::Invoke(DISPID dispIdMember, REFIID /*riid*/, LCI
+ 				VARIANT var1;
+ 				V_VT(&var1) = VT_I4;
+ 				V_I4(&var1) = 5000;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var1, (index > 0) ? &pDispParams->rgvarg[--index] : &var1, 0, VT_I4);
++				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var1, (index > 0) ? ArgOrDefault(&pDispParams->rgvarg[--index], &var1) : &var1, 0, VT_I4);
+ 				VARIANT var2;
+ 				V_VT(&var2) = VT_I4;
+ 				V_I4(&var2) = 0;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var2, (index > 0) ? &pDispParams->rgvarg[--index] : &var2, 0, VT_I4);
++				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var2, (index > 0) ? ArgOrDefault(&pDispParams->rgvarg[--index], &var2) : &var2, 0, VT_I4);
+ 				if (FAILED(hrConv)) {
+ 					hres = hrConv;
+ 					if (puArgErr) *puArgErr = (UINT)index;
+@@ -4803,31 +4806,31 @@ STDMETHODIMP ScriptGlobalTable::Invoke(DISPID dispIdMember, REFIID /*riid*/, LCI
+ 				VARIANT var3;
+ 				V_VT(&var3) = VT_R4;
+ 				V_R4(&var3) = 0;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var3, (index > 0) ? &pDispParams->rgvarg[--index] : &var3, 0, VT_R4);
++				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var3, (index > 0) ? ArgOrDefault(&pDispParams->rgvarg[--index], &var3) : &var3, 0, VT_R4);
+ 				VARIANT var4;
+ 				V_VT(&var4) = VT_I4;
+ 				V_I4(&var4) = 1;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var4, (index > 0) ? &pDispParams->rgvarg[--index] : &var4, 0, VT_I4);
++				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var4, (index > 0) ? ArgOrDefault(&pDispParams->rgvarg[--index], &var4) : &var4, 0, VT_I4);
+ 				VARIANT var5;
+ 				V_VT(&var5) = VT_R4;
+ 				V_R4(&var5) = 1;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var5, (index > 0) ? &pDispParams->rgvarg[--index] : &var5, 0, VT_R4);
++				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var5, (index > 0) ? ArgOrDefault(&pDispParams->rgvarg[--index], &var5) : &var5, 0, VT_R4);
+ 				VARIANT var6;
+ 				V_VT(&var6) = VT_R4;
+ 				V_R4(&var6) = 0;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var6, (index > 0) ? &pDispParams->rgvarg[--index] : &var6, 0, VT_R4);
++				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var6, (index > 0) ? ArgOrDefault(&pDispParams->rgvarg[--index], &var6) : &var6, 0, VT_R4);
+ 				VARIANT var7;
+ 				V_VT(&var7) = VT_I4;
+ 				V_I4(&var7) = 0;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var7, (index > 0) ? &pDispParams->rgvarg[--index] : &var7, 0, VT_I4);
++				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var7, (index > 0) ? ArgOrDefault(&pDispParams->rgvarg[--index], &var7) : &var7, 0, VT_I4);
+ 				VARIANT var8;
+ 				V_VT(&var8) = VT_BOOL;
+ 				V_BOOL(&var8) = 0;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var8, (index > 0) ? &pDispParams->rgvarg[--index] : &var8, 0, VT_BOOL);
++				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var8, (index > 0) ? ArgOrDefault(&pDispParams->rgvarg[--index], &var8) : &var8, 0, VT_BOOL);
+ 				VARIANT var9;
+ 				V_VT(&var9) = VT_BOOL;
+ 				V_BOOL(&var9) = 1;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var9, (index > 0) ? &pDispParams->rgvarg[--index] : &var9, 0, VT_BOOL);
++				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var9, (index > 0) ? ArgOrDefault(&pDispParams->rgvarg[--index], &var9) : &var9, 0, VT_BOOL);
+ 				if (FAILED(hrConv)) {
+ 					hres = hrConv;
+ 					if (puArgErr) *puArgErr = (UINT)index;
+@@ -6147,7 +6150,7 @@ STDMETHODIMP ScriptInterpreter::DebuggerModule::Invoke(DISPID dispIdMember, REFI
+ 				HRESULT hrConv = S_OK;
+ 				VARIANT var0;
+ 				V_VT(&var0) = VT_EMPTY;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantCopyInd(&var0, &pDispParams->rgvarg[--index]);
++				if (SUCCEEDED(hrConv)) hrConv = VariantCopyInd(&var0, (index > 0) ? &pDispParams->rgvarg[--index] : &var0);
+ 				if (FAILED(hrConv)) {
+ 					hres = hrConv;
+ 					if (puArgErr) *puArgErr = (UINT)index;
+@@ -13360,7 +13363,7 @@ STDMETHODIMP Kicker::Invoke(DISPID dispIdMember, REFIID /*riid*/, LCID lcid, WOR
+ 				VARIANT var2;
+ 				V_VT(&var2) = VT_R4;
+ 				V_R4(&var2) = 0;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var2, (index > 0) ? &pDispParams->rgvarg[--index] : &var2, 0, VT_R4);
++				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var2, (index > 0) ? ArgOrDefault(&pDispParams->rgvarg[--index], &var2) : &var2, 0, VT_R4);
+ 				if (FAILED(hrConv)) {
+ 					hres = hrConv;
+ 					if (puArgErr) *puArgErr = (UINT)index;
+@@ -17894,11 +17897,11 @@ STDMETHODIMP Gate::Invoke(DISPID dispIdMember, REFIID /*riid*/, LCID lcid, WORD
+ 				VARIANT var1;
+ 				V_VT(&var1) = VT_R4;
+ 				V_R4(&var1) = 0;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var1, (index > 0) ? &pDispParams->rgvarg[--index] : &var1, 0, VT_R4);
++				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var1, (index > 0) ? ArgOrDefault(&pDispParams->rgvarg[--index], &var1) : &var1, 0, VT_R4);
+ 				VARIANT var2;
+ 				V_VT(&var2) = VT_R4;
+ 				V_R4(&var2) = 0;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var2, (index > 0) ? &pDispParams->rgvarg[--index] : &var2, 0, VT_R4);
++				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var2, (index > 0) ? ArgOrDefault(&pDispParams->rgvarg[--index], &var2) : &var2, 0, VT_R4);
+ 				if (FAILED(hrConv)) {
+ 					hres = hrConv;
+ 					if (puArgErr) *puArgErr = (UINT)index;
+@@ -23979,15 +23982,15 @@ STDMETHODIMP LightSeq::Invoke(DISPID dispIdMember, REFIID /*riid*/, LCID lcid, W
+ 				VARIANT var1;
+ 				V_VT(&var1) = VT_I4;
+ 				V_I4(&var1) = 0;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var1, (index > 0) ? &pDispParams->rgvarg[--index] : &var1, 0, VT_I4);
++				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var1, (index > 0) ? ArgOrDefault(&pDispParams->rgvarg[--index], &var1) : &var1, 0, VT_I4);
+ 				VARIANT var2;
+ 				V_VT(&var2) = VT_I4;
+ 				V_I4(&var2) = 1;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var2, (index > 0) ? &pDispParams->rgvarg[--index] : &var2, 0, VT_I4);
++				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var2, (index > 0) ? ArgOrDefault(&pDispParams->rgvarg[--index], &var2) : &var2, 0, VT_I4);
+ 				VARIANT var3;
+ 				V_VT(&var3) = VT_I4;
+ 				V_I4(&var3) = 0;
+-				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var3, (index > 0) ? &pDispParams->rgvarg[--index] : &var3, 0, VT_I4);
++				if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var3, (index > 0) ? ArgOrDefault(&pDispParams->rgvarg[--index], &var3) : &var3, 0, VT_I4);
+ 				if (FAILED(hrConv)) {
+ 					hres = hrConv;
+ 					if (puArgErr) *puArgErr = (UINT)index;
+diff --git a/tools/idl/parser/src/main/java/org/vpinball/IDLParserToCpp.java b/tools/idl/parser/src/main/java/org/vpinball/IDLParserToCpp.java
+index 77e8527d9..3b7f36cd1 100644
+--- a/tools/idl/parser/src/main/java/org/vpinball/IDLParserToCpp.java
++++ b/tools/idl/parser/src/main/java/org/vpinball/IDLParserToCpp.java
+@@ -126,6 +126,9 @@ public class IDLParserToCpp {
+ 			}
+ 		}
+ 
++		outputStream.write("\n// A script argument left out (`Play a, , c`) is passed as VT_ERROR/DISP_E_PARAMNOTFOUND\n".getBytes());
++		outputStream.write("static VARIANT* ArgOrDefault(VARIANT* arg, VARIANT* def) { return (V_VT(arg) == VT_ERROR && V_ERROR(arg) == DISP_E_PARAMNOTFOUND) ? def : arg; }\n".getBytes());
++
+ 		outputStream.write("\n".getBytes());
+ 
+ 		for (String[] block : order) {
+@@ -633,35 +636,20 @@ public class IDLParserToCpp {
+ 			buffer.append("V_VT(&var" + index + ") = VT_EMPTY;\n");
+ 		}
+ 
+-		if (type != null) {
+-			// hrConv gates the method call, see generateMethod()
+-			if (!param.getType().equals("VARIANT")) {
+-				buffer.append("if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var" + index + ", ");
+-
+-				if (param.hasDefaultValue() || param.isOptional()) {
+-					buffer.append("(index > 0) ? &pDispParams->rgvarg[--index] : &var" + index);
+-				}
+-				else {
+-					buffer.append("&pDispParams->rgvarg[--index]");
+-				}
+-
+-				buffer.append(", 0, " + type + ");\n");
+-			}
+-			else {
+-				buffer.append("if (SUCCEEDED(hrConv)) hrConv = VariantCopyInd(&var" + index + ", ");
+-
+-				if (param.hasDefaultValue() || param.isOptional()) {
+-					buffer.append("(index > 0) ? &pDispParams->rgvarg[--index] : &var" + index);
+-				}
+-				else {
+-					buffer.append("&pDispParams->rgvarg[--index]");
+-				}
++		// An omitted optional argument (no slot, or the VT_ERROR/DISP_E_PARAMNOTFOUND marker in one) keeps the
++		// parameter's default; optional VARIANTs receive the marker, as their methods expect
++		final boolean convert = type != null && !"VARIANT".equals(param.getType());
++		String arg = "&pDispParams->rgvarg[--index]";
++		if (param.hasDefaultValue() || param.isOptional()) {
++			arg = "(index > 0) ? " + (convert ? "ArgOrDefault(" + arg + ", &var" + index + ")" : arg) + " : &var" + index;
++		}
+ 
+-				buffer.append(");\n");
+-			}
++		// hrConv gates the method call, see generateMethod()
++		if (convert) {
++			buffer.append("if (SUCCEEDED(hrConv)) hrConv = VariantChangeType(&var" + index + ", " + arg + ", 0, " + type + ");\n");
+ 		}
+ 		else {
+-			buffer.append("if (SUCCEEDED(hrConv)) hrConv = VariantCopyInd(&var" + index + ", &pDispParams->rgvarg[--index]);\n");
++			buffer.append("if (SUCCEEDED(hrConv)) hrConv = VariantCopyInd(&var" + index + ", " + arg + ");\n");
+ 		}
+ 
+ 		return buffer.toString();
+-- 
+2.53.0
+

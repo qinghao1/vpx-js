@@ -515,15 +515,16 @@ describe('WASM scene sync', () => {
 		const f32 = new Float32Array(heap)
 		f32.set([1, 2, 3, 4, 0, 0, 0, 0], 24)
 		f32.set([0.5, 0.25, 0.125, 1], 40)
-		u32.set([96, 1, 8], 8)
-		u32.set([160, 2, 2, 1, 7], 12)
+		// ABI 4 descriptors: 64-bit heap offset (lo, hi words), then u32 fields.
+		u32.set([96, 0, 1, 8], 8)
+		u32.set([160, 0, 2, 2, 1, 7], 12)
 		const calls: string[] = []
 		let freed = -1
 		const raw = {
 			_VpxWasm_GetAbiVersion: () => HEADLESS_ABI_VERSION,
 			_VpxWasm_Init: () => (calls.push('Init'), 0),
 			_VpxWasm_MountRom: () => (calls.push('MountRom'), 0),
-			_VpxWasm_LoadTable: () => (calls.push('LoadTable'), 0),
+			_VpxWasm_LoadTable: async () => (calls.push('LoadTable'), 0),
 			_VpxWasm_StepFrame: () => void calls.push('StepFrame'),
 			_VpxWasm_GetPartCatalogJson: () => 4,
 			_VpxWasm_GetBuffer: () => 32,
@@ -532,7 +533,7 @@ describe('WASM scene sync', () => {
 			_VpxWasm_Nudge: () => void calls.push('Nudge'),
 			_VpxWasm_GetScriptErrorCount: () => 0,
 			_VpxWasm_GetScriptError: () => 0,
-			_VpxWasm_DestroyTable: () => void calls.push('DestroyTable'),
+			_VpxWasm_DestroyTable: async () => void calls.push('DestroyTable'),
 			_malloc: (size: number) => (calls.push(`malloc:${size}`), 200),
 			_free: (ptr: number) => void (freed = ptr),
 			UTF8ToString: () => '[{"idx":0}]',
