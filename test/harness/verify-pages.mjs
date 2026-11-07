@@ -2,8 +2,9 @@
 /**
  * Static-hosting E2E (GitHub Pages): serves a VITE_COI_SW=1 demo bundle from a
  * plain static server — no COOP/COEP, under a /vpx-js/ subpath, like Pages —
- * and asserts the service worker makes the page cross-origin isolated with one
- * reload, a second visit needs none, and the threaded engine boots a table.
+ * and asserts the service worker makes the page cross-origin isolated with its
+ * service-worker reloads, a second visit needs none, and the threaded engine
+ * boots a table.
  *
  * Run: node test/harness/verify-pages.mjs [--dist=demo-browser/dist]
  *   Without --dist it builds the bundle into a temp dir first.

@@ -21,24 +21,24 @@ npx tsx test/harness/verify-all.ts   # TAP 1..8: table → play-room → headles
 `verify-*` gate; `bench-*` measure (no pass/fail); `compare-*` and
 `test/manual/*` are manual-only (no asserts in CI).
 
-| File                        | What                                                                                                                                                                                  | Needs                                                            |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `verify-all.ts`             | Aggregator, TAP 1..8 (table, play-room, headless, twd-render, ab, cadet, pages, browser), exit 0/1                                                                                    | varies per step                                                  |
-| `verify-table.ts`           | VPX parse + script extract over fixtures + `example-table.vpx`                                                                                                                        | —                                                                |
-| `verify-play-room.ts`       | Play-room scene checks (TAP `Tap` class)                                                                                                                                              | —                                                                |
-| `verify-headless.mjs`       | Headless engine checks (15 gates: load, boot, DMD, coins, audio, lifecycle)                                                                                                           | engine artifact + Chrome, else SKIP                              |
-| `verify-twd-render.ts`      | Walking-dead render-pipeline checks; non-TWD table exits 77                                                                                                                           | `walking_dead.vpx`                                               |
-| `verify-ab.mjs`             | A/B parity: same table+ROM, same scripted match, NEW vs OLD baseline (`/tmp/vpx-js-old` provisioned from `--old-ref`; leg C fails unless OLD differs from HEAD). TWD-like tables only | VPX + ROM + Chrome + vite + OLD worktree, else SKIP              |
-| `verify-cadet.mjs`          | Space Cadet live checks                                                                                                                                                               | `space_cadet.vpx` + Chrome + vite + rebuilt wasm, else SKIP/fail |
-| `verify-pages.mjs`          | Static-host E2E: `VITE_COI_SW=1` bundle on a header-less server — service worker isolates, threaded engine boots                                                                      | engine artifact (`public/wasm/`)                                 |
-| `compare-side-by-side.ts`   | MANUAL dual-window launcher (browser left, native right) — eyeball only, no asserts                                                                                                   | Chrome + vite + native                                           |
-| `bench.mjs`                 | Browser bench: load + FPS + profile (`--vpx/--rom/--duration/--warmup/--out/--headed/--gpu/--trace`)                                                                                  | Chrome + vite                                                    |
-| `bench-fps-gpu.mjs`         | GPU FPS bench                                                                                                                                                                         | Chrome + vite + GPU                                              |
-| `tap.ts`                    | TAP helpers (`tapHeader/tapOk/tapNotOk/tapSkip/tapPlan`, `Tap` class) — no main                                                                                                       | —                                                                |
-| `utils.mjs`                 | Puppeteer/vite helpers (`launchBrowser/newPage/ensureVite`, signal trap reaps browsers/servers) — no main                                                                             | —                                                                |
-| `vpinball-resolver.ts`      | Arg parsing + VPX/ROM/native discovery — no main                                                                                                                                      | —                                                                |
-| `vpinball-resolver.spec.ts` | Arg parsing specs (vitest)                                                                                                                                                            | —                                                                |
-| `wasm-pacing.spec.ts`       | Pacing specs (vitest)                                                                                                                                                                 | —                                                                |
+| File                        | What                                                                                                                                                                                  | Needs                                                                |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `verify-all.ts`             | Aggregator, TAP 1..8 (table, play-room, headless, twd-render, ab, cadet, pages, browser), exit 0/1                                                                                    | varies per step                                                      |
+| `verify-table.ts`           | VPX parse + script extract over fixtures + `example-table.vpx`                                                                                                                        | —                                                                    |
+| `verify-play-room.ts`       | Play-room scene checks (TAP `Tap` class)                                                                                                                                              | —                                                                    |
+| `verify-headless.mjs`       | Headless engine checks (15 gates: load, boot, DMD, coins, audio, lifecycle)                                                                                                           | engine artifact + Chrome, else SKIP                                  |
+| `verify-twd-render.ts`      | Walking-dead render-pipeline checks; non-TWD table exits 77                                                                                                                           | `walking_dead.vpx`                                                   |
+| `verify-ab.mjs`             | A/B parity: same table+ROM, same scripted match, NEW vs OLD baseline (`/tmp/vpx-js-old` provisioned from `--old-ref`; leg C fails unless OLD differs from HEAD). TWD-like tables only | VPX + ROM + Chrome + vite + OLD worktree, else SKIP                  |
+| `verify-cadet.mjs`          | Space Cadet live checks                                                                                                                                                               | `space_cadet.vpx` + Chrome + vite + committed engine, else SKIP/fail |
+| `verify-pages.mjs`          | Static-host E2E: `VITE_COI_SW=1` bundle on a header-less server — service worker isolates, threaded engine boots (WebGL fallback)                                                     | engine artifact (`public/wasm/`)                                     |
+| `compare-side-by-side.ts`   | MANUAL dual-window launcher (browser left, native right) — eyeball only, no asserts                                                                                                   | Chrome + vite + native                                               |
+| `bench.mjs`                 | Browser bench: load + FPS + profile (`--vpx/--rom/--duration/--warmup/--out/--headed/--gpu/--trace`)                                                                                  | Chrome + vite                                                        |
+| `bench-fps-gpu.mjs`         | GPU FPS bench                                                                                                                                                                         | Chrome + vite + GPU                                                  |
+| `tap.ts`                    | TAP helpers (`tapHeader/tapOk/tapNotOk/tapSkip/tapPlan`, `Tap` class) — no main                                                                                                       | —                                                                    |
+| `utils.mjs`                 | Puppeteer/vite helpers (`launchBrowser/newPage/ensureVite`, signal trap reaps browsers/servers) — no main                                                                             | —                                                                    |
+| `vpinball-resolver.ts`      | Arg parsing + VPX/ROM/native discovery — no main                                                                                                                                      | —                                                                    |
+| `vpinball-resolver.spec.ts` | Arg parsing specs (vitest)                                                                                                                                                            | —                                                                    |
+| `wasm-pacing.spec.ts`       | Pacing specs (vitest)                                                                                                                                                                 | —                                                                    |
 
 ## Quickstart
 
@@ -72,10 +72,11 @@ node test/harness/verify-ab.mjs --vpx=<table>.vpx --rom=<game>.zip   # A/B vs /t
 ## CI matrix
 
 - `Check` job (`nodejs.yml`): `npm ci`, `npm run build:esm`,
-  `npm run check` (lint + all typechecks + vitest with coverage),
-  `npm run verify:table`, `npm run verify:play-room`. No browser, no VPX/ROM.
-- `Deploy demo to GitHub Pages` (`pages.yml`): builds dist-esm, the headless
-  engine (`wasm/build-headless.sh`), and the demo bundle with the isolation
+  `npm run verify:engine-manifest`, `npm run check` (lint + all typechecks +
+  vitest with coverage), `npm run verify:table`, `npm run verify:play-room`.
+  No browser, no VPX/ROM.
+- `Deploy demo to GitHub Pages` (`pages.yml`): builds dist-esm, verifies the
+  committed engine manifest, and builds the demo bundle with the isolation
   service worker, then runs the static-host E2E.
 - Everything else (full `verify-all`, A/B, browser legs, TWD benches) runs
   locally: Chrome + engine artifact required, VPX/ROM fixtures optional with

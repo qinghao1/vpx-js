@@ -4,7 +4,7 @@ IFS=$'\n\t'
 
 # Headless-engine builder — compiles vpinball-headless from the pinned
 # external/vpinball submodule plus the in-repo bridge patches, and deploys
-#   demo-browser/public/wasm/vpinball-headless.{js,wasm,wasm.map,data}
+#   demo-browser/public/wasm/vpinball-headless.{js,wasm,data}
 # (committed release build + build-info.json provenance — rebuild and commit
 # them together; CI verifies the manifest instead of rebuilding).
 # The .wasm.map sidecar (bridge-wasm-source-maps patch, -gsource-map) is
@@ -55,6 +55,12 @@ elif [[ -f "/tmp/emsdk-6.0.13/emsdk_env.sh" ]]; then
 fi
 if ! command -v emcc >/dev/null 2>&1; then
   log "ERROR: emcc not found — source emsdk_env.sh (emsdk 6.0.13) or set \$EMSDK"
+  exit 1
+fi
+# The verifier pins the toolchain: fail here, not after a full build.
+emsdk_ver="$(emcc --version 2>/dev/null | head -n1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)"
+if [[ "$emsdk_ver" != "6.0.13" ]]; then
+  log "ERROR: emsdk ${emsdk_ver:-unknown} — this build requires exactly 6.0.13 (see wasm/README.md)"
   exit 1
 fi
 
@@ -143,52 +149,6 @@ log "deployed:"
 # shellcheck disable=SC2012
 ls -lh "$OUT_DIR"/vpinball-headless.{js,wasm,wasm.map,data}
 
-# Provenance manifest: the deployed engine is a committed release artifact, so
-# record exactly which inputs produced it. CI verifies this manifest instead of
-# rebuilding the engine.
-emsdk_ver="$(emcc --version 2>/dev/null | head -n1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)"
-[[ -n "$emsdk_ver" ]] || emsdk_ver="unknown"
-{
-  printf '{\n'
-  printf '  "vpinball": "%s",\n' "$(git -C "$VPINBALL" rev-parse HEAD)"
-  printf '  "emsdk": "%s",\n' "$emsdk_ver"
-  printf '  "buildType": "%s",\n' "$BUILD_TYPE"
-  printf '  "patches": {\n'
-  # Tracked patches only: the manifest describes the committed tree (what CI
-  # sees), so in-progress untracked patches never leak into it. Hashes still
-  # come from the working tree — exactly what was just built.
-  mapfile -t series < <(git -C "$ROOT" ls-files -- 'wasm/modules/headless/patches/*.patch')
-  for i in "${!series[@]}"; do
-    name="$(basename "${series[$i]}")"
-    hash="$(sha256sum "$ROOT/${series[$i]}" | cut -d' ' -f1)"
-    if (( i < ${#series[@]} - 1 )); then comma=","; else comma=""; fi
-    printf '    "%s": "%s"%s\n' "$name" "$hash" "$comma"
-  done
-  # Releasable builds come from a clean patch dir: the build itself applies
-  # every on-disk patch, so record any outside git — the verifier refuses a
-  # dirty build's manifest, forcing a rebuild after commit (or removal).
-  shopt -s nullglob
-  present=("$PATCH_DIR"/*.patch)
-  shopt -u nullglob
-  declare -A seen
-  for p in "${series[@]}"; do seen["$(basename "$p")"]=1; done
-  untracked=()
-  for p in "${present[@]}"; do
-    [[ -n "${seen[$(basename "$p")]:-}" ]] || untracked+=("$(basename "$p")")
-  done
-  printf '  },\n  "untrackedPatches": ['
-  for i in "${!untracked[@]}"; do
-    if (( i > 0 )); then printf ', '; fi
-    printf '"%s"' "${untracked[$i]}"
-  done
-  # Byte identity of the shipped files, so a stale or hand-replaced binary
-  # cannot pass on matching inputs alone. Map omitted: local-only debug aid.
-  printf '],\n  "artifacts": {\n'
-  artifacts=(vpinball-headless.js vpinball-headless.wasm vpinball-headless.data)
-  for i in "${!artifacts[@]}"; do
-    if (( i < ${#artifacts[@]} - 1 )); then comma=","; else comma=""; fi
-    printf '    "%s": "%s"%s\n' "${artifacts[$i]}" "$(sha256sum "$OUT_DIR/${artifacts[$i]}" | cut -d' ' -f1)" "$comma"
-  done
-  printf '  }\n}\n'
-} > "$OUT_DIR/build-info.json"
-log "manifest: $OUT_DIR/build-info.json"
+# Provenance manifest lives in wasm/write-build-info.mjs (node, so no
+# comma-bookkeeping): same inputs the build used, for CI to verify.
+node "$ROOT/wasm/write-build-info.mjs" "$ROOT" "$OUT_DIR" "$BUILD_TYPE" "$emsdk_ver"

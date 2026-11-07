@@ -8,10 +8,9 @@ concurrency:
 
 jobs:
   check:
-    # Lint, typecheck, unit tests, and the harness legs that need no VPX,
-    # ROM, or browser. The engine artifacts are committed, so this also runs
-    # verify:engine-manifest; the browser legs run in pages.yml, which boots
-    # the committed build (see verify:pages).
+    # Lint, typecheck, unit tests, and harness legs needing no VPX, ROM, or
+    # browser. The engine ships committed (see wasm/README.md); the browser
+    # legs run in pages.yml.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

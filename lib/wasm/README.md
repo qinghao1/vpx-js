@@ -32,11 +32,12 @@ WASM. This seam is the only boundary between them.
 
 ## Status
 
-Bridge live, built from the pinned `external/vpinball` submodule
-(`@64a480a96`) — never from a side checkout — plus the patch series in
+Bridge live, built from the pinned `external/vpinball` submodule — never
+from a side checkout — plus the patch series in
 `wasm/modules/headless/patches/` (one concern per patch; see `wasm/README.md`).
 Build with `npm run build:wasm:headless`, which outputs
-`demo-browser/public/wasm/vpinball-headless.{js,wasm,wasm.map,data}` (gitignored).
+`demo-browser/public/wasm/vpinball-headless.{js,wasm,data}` plus
+`build-info.json` (all committed; the `.wasm.map` stays local-only).
 `HeadlessEngine` is the only boundary: byte-array in, typed rows/DMD/PCM
 audio/script errors out. Calls that may block on engine threads (`loadTable`,
 `destroyTable`) enter WASM through `WebAssembly.promising` (JSPI).
