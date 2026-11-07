@@ -17,6 +17,7 @@
 			"!test/fixtures",
 			"!!demo-browser/dist",
 			"!!demo-browser/node_modules",
+			"!!demo-browser/public/wasm",
 			"!**/bench*.spec.ts",
 			"!**/*.vpx"
 		]

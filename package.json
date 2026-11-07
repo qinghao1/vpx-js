@@ -38,6 +38,7 @@
 		"verify:twd-render": "tsx test/harness/verify-twd-render.ts",
 		"verify:ab": "node test/harness/verify-ab.mjs",
 		"verify:cadet": "node test/harness/verify-cadet.mjs",
+		"verify:engine-manifest": "node test/harness/verify-engine-manifest.mjs",
 		"verify:pages": "node test/harness/verify-pages.mjs",
 		"verify:browser": "node demo-browser/e2e/integration.mjs",
 		"verify:all": "tsx test/harness/verify-all.ts",

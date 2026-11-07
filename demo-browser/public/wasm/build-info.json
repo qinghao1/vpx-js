@@ -1,0 +1,26 @@
+{
+  "vpinball": "64a480a96d1b972711fbb8eea014654c779b1e23",
+  "emsdk": "6.0.13",
+  "buildType": "Release",
+  "patches": {
+    "0001-bridge-add-vpx-wasm-bridge.patch": "baf42499e9cf01405de011d7739a1a49085daeb878fba11b9434fad80dcf05f4",
+    "0002-bridge-expose-part-state-getters.patch": "2328185d73db8283140f4dc3a7a376faffc13bbcd0fc5078e5de824f24d15b89",
+    "0003-bridge-add-headless-step-and-script-error.patch": "ebf0a4cfddaaa55093d8ed21161f4c70f270479fe5fea84831851d4f683f2fce",
+    "0004-bridge-noop-render-device-headless.patch": "b081fbe00a547e317a23cc8a6313be282b8ecf3578dab3a8dd5608672a112deb",
+    "0005-bridge-add-headless-cmake-target.patch": "4bc13e587b2309732696f58c089bb6e047cd2905490caadff3c90624b4d90c80",
+    "0006-bridge-mirror-pinmame-dmd.patch": "e561afb613723e1bc2eadd2d0531b391e25003148642d37552f5c104e5c581d0",
+    "0007-bridge-is-playing-ignore-focus.patch": "ae718e5b7b3125f966220f670cae349b21f7790e81f6d481507af1209d56002a",
+    "0008-bridge-pace-pinmame-fence.patch": "74f2ed5f345931729ae8b6d9030b686184b84ab37c2073181acd45744d654302",
+    "0009-bridge-pinmame-audio-capture.patch": "e47e861deea334526bea024ec22b11413255facf01bcd7b7ffac29bdbe3c6503",
+    "0010-bridge-drop-sdl-controller-echo.patch": "b6afaaeb99a14f2ea51d6d2418f886319116c257007c839abb16a7c8b044afa2",
+    "0011-bridge-silence-refresh-rate-error.patch": "4a261c9ff02b25405df4e31b6ed579588af1072638a28af923cb20de8c449c56",
+    "0012-bridge-mirror-flexdmd.patch": "2665d97de19a5f05bf131ebe056696d93d26ae96a96f9c11fb33efc0eabb447c",
+    "0013-bridge-flasher-image.patch": "c5d0db75e3f5a8a34f58911dc037eefcc527293c37740d98ab7891dc9e8f97ca",
+    "0014-bridge-set-audio-level.patch": "ca664e6edb081bcbb50611fd068f319c0f1a92f1eaa05c52855b2f179905b698",
+    "0015-bridge-vr-player-mode.patch": "427d1e2c91dd0758bd2a01ef482aedb33d6e4c091f5c29431f1ad6672e73d3b7",
+    "0016-bridge-wasm-source-maps.patch": "a73fdae0af6d35531fd816f796d3a3b4fc8108a929f55ddc4f1c6656d5b80400",
+    "0017-bridge-abi-version-catalog-escape-reset.patch": "263c181429725c0d544e009601a15118da2e7ae6ff0fd09f36dc0cab633dea5b",
+    "0018-bridge-dispreel-values.patch": "7a5083fee9fa9ca629378bb7420816b8e059319f7b978621702b4b650b96f67e",
+    "0019-bridge-disable-b2s-hint.patch": "89e4b2ca88e8fb84f23409425e4e52595a5b27598faca8d64c26f3ecd064ea1f"
+  }
+}

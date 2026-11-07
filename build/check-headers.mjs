@@ -3,9 +3,11 @@
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 
-const sources = execFileSync('git', ['ls-files', '*.ts', '*.js', '*.mjs', '*.mts', '*.cts', ':!external'], {
-	encoding: 'utf8',
-})
+const sources = execFileSync(
+	'git',
+	['ls-files', '*.ts', '*.js', '*.mjs', '*.mts', '*.cts', ':!external', ':!demo-browser/public/wasm'],
+	{ encoding: 'utf8' },
+)
 	.split('\n')
 	.filter(Boolean)
 const missing = sources.filter(file => !readFileSync(file, 'utf8').startsWith('// Copyright'))

@@ -2,8 +2,13 @@
 
 `build-headless.sh` builds the headless vpinball engine (`vpinball-headless`)
 from the pinned `external/vpinball` submodule plus the bridge patch series in
-`modules/headless/patches/`, and deploys it to `demo-browser/public/wasm/`
-(gitignored). The TypeScript side of the bridge is `lib/wasm/`.
+`modules/headless/patches/`, and deploys it to `demo-browser/public/wasm/`.
+That directory is a committed release build — CI never rebuilds it, it
+verifies `build-info.json` provenance instead (`npm run
+verify:engine-manifest`) and boots the engine (`npm run verify:pages`). So
+after changing the submodule pin or any patch, rebuild locally and commit the
+binaries together with the code change. The TypeScript side of the bridge is
+`lib/wasm/`.
 
 The engine uses pthreads, so its page must be cross-origin isolated: a server
 you control sends `Cross-Origin-Opener-Policy: same-origin` and

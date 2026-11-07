@@ -140,3 +140,27 @@ done
 log "deployed:"
 # shellcheck disable=SC2012
 ls -lh "$OUT_DIR"/vpinball-headless.{js,wasm,wasm.map,data}
+
+# Provenance manifest: the deployed engine is a committed release artifact, so
+# record exactly which inputs produced it. CI verifies this manifest instead of
+# rebuilding the engine.
+emsdk_ver="$(emcc --version 2>/dev/null | head -n1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)"
+[[ -n "$emsdk_ver" ]] || emsdk_ver="unknown"
+{
+  printf '{\n'
+  printf '  "vpinball": "%s",\n' "$(git -C "$VPINBALL" rev-parse HEAD)"
+  printf '  "emsdk": "%s",\n' "$emsdk_ver"
+  printf '  "buildType": "%s",\n' "$BUILD_TYPE"
+  printf '  "patches": {\n'
+  shopt -s nullglob
+  series=("$PATCH_DIR"/*.patch)
+  shopt -u nullglob
+  for i in "${!series[@]}"; do
+    name="$(basename "${series[$i]}")"
+    hash="$(sha256sum "${series[$i]}" | cut -d' ' -f1)"
+    if (( i < ${#series[@]} - 1 )); then comma=","; else comma=""; fi
+    printf '    "%s": "%s"%s\n' "$name" "$hash" "$comma"
+  done
+  printf '  }\n}\n'
+} > "$OUT_DIR/build-info.json"
+log "manifest: $OUT_DIR/build-info.json"

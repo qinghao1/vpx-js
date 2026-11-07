@@ -12,8 +12,13 @@ bench*.spec.ts
 /*.vpx
 
 demo-browser/.vite/
-# built engine artifact (npm run build:wasm:headless) and local test tables
-demo-browser/public/wasm/
+# local test tables dropped next to the committed engine build
+demo-browser/public/wasm/*
+!demo-browser/public/wasm/vpinball-headless.js
+!demo-browser/public/wasm/vpinball-headless.wasm
+!demo-browser/public/wasm/vpinball-headless.wasm.map
+!demo-browser/public/wasm/vpinball-headless.data
+!demo-browser/public/wasm/build-info.json
 demo-browser/public/ab-tmp/
 scratch/
 .claude/
