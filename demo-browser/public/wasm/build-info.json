@@ -6,12 +6,12 @@
     "bridge/vpx_wasm_bridge.cpp": "821a20774479a3a320b65d1b3f08f1b20b1bdfabe220a6ebc17b1a3d8c042111",
     "patches/0001-headless-player.patch": "077d7f10471d3c3af050d8d7281c2a72f7b5555487a9fe577139a13d296a15d2",
     "patches/0002-player-state-accessors.patch": "2e5f7667f707ccf2dd4df086e6c671694a39cb66d9d32b9dc31d8a740c1da919",
-    "patches/0003-vpx-js-headless-target.patch": "5c73217c34f12e0b1d7209b386a0d531a8194989e44a0c37d948da141251faea"
+    "patches/0003-vpx-js-headless-target.patch": "6e1f745b171b34ac0b378b0837c58899bbbd130eeabbc978de67cdda570cb380"
   },
   "untrackedInputs": [],
   "artifacts": {
-    "vpinball-headless.js": "4e4acd1d14aeb36ba433023a3aa7efe0fa94008d6f64a045c24242d110301ac4",
-    "vpinball-headless.wasm": "219c2813136165678c543ba9bcb56b464e3bebc048fdd507952b96405bde1630",
-    "vpinball-headless.data": "086a299fb4257ed43e6dec2550fe7dfdbbfe3914a139e8d8191607966768b389"
+    "vpinball-headless.js": "576f0c19d90f48c0c58af3bb393b1c766a119aa01b87a192032e6405299e19f8",
+    "vpinball-headless.wasm": "2b8722abe911cc7fe3aed8b361193999a6d66fb1fdbd626dd4becee4400018e0",
+    "vpinball-headless.data": "5d897efd2b5c4aeabe8a638d7c3c27ec863e63b2be25c862abfd8831222adb43"
   }
 }
