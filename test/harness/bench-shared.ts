@@ -1,38 +1,10 @@
 // Copyright (C) 2026 Chu Qinghao <6337103+qinghao1@users.noreply.github.com> — GPL-2.0 — see LICENSE
-// Shared bench helpers: timing stats, file probing, VPX candidates, scene-export options, tri counting.
+// Shared bench helpers: file probing, VPX candidates, scene-export options.
 // Plain-Node safe: no relative imports and erasable types only, so .mjs benches can import
 // this file directly via `./bench-shared.ts` (arg parsing lives in vpinball-resolver.ts).
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-
-export interface BenchStats {
-	avg: number
-	p50: number
-	p95: number
-	p99: number
-	min: number
-	max: number
-	count: number
-}
-
-export function stats(values: number[], digits = 2): BenchStats | null {
-	if (values.length === 0) return null
-	const sorted = [...values].sort((a, b) => a - b)
-	const last = sorted.length - 1
-	const pick = (frac: number): number =>
-		+(sorted[Math.min(last, Math.floor(sorted.length * frac))] ?? 0).toFixed(digits)
-	const avg = sorted.reduce((sum, value) => sum + value, 0) / sorted.length
-	return {
-		avg: +avg.toFixed(digits),
-		p50: pick(0.5),
-		p95: pick(0.95),
-		p99: pick(0.99),
-		min: +(sorted[0] ?? 0).toFixed(digits),
-		max: +(sorted[last] ?? 0).toFixed(digits),
-		count: sorted.length,
-	}
-}
 
 export function exists(filePath: string, minSize = 1024): boolean {
 	try {
@@ -65,10 +37,6 @@ export const WALKING_DEAD_ROM_CANDIDATES: string[] = [
 
 export const VPX_CANDIDATES: string[] = [...WALKING_DEAD_CANDIDATES, path.resolve('test/fixtures/table-empty.vpx')]
 
-export function findVpx(): string | null {
-	return VPX_CANDIDATES.find(candidate => exists(candidate)) ?? null
-}
-
 export function findWalkingDead(): string | null {
 	return WALKING_DEAD_CANDIDATES.find(candidate => exists(candidate, 1024 * 1024)) ?? null
 }
@@ -98,46 +66,6 @@ export function defaultGenOpts(overrides: Record<string, boolean> = {}): Record<
 	}
 }
 
-export interface TriCount {
-	tris: number
-	meshes: number
-}
-
-// Wall-clock probe wrappers for the bench breakdowns; each preserves the wrapped
-// method's sync/async shape and records the elapsed ms of the last call.
-export function timedSync(original: (...args: any[]) => any, record: (ms: number) => void): (...args: any[]) => any {
-	return function (this: unknown, ...args: any[]): any {
-		const start = performance.now()
-		const result = original.apply(this, args)
-		record(performance.now() - start)
-		return result
-	}
-}
-
-export function timedAsync(
-	original: (...args: any[]) => Promise<any>,
-	record: (ms: number) => void,
-): (...args: any[]) => Promise<any> {
-	return async function (this: unknown, ...args: any[]): Promise<any> {
-		const start = performance.now()
-		const result = await original.apply(this, args)
-		record(performance.now() - start)
-		return result
-	}
-}
-
-export function countTris(root: { traverse(work: (node: any) => void): void } | null | undefined): TriCount {
-	let tris = 0
-	let meshes = 0
-	root?.traverse(node => {
-		if (node?.isMesh && node.geometry?.attributes?.position) {
-			tris += node.geometry.attributes.position.count / 3
-			meshes++
-		}
-	})
-	return { tris, meshes }
-}
-
 // ---- Shared texture streaming filter (bench-node + ranked-profile) ----
 
 export interface StreamTexture {
@@ -152,24 +80,7 @@ export interface StreamTable {
 	getPlayfieldMap(): string
 }
 
-/** Ascending footprint order for texture preload lists. */
-export function compareByAreaAsc(a: StreamTexture, b: StreamTexture): number {
-	return a.width * a.height - b.width * b.height
-}
-
 export const RE_BAKE_MAP = /bake|nestmap/i
-
-/** Textures safe to defer: HDR/EXR and large non-bake maps stream after first paint. */
-export function isDeferredTexture(tx: StreamTexture, table: StreamTable): boolean {
-	const n = tx.getName().toLowerCase()
-	const pf = table.getPlayfieldMap().toLowerCase()
-	if (n === pf) return false
-	if (n.includes('nestmap') || n.includes('bake') || n.includes('playfield') || n === 'blueprintsv2noramps')
-		return false
-	const p = (tx.szPath || '').toLowerCase()
-	if (p.endsWith('.exr') || p.endsWith('.hdr') || tx.isHdr?.()) return true
-	return tx.width * tx.height > 1048576
-}
 
 /** Lowercased playfield map key, '' when the table exposes none. */
 export function getPlayfieldMapKey(table: StreamTable): string {
@@ -178,17 +89,6 @@ export function getPlayfieldMapKey(table: StreamTable): string {
 	} catch {
 		return ''
 	}
-}
-
-/** Move the playfield map to the front so it streams first. Returns its prior index. */
-export function movePlayfieldFirst<T extends StreamTexture>(textures: T[], pfMap: string): number {
-	if (!pfMap) return -1
-	const idx = textures.findIndex(tx => tx.getName().toLowerCase() === pfMap)
-	if (idx > 0) {
-		const [pfTx] = textures.splice(idx, 1)
-		textures.unshift(pfTx)
-	}
-	return idx
 }
 
 export interface UsedTextureNames {

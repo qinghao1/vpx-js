@@ -720,5 +720,3 @@ function downsampleData(texture: any, maxSize: number, name?: string): any {
 	texture.image.data = null
 	return tex
 }
-
-export default ThreeTextureLoaderBrowser

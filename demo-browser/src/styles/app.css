@@ -55,8 +55,7 @@ body {
 }
 
 /* Loading — semantic main + section */
-#loading,
-.loading {
+#loading {
 	position: fixed;
 	inset: 0;
 	display: flex;
@@ -68,8 +67,7 @@ body {
 	background: radial-gradient(ellipse at 50% 18%, #121a2b 0%, #070a12 55%, #05070a 100%);
 	padding: 24px;
 }
-#loading-card,
-.loading-card {
+#loading-card {
 	background: var(--surface, rgba(16, 20, 30, 0.72));
 	backdrop-filter: blur(20px) saturate(1.2);
 	-webkit-backdrop-filter: blur(20px) saturate(1.2);
@@ -194,16 +192,6 @@ body.drag::after {
 	margin-top: 14px;
 	width: 100%;
 }
-.picker input[type="text"] {
-	background: var(--border-faint);
-	border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-	color: var(--fg);
-	padding: 8px 10px;
-	border-radius: 8px;
-	font-size: 12px;
-	flex: 1 1 180px;
-	min-width: 0;
-}
 .picker .btn {
 	background: var(--accent);
 	color: #fff;
@@ -294,8 +282,7 @@ body.drag::after {
 }
 
 /* Brand header */
-#brand,
-.brand {
+#brand {
 	position: fixed;
 	top: max(22px, env(safe-area-inset-top));
 	left: max(22px, env(safe-area-inset-left));
@@ -356,8 +343,7 @@ body.drag::after {
 	align-items: center;
 	pointer-events: auto;
 }
-#actions button,
-#actions a.btn {
+#actions button {
 	appearance: none;
 	background: var(--surface, rgba(16, 20, 30, 0.72));
 	backdrop-filter: blur(16px) saturate(1.2);
@@ -376,24 +362,13 @@ body.drag::after {
 		background 0.15s,
 		border-color 0.15s;
 }
-#actions button:hover,
-#actions a.btn:hover {
+#actions button:hover {
 	background: rgba(26, 32, 48, 0.88);
 	border-color: var(--border-strong);
 	transform: translateY(-1px);
 }
-#actions button:active,
-#actions a.btn:active {
+#actions button:active {
 	transform: translateY(0);
-}
-#actions a.btn {
-	background: rgba(255, 255, 255, 0.92);
-	color: #111;
-	border-color: transparent;
-	font-weight: 600;
-}
-#actions a.btn:hover {
-	background: #fff;
 }
 /* Sound: one glass pill — icon button + inline expanding slider.
    YouTube/Jellyflix-style hover-reveal: the slider lives in the DOM
@@ -662,18 +637,6 @@ body.show-debug .debug-panel {
 .stats-item .v--muted {
 	color: var(--muted);
 	font-weight: 500;
-}
-.stats-foot {
-	margin-top: 10px;
-	padding-top: 8px;
-	border-top: 1px solid var(--border-subtle);
-	font-size: 10px;
-	line-height: 1.4;
-	color: #8a94a8;
-	display: flex;
-	gap: 10px;
-	flex-wrap: wrap;
-	font-variant-numeric: tabular-nums;
 }
 #log-wrap,
 .log-wrap {
@@ -1283,10 +1246,6 @@ body.is-play #mobile-controls {
 	color: #e6e6e6;
 }
 
-.sep-muted {
-	opacity: 0.35;
-}
-
 /* Play tip positioned via CSS vars instead of inline left/top */
 #play-tip {
 	--tip-x: 0px;
@@ -1304,10 +1263,6 @@ body.is-play #mobile-controls {
 /* Canvas states via classes instead of inline cursor/display */
 #canvas.is-pointer {
 	cursor: pointer;
-}
-
-.hidden {
-	display: none !important;
 }
 
 [hidden] {

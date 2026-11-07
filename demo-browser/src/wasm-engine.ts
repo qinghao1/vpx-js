@@ -10,12 +10,7 @@ import type { PlungerData } from '../../dist-esm/lib/vpt/plunger/plunger-data.js
 import { PlungerMeshGenerator } from '../../dist-esm/lib/vpt/plunger/plunger-mesh-generator.js'
 import type { Table } from '../../dist-esm/lib/vpt/table/table.js'
 import type { HeadlessEngine, WasmBufferKind } from '../../dist-esm/lib/wasm/vpinball-wasm.js'
-import {
-	HeadlessEngineMissingError,
-	loadHeadlessEngine,
-	romMountFileName,
-	WASM_STRIDES,
-} from '../../dist-esm/lib/wasm/vpinball-wasm.js'
+import { loadHeadlessEngine, romMountFileName } from '../../dist-esm/lib/wasm/vpinball-wasm.js'
 import type { BallSlot, PartSlot, ReelState, SyncCounts, SyncScene } from '../../dist-esm/lib/wasm/wasm-scene-sync.js'
 import { WasmSceneSync } from '../../dist-esm/lib/wasm/wasm-scene-sync.js'
 
@@ -80,7 +75,6 @@ export class WasmEngine {
 	private readonly plungerFrames = new Map<number, number>()
 	private sync?: WasmSceneSync<Object3D, BufferGeometry, PointLight>
 	private engine?: HeadlessEngine
-	private ballsVisible = true
 	private destroyed = false
 	private _muted = false
 	private _volume = 1
@@ -318,11 +312,6 @@ export class WasmEngine {
 		return frame
 	}
 
-	setBallsVisible(visible: boolean): void {
-		this.ballsVisible = visible
-		this.host.ballsGroup.visible = visible
-	}
-
 	pushKey(scancode: number, down: boolean): void {
 		this.engine?.pushKey(scancode, down)
 	}
@@ -432,7 +421,7 @@ export class WasmEngine {
 				const meshes = ball.getMeshes<BufferGeometry>(this.host.table)
 				const obj = this.host.renderApi.createParentNode(`Ball${id}`)
 				for (const mesh of Object.values(meshes)) obj.add(this.host.renderApi.createMesh(mesh))
-				obj.visible = this.ballsVisible
+				obj.visible = true
 				this.host.ballsGroup.add(obj)
 				const slot: BallSlot<Object3D> = { obj, state, updater: ball.getUpdater() }
 				this.liveBalls.set(id, slot)

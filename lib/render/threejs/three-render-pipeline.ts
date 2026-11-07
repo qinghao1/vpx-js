@@ -36,8 +36,8 @@ export class VpxRenderPipeline {
 
 	constructor(
 		private readonly renderer: THREE.WebGPURenderer,
-		private readonly scene: THREE.Scene,
-		private readonly camera: THREE.Camera,
+		scene: THREE.Scene,
+		camera: THREE.Camera,
 		config: PipelineConfig = {},
 	) {
 		this.pipeline = new THREE.RenderPipeline(renderer)

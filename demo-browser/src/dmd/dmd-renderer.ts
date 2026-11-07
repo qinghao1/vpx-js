@@ -452,9 +452,4 @@ export class DmdRenderer implements DirtyOverlay {
 			}
 		return presented
 	}
-
-	getTexture() {
-		this._ensureTexture()
-		return this.texture
-	}
 }

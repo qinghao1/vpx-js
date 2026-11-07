@@ -18,13 +18,4 @@ export const ensureBvh = () => {
 	}
 }
 
-export {
-	getEffectiveCaps,
-	getMaxLights,
-	getQuality,
-	getTargetPixelRatio,
-	isLowQuality,
-	isPlayMode,
-	QUALITY_CAPS,
-	QUALITY_MAX_LIGHTS,
-} from '../../dist-esm/lib/util/quality.js'
+export { getMaxLights, getTargetPixelRatio, isLowQuality, QUALITY_CAPS } from '../../dist-esm/lib/util/quality.js'
