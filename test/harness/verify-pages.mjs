@@ -55,6 +55,9 @@ async function visit(browser, errors) {
 		if (frame === page.mainFrame()) navigations++
 	})
 	page.on('pageerror', error => errors.push(error.message))
+	page.on('console', msg => {
+		if (msg.type() === 'error') errors.push(`console: ${msg.text().slice(0, 300)}`)
+	})
 	await page.goto(url, { waitUntil: 'load' })
 	const isolated = await waitFor(() => page.evaluate(() => crossOriginIsolated && !!window.vpx), { timeoutMs: 30000 })
 	return { page, isolated, loads: () => navigations }
@@ -71,7 +74,13 @@ try {
 				return window.vpx.state
 			})
 		: null
-	check(engine?.wasmReady === true, 'threaded engine boots on the static host', `catalog=${engine?.catalogSize}`)
+	check(
+		engine?.wasmReady === true,
+		'threaded engine boots on the static host',
+		engine
+			? `wasmReady=${engine.wasmReady} catalog=${engine.catalogSize} scriptErrors=${engine.scriptErrors} table=${engine.tableName} load=${engine.loadState}`
+			: 'no state',
+	)
 	check(engine?.scriptErrors === 0, 'no script errors', `errors=${engine?.scriptErrors}`)
 	await sleep(2000)
 	// Chrome sometimes serves the SW from cache without a reload, sometimes
