@@ -1,0 +1,71 @@
+From 6291521010f04a67527fbd8c7b28460428aba352 Mon Sep 17 00:00:00 2001
+From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
+Date: Sat, 7 Nov 2026 12:00:00 -0500
+Subject: [PATCH] Player: expose primitive animation frame, EM reel digits and
+ last script error
+
+Read-only state a host embedding the player needs to mirror a running table:
+- Primitive::GetCurrentFrame(): current vertex animation frame
+- DispReel::GetReelValue(): digit currently shown by a reel
+- Player::m_lastScriptError: last reported script error, for hosts that do
+  not show the in-game notifications
+---
+ src/core/player.cpp   | 3 ++-
+ src/core/player.h     | 1 +
+ src/parts/dispreel.h  | 1 +
+ src/parts/primitive.h | 1 +
+ 4 files changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/src/core/player.cpp b/src/core/player.cpp
+index 270f908ca..43dcd8c1b 100644
+--- a/src/core/player.cpp
++++ b/src/core/player.cpp
+@@ -1662,7 +1662,8 @@ void Player::OnScriptError(ScriptInterpreter::ErrorType type, int line, int colu
+ 
+    const string errorType = (type == ScriptInterpreter::ErrorType::Runtime) ? "Runtime" : "Compile";
+    const string desc = string_from_utf8_or_cp1252(description.c_str(), description.length());
+-   PLOGE << errorType << " error on line " << line << ", col " << column << ": " << desc;
++   m_lastScriptError = errorType + " error on line " + std::to_string(line) + ", col " + std::to_string(column) + ": " + desc;
++   PLOGE << m_lastScriptError;
+    if (m_liveUI && m_nScriptErrorNotification < 200)
+    {
+       m_liveUI->PushNotification(errorType + " error: " + desc, 5000);
+diff --git a/src/core/player.h b/src/core/player.h
+index 7de6ce5dd..044ee4b6d 100644
+--- a/src/core/player.h
++++ b/src/core/player.h
+@@ -397,6 +397,7 @@ public:
+ 
+    CComObject<ScriptInterpreter>* m_scriptInterpreter = nullptr;
+    unsigned int m_nScriptErrorNotification = 0;
++   string m_lastScriptError; // Last reported script error, for hosts that do not show the in-game notifications
+    void OnScriptError(ScriptInterpreter::ErrorType type, int line, int column, const string &description, const vector<string> &stackDump);
+ 
+    PinballPlugin::ResURIResolver m_resURIResolver;
+diff --git a/src/parts/dispreel.h b/src/parts/dispreel.h
+index 5952a5dbb..7c88219a0 100644
+--- a/src/parts/dispreel.h
++++ b/src/parts/dispreel.h
+@@ -90,6 +90,7 @@ public:
+    int     GetImagesPerGridRow() const { return m_d.m_imagesPerGridRow; }
+    void    SetImagesPerGridRow(const int amount) { m_d.m_imagesPerGridRow = max(1, amount); }
+    int     GetReels() const { return m_d.m_reelcount; }
++   int     GetReelValue(const int reel) const { return m_reelInfo[reel].currentValue; } // Digit currently shown by a reel
+    void    SetReels(const int reels)
+    {
+        m_d.m_reelcount = min(max(1, reels), MAX_REELS); // must have at least 1 reel and a max of MAX_REELS
+diff --git a/src/parts/primitive.h b/src/parts/primitive.h
+index 9f8aac87b..49377b311 100644
+--- a/src/parts/primitive.h
++++ b/src/parts/primitive.h
+@@ -269,6 +269,7 @@ public:
+    bool IsPlayfield() const { return StrCompareNoCase(m_name, "playfield_mesh"s); }
+ 
+    float GetAlpha() const { return m_d.m_alpha; }
++   float GetCurrentFrame() const { return m_currentFrame; } // Current vertex animation frame, -1 when not animated
+    void SetAlpha(const float value) { m_d.m_alpha = max(value, 0.f); }
+ 
+    // The playfield mesh follows the table setting (edited from both the table and the playfield mesh panes)
+-- 
+2.53.0
+

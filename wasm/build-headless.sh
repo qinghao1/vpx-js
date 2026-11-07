@@ -3,13 +3,14 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # Headless-engine builder — compiles vpinball-headless from the pinned
-# external/vpinball submodule plus the in-repo bridge patches, and deploys
+# external/vpinball submodule plus the in-repo patches, around the vpx-js
+# bridge (wasm/modules/headless/bridge/), and deploys
 #   demo-browser/public/wasm/vpinball-headless.{js,wasm,data}
 # (committed release build + build-info.json provenance — rebuild and commit
 # them together; CI verifies the manifest instead of rebuilding).
-# The .wasm.map sidecar (bridge-wasm-source-maps patch, -gsource-map) is
-# what makes a SIGILL in the shipped engine debuggable; the build fails if
-# it is missing. Only js/wasm/data ship to Pages (the map stays local).
+# The .wasm.map sidecar (-gsource-map, see the target patch) is what makes a
+# SIGILL in the shipped engine debuggable; the build fails if it is missing.
+# Only js/wasm/data ship to Pages (the map stays local).
 # Patches live in wasm/modules/headless/patches/ and apply idempotently,
 # pinmame-style: never hand-edit external/vpinball, change the patch files.
 #   npm run build:wasm:headless          # release (default)
@@ -20,6 +21,7 @@ IFS=$'\n\t'
 readonly ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly VPINBALL="$ROOT/external/vpinball"
 readonly PATCH_DIR="$ROOT/wasm/modules/headless/patches"
+readonly BRIDGE="$ROOT/wasm/modules/headless/bridge/vpx_wasm_bridge.cpp"
 readonly BUILD_DIR="$VPINBALL/build/wasm-wasm32"
 readonly OUT_DIR="$ROOT/demo-browser/public/wasm"
 
@@ -64,12 +66,12 @@ if [[ "$emsdk_ver" != "6.0.13" ]]; then
   exit 1
 fi
 
-# Apply bridge patches (idempotent — skip when already applied). Checked as
+# Apply the patches (idempotent — skip when already applied). Checked as
 # one atomic series: per-file checks cannot tell "fully applied" from
 # "broken" once patches stack on the same file.
 patches=("$PATCH_DIR"/*.patch)
 if [[ ! -e "${patches[0]}" ]]; then
-  log "no bridge patches"
+  log "no patches"
 else
   # Series-aware state check: stage the fully-patched tree in a throwaway
   # worktree, then compare file contents. Per-patch reverse checks cannot
@@ -78,7 +80,7 @@ else
   git -C "$VPINBALL" worktree add --detach "$check_tree" HEAD >/dev/null 2>&1
   if ! git -C "$check_tree" apply "${patches[@]}" >/dev/null 2>&1; then
     git -C "$VPINBALL" worktree remove --force "$check_tree" >/dev/null 2>&1
-    log "ERROR: bridge patch series does not apply to a pristine $VPINBALL — refusing to build"
+    log "ERROR: patch series does not apply to a pristine $VPINBALL — refusing to build"
     exit 1
   fi
   mapfile -t touched < <(git -C "$check_tree" diff --name-only; git -C "$check_tree" ls-files --others --exclude-standard)
@@ -110,12 +112,12 @@ else
   fi
   git -C "$VPINBALL" worktree remove --force "$check_tree" >/dev/null 2>&1
   if [[ "$state" == applied ]]; then
-    log "bridge patches already applied (skip)"
+    log "patches already applied (skip)"
   elif [[ "$state" == pristine ]]; then
     for patch in "${patches[@]}"; do log "apply $(basename "$patch")"; done
     git -C "$VPINBALL" apply "${patches[@]}"
   else
-    log "ERROR: $VPINBALL has unexpected modifications outside the bridge patch series ($state) — reset it before building"
+    log "ERROR: $VPINBALL has unexpected modifications outside the patch series ($state) — reset it before building"
     exit 1
   fi
 fi
@@ -134,7 +136,7 @@ if [[ ! -f "$VPINBALL/third-party/include/spatialaudio/SpatialaudioConfig.h" ]];
 fi
 
 log "configuring ($BUILD_TYPE)"
-emcmake cmake -DPLATFORM=wasm -DARCH=wasm32 "-DCMAKE_BUILD_TYPE=$BUILD_TYPE" -B "$BUILD_DIR" -S "$VPINBALL" >/dev/null
+emcmake cmake -DPLATFORM=wasm -DARCH=wasm32 "-DCMAKE_BUILD_TYPE=$BUILD_TYPE" "-DVPX_HEADLESS_BRIDGE=$BRIDGE" -B "$BUILD_DIR" -S "$VPINBALL" >/dev/null
 log "building vpinball-headless — $(emcc --version 2>/dev/null | head -n1)"
 JOBS="${JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
 cmake --build "$BUILD_DIR" --target vpinball-headless --parallel "$JOBS"

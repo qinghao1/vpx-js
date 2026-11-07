@@ -2,7 +2,7 @@
 /**
  * Engine provenance check: demo-browser/public/wasm/ holds a committed
  * release build, so this verifies build-info.json matches the current
- * vpinball pin + bridge patch series + artifact bytes. CI runs this instead
+ * vpinball pin + patch series + bridge source + artifact bytes. CI runs this instead
  * of rebuilding the engine; a mismatch means someone changed the inputs
  * without rebuilding locally.
  *
@@ -11,10 +11,10 @@
  */
 
 import { execFileSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { engineInputs, sha256 as sha } from '../../wasm/engine-inputs.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const wasmDir = join(root, 'demo-browser', 'public', 'wasm')
@@ -28,7 +28,6 @@ const fail = msg => {
 }
 const asObject = value => (value && typeof value === 'object' ? value : {})
 
-const sha = path => createHash('sha256').update(readFileSync(path)).digest('hex')
 const git = args => {
 	try {
 		return execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim()
@@ -60,33 +59,27 @@ if (info && typeof info === 'object') {
 	// Release-only policy (the debug script builds -O0 with assertions).
 	if (info.buildType !== 'Release') fail(`engine built as ${info.buildType}, expected Release`)
 	if (info.emsdk !== '6.0.13') fail(`engine built with emsdk ${info.emsdk}, expected 6.0.13`)
-	// Tracked names only, mirroring the manifest writer: untracked patches
-	// never enter the hash map — they are gated via info.untrackedPatches
-	// below instead.
-	const tracked = git(['ls-files', '--', 'wasm/modules/headless/patches/*.patch'])
-	const onDisk = {}
-	if (tracked !== null) {
-		for (const line of tracked.split('\n')) {
-			const file = line.trim()
-			if (!file.endsWith('.patch')) continue
-			try {
-				onDisk[file.split('/').pop()] = sha(join(root, file))
-			} catch {
-				fail(`patch ${file} is tracked but unreadable`)
-			}
-		}
+	// Same inputs the writer hashed (wasm/engine-inputs.mjs). Untracked ones
+	// never enter the hash map: they are gated via info.untrackedInputs.
+	let current = null
+	try {
+		current = engineInputs(root)
+	} catch {
+		fail('cannot read the engine inputs (not a checkout?)')
 	}
-	const recorded = asObject(info.patches)
-	for (const [file, hash] of Object.entries(onDisk))
-		if (!(file in recorded)) fail(`patch ${file} not included in the engine build`)
-		else if (recorded[file] !== hash) fail(`patch ${file} changed since the engine was built`)
-	for (const file of Object.keys(recorded))
-		if (!(file in onDisk)) fail(`patch ${file} recorded in build-info.json but missing from the tree`)
-	const untracked = info.untrackedPatches ?? []
-	if (!Array.isArray(untracked)) fail('build-info.json untrackedPatches is not an array')
+	if (current) {
+		const recorded = asObject(info.inputs)
+		for (const [file, hash] of Object.entries(current.inputs))
+			if (!(file in recorded)) fail(`${file} not included in the engine build`)
+			else if (recorded[file] !== hash) fail(`${file} changed since the engine was built`)
+		for (const file of Object.keys(recorded))
+			if (!(file in current.inputs)) fail(`${file} recorded in build-info.json but missing from the tree`)
+	}
+	const untracked = info.untrackedInputs ?? []
+	if (!Array.isArray(untracked)) fail('build-info.json untrackedInputs is not an array')
 	else
 		for (const file of untracked)
-			fail(`engine was built with uncommitted patch ${file} — rebuild from a clean tree`)
+			fail(`engine was built with uncommitted input ${file} — rebuild from a clean tree`)
 	// Byte identity of the shipped files, so a stale or hand-replaced binary
 	// cannot pass on matching inputs alone.
 	const hashes = asObject(info.artifacts)
@@ -114,7 +107,7 @@ if (info && typeof info === 'object') {
 }
 
 if (failures.length > 0) {
-	console.error('engine manifest mismatch — rebuild locally (from a clean patch dir): npm run build:wasm:headless')
+	console.error('engine manifest mismatch — rebuild locally (from a clean tree): npm run build:wasm:headless')
 	process.exit(1)
 }
-console.log('✓ engine manifest matches the pinned vpinball + patch series')
+console.log('✓ engine manifest matches the pinned vpinball + engine inputs')

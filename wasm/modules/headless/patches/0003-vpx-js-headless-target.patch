@@ -1,0 +1,63 @@
+From 8a18ea432fdec01a07a0429a6193a233367d988f Mon Sep 17 00:00:00 2001
+From: Chu Qinghao <6337103+qinghao1@users.noreply.github.com>
+Date: Sat, 7 Nov 2026 12:00:00 -0500
+Subject: [PATCH] vpx-js: vpinball-headless wasm target
+
+Builds the headless player (ENABLE_HEADLESS) around the vpx-js embedding
+bridge, given as -DVPX_HEADLESS_BRIDGE=<source path>, as an ES module with a
+sidecar source map. Local to vpx-js, not meant for upstream.
+---
+ make/CMakeLists_app.txt | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
+
+diff --git a/make/CMakeLists_app.txt b/make/CMakeLists_app.txt
+index 23f777cc7..e28ef91cf 100644
+--- a/make/CMakeLists_app.txt
++++ b/make/CMakeLists_app.txt
+@@ -1012,4 +1012,43 @@ elseif(PLATFORM STREQUAL "wasm")
+       SUFFIX ".html"
+    )
+ 
++   # Headless engine for vpx-js: the player built with ENABLE_HEADLESS around an
++   # embedding bridge (VPX_HEADLESS_BRIDGE, path to its source) instead of main.cpp.
++   if(VPX_HEADLESS_BRIDGE)
++      set(VPX_HEADLESS_SOURCES ${VPX_STANDALONE_SOURCES})
++      list(REMOVE_ITEM VPX_HEADLESS_SOURCES "src/core/main.cpp")
++      add_executable(vpinball-headless ${VPX_HEADLESS_SOURCES} "${VPX_HEADLESS_BRIDGE}")
++      add_dependencies(vpinball-headless vpx-shaders)
++      foreach(property INCLUDE_DIRECTORIES COMPILE_DEFINITIONS COMPILE_OPTIONS LINK_DIRECTORIES LINK_LIBRARIES)
++         get_target_property(value vpinball ${property})
++         set_target_properties(vpinball-headless PROPERTIES ${property} "${value}")
++      endforeach()
++      target_compile_definitions(vpinball-headless PRIVATE ENABLE_HEADLESS)
++      # Sidecar source map: makes a crash in the shipped engine debuggable.
++      target_compile_options(vpinball-headless PRIVATE -gsource-map)
++      target_link_options(vpinball-headless PRIVATE
++         -gsource-map
++         --use-port=emdawnwebgpu
++         -sJSPI
++         -sALLOW_MEMORY_GROWTH=1
++         -sMAXIMUM_MEMORY=4GB
++         -sINITIAL_MEMORY=512MB
++         -sSTACK_SIZE=8MB
++         -sDEFAULT_PTHREAD_STACK_SIZE=2MB
++         -sPTHREAD_POOL_SIZE=32
++         -sMODULARIZE=1
++         -sEXPORT_ES6=1
++         -sEXPORT_NAME=createVpinballHeadless
++         -sEXPORTED_FUNCTIONS=_main,_malloc,_free
++         -sEXPORTED_RUNTIME_METHODS=UTF8ToString,HEAPU8,HEAPU32,HEAPF32
++         -Wl,--allow-multiple-definition
++         "--preload-file=${CMAKE_SOURCE_DIR}/src/assets@/assets"
++         "--preload-file=${CMAKE_SOURCE_DIR}/src/scripts@/scripts"
++         "--preload-file=${CMAKE_SOURCE_DIR}/plugins/nixie/layouts@/plugins/nixie/layouts"
++         "--preload-file=${CMAKE_SOURCE_DIR}/plugins/flexdmd/assets@/plugins/flexdmd/assets"
++         "--exclude-file=*.vpz"
++         "--exclude-file=*/src/assets/web"
++      )
++   endif()
++
+ endif()
+-- 
+2.53.0
+

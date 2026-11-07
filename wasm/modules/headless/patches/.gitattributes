@@ -1,0 +1,2 @@
+# Patches carry upstream files byte for byte, CRLF ones included: never convert them.
+*.patch -text
