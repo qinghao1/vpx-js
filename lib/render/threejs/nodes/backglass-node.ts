@@ -41,6 +41,13 @@ export interface PlayfieldExtent {
 	glassHeight: number
 }
 
+const CORNERS = [
+	[-1, -1],
+	[1, -1],
+	[-1, 1],
+	[1, 1],
+] as const
+
 const panelAspect = (artAspect: number): number =>
 	Number.isFinite(artAspect) && artAspect > 0 ? artAspect : DEFAULT_ASPECT
 
@@ -85,26 +92,19 @@ export function fitBackglassPanel(
 	const corner = new THREE.Vector3()
 	const fits = (height: number): boolean => {
 		world.multiplyMatrices(tableToWorld, backglassPanelMatrix(playfield, artAspect, height))
-		for (const [x, y] of [
-			[-1, -1],
-			[1, -1],
-			[-1, 1],
-			[1, 1],
-		]) {
-			corner.set(x!, y!, 0).applyMatrix4(world).project(camera)
+		for (const [x, y] of CORNERS) {
+			corner.set(x, y, 0).applyMatrix4(world).project(camera)
 			if (Math.abs(corner.x) > limit || corner.y > limit || Math.abs(corner.z) > 1) return false
 		}
 		return true
 	}
 	let low = 0
 	let high = (PANEL.maxWidth * (playfield.right - playfield.left)) / panelAspect(artAspect)
-	if (fits(high)) low = high
-	else
-		for (let i = 0; i < 24; i++) {
-			const mid = (low + high) / 2
-			if (fits(mid)) low = mid
-			else high = mid
-		}
+	for (let i = 0; i < 24; i++) {
+		const mid = (low + high) / 2
+		if (fits(mid)) low = mid
+		else high = mid
+	}
 	return backglassPanelMatrix(playfield, artAspect, low)
 }
 
