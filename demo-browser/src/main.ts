@@ -19,7 +19,10 @@ function parseViewerOptions(search: string) {
 	}
 }
 
-if (import.meta.env.VITE_COI_SW && !(await crossOriginIsolate())) showIsolationNotice()
+if (import.meta.env.VITE_COI_SW) {
+	const isolation = await crossOriginIsolate()
+	if (isolation !== true) showIsolationNotice(isolation)
+}
 
 const options = parseViewerOptions(location.search)
 const viewer = new Viewer(options)
