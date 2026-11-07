@@ -55,13 +55,24 @@ import {
 	TABLE_OPTS,
 } from './config.js'
 import { DmdRenderer } from './dmd/dmd-renderer.js'
-import { ensureBvh, getMaxLights, getTargetPixelRatio, isLowQuality, QUALITY_CAPS } from './env.js'
+import {
+	ADAPT_QUALITY,
+	adaptPixelRatio,
+	ensureBvh,
+	getHighPixelRatio,
+	getLowPixelRatio,
+	getMaxLights,
+	getTargetPixelRatio,
+	isLowQuality,
+	isQualityPinned,
+	QUALITY_CAPS,
+} from './env.js'
 import { ownsKey, RELEASE_CODES } from './input/input-manager.js'
 import { pollNudgePads } from './input/nudge-controller.js'
 import { attachInput } from './input.js'
 import type { DirtyOverlay } from './overlays/dirty-overlay.js'
-import { createLog } from './ui/log-viewer.js'
-import { fpsClass, renderStats } from './ui/stats-overlay.js'
+import { createLog, type PageLog } from './ui/page-log.js'
+import { createStatsView, perfTier } from './ui/stats-overlay.js'
 import {
 	$,
 	computeTexMem,
@@ -115,12 +126,6 @@ function cullExcessLights(root: any, maxLights: number) {
 	return { before: lights.length, after: maxLights, culled }
 }
 
-const SOUND_SPEAKER = '<path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" stroke="none"></path>'
-const SOUND_SVG_ATTRS =
-	'viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"'
-const SOUND_ICON_HIGH = `<svg ${SOUND_SVG_ATTRS}>${SOUND_SPEAKER}<path d="M15.5 8.5a5 5 0 0 1 0 7"></path><path d="M18.4 5.6a9 9 0 0 1 0 12.8"></path></svg>`
-const SOUND_ICON_LOW = `<svg ${SOUND_SVG_ATTRS}>${SOUND_SPEAKER}<path d="M15.5 8.5a5 5 0 0 1 0 7"></path></svg>`
-const SOUND_ICON_OFF = `<svg ${SOUND_SVG_ATTRS}>${SOUND_SPEAKER}<line x1="16" y1="9" x2="22" y2="15"></line><line x1="22" y1="9" x2="16" y2="15"></line></svg>`
 const setTitle = title => {
 	const el = document.getElementById('title')
 	if (el && title) el.textContent = title
@@ -136,6 +141,7 @@ export class Viewer {
 	declare wasmEngine: WasmEngine | null
 	declare viewerMode: 'viewer' | 'play'
 	declare isPaused: boolean
+	declare log: PageLog
 	private readonly overlays: DirtyOverlay[]
 	constructor({ viewerMode = 'viewer', antialias = true, batched = true, forceWebGL = false } = {}) {
 		ensureBvh()
@@ -150,8 +156,8 @@ export class Viewer {
 			loadDetail: $('load-detail'),
 			loadTitle: $('load-title'),
 			subtitle: $('subtitle'),
-			stats: $('stats'),
 			resetBtn: $('reset'),
+			exitBtn: $('exit-play'),
 			wrap: $('canvas-wrap'),
 			playTip: $('play-tip'),
 			soundBtn: $('sound-btn'),
@@ -161,9 +167,13 @@ export class Viewer {
 			streamText: $('stream-text'),
 			streamLabel: $('stream-label'),
 			nudgeFlash: $('nudge-flash'),
-			fpsHud: $('fps-hud'),
+			hudToggle: $('hud-toggle'),
+			debugPanel: $('debug-panel'),
 		}
-		this.log = createLog($('log'))
+		this.log = createLog()
+		this._renderStats = createStatsView(this.dom.debugPanel)
+		this._fps = 0
+		this._frameStats = { draws: 0, triangles: 0 }
 		this.scene = new THREE.Scene()
 		this.scene.background = getPrerenderedBackground() as any
 		this.camera = new THREE.PerspectiveCamera(CAM.fov, innerWidth / innerHeight, CAM.near, CAM.far)
@@ -203,6 +213,11 @@ export class Viewer {
 		this.renderPipeline = null
 		this.renderer = null
 		this._loop = null
+		// Runtime adaptation owns the ratio from here on: the floor is the
+		// tier value, the ceiling is full quality, and only measured fps
+		// moves it between them (never on a pinned ?quality= URL).
+		this._resetPixelRatio(this.viewerMode, false)
+		this._lastAdapt = 0
 		this._deviceLossCount = 0
 		this._startRenderer()
 		this.dmd = new DmdRenderer(this)
@@ -217,14 +232,21 @@ export class Viewer {
 		})
 		this._setupSoundControls()
 		this.dom.resetBtn?.addEventListener('click', () => this._onResetView())
+		this.dom.exitBtn?.addEventListener('click', () => this._switchToViewer())
 		this._setupModeSwitch()
 		this._setupDebugToggle()
 		this._syncChrome()
 	}
+	/** The FPS pill doubles as the stats toggle (also `` ` `` / F2); the panel opens above it. */
 	_setupDebugToggle() {
-		const btn = document.getElementById('debug-toggle')
-		const toggle = () => document.body.classList.toggle('show-debug')
-		btn?.addEventListener('click', toggle)
+		const { hudToggle, debugPanel } = this.dom
+		if (!hudToggle || !debugPanel) return
+		const toggle = () => {
+			debugPanel.hidden = !debugPanel.hidden
+			hudToggle.setAttribute('aria-expanded', String(!debugPanel.hidden))
+			this._renderHud(this._fps)
+		}
+		hudToggle.addEventListener('click', toggle)
 		const onKey = e => {
 			if ((e.code === 'Backquote' || e.key === '`' || e.key === 'F2') && !e.ctrlKey && !e.metaKey && !e.altKey) {
 				if (!ownsKey(e.target, e.code)) toggle()
@@ -286,7 +308,7 @@ export class Viewer {
 		if (btn && engine) {
 			const muted = engine.muted
 			const level = engine.volume
-			btn.innerHTML = muted || level <= 0 ? SOUND_ICON_OFF : level <= 0.5 ? SOUND_ICON_LOW : SOUND_ICON_HIGH
+			btn.dataset.level = muted || level <= 0 ? 'off' : level <= 0.5 ? 'low' : 'high'
 			btn.setAttribute('aria-pressed', muted ? 'true' : 'false')
 			btn.setAttribute('aria-label', muted ? 'Unmute sound' : 'Mute sound')
 		}
@@ -370,7 +392,7 @@ export class Viewer {
 			renderer = await boot(true)
 		}
 
-		renderer.setPixelRatio(getTargetPixelRatio(this.viewerMode))
+		renderer.setPixelRatio(this._pixelRatio)
 		renderer.outputColorSpace = THREE.SRGBColorSpace
 		renderer.sortObjects = true
 		renderer.shadowMap.enabled = false
@@ -456,10 +478,6 @@ export class Viewer {
 		return this._rendererReady
 	}
 	_onResetView() {
-		if (this.viewerMode === 'play') {
-			this._switchToViewer()
-			return
-		}
 		if (!this.tableGroup || !this.controls) return
 		const state = computeViewerFraming(this.tableGroup)
 		this._animateCameraTo(state, CAM_ANIM.durationReset)
@@ -473,9 +491,35 @@ export class Viewer {
 		const height = Math.max(1, Math.round(viewport?.height ?? innerHeight))
 		this.camera.aspect = width / height
 		this.camera.updateProjectionMatrix()
-		const pixelRatio = getTargetPixelRatio(this.viewerMode)
-		if (this.renderer) this.renderer.setPixelRatio(pixelRatio)
+		if (this.renderer) this.renderer.setPixelRatio(this._pixelRatio)
 		this.renderer?.setSize(width, height)
+	}
+	/** Re-anchor the adaptive ratio (boot and mode switches); the tier value is the new floor. */
+	_resetPixelRatio(mode, apply = true) {
+		this._pixelRatio = getTargetPixelRatio(mode)
+		this._qualityFloor = getLowPixelRatio(mode)
+		this._qualityCeil = getHighPixelRatio()
+		if (apply) this.renderer?.setPixelRatio(this._pixelRatio)
+	}
+	/**
+	 * Generic fps-driven quality: climb toward full resolution on sustained
+	 * headroom, back off when the GPU (or its thermal budget) falls behind.
+	 * Pinned `?quality=` URLs opt out; idle windows present nothing, so they
+	 * never step the ratio down.
+	 */
+	_adaptQuality(fps, now) {
+		if (isQualityPinned() || !this.renderer) return
+		if (now - this._lastAdapt < ADAPT_QUALITY.intervalMs) return
+		// Bounds follow the live viewport/DPR: a resize can move them under a live ratio.
+		this._qualityFloor = getLowPixelRatio(this.viewerMode)
+		this._qualityCeil = getHighPixelRatio()
+		const current = this.renderer.getPixelRatio()
+		const next = adaptPixelRatio(current, fps, this._qualityFloor, this._qualityCeil)
+		if (next === current) return
+		this._lastAdapt = now
+		this._pixelRatio = next
+		this._onResize()
+		this.log(`[quality] pixel ratio ${current} → ${next} (${fps} fps)`, 'debug')
 	}
 	_setupModeSwitch() {
 		const onOrbitToggle = e => {
@@ -553,7 +597,7 @@ export class Viewer {
 		if (this.viewerMode === 'play' || !this.tableGroup) return
 		this.viewerMode = 'play'
 		if (history.state?.mode !== 'play') history.pushState({ ...history.state, mode: 'play' }, '')
-		this.renderer?.setPixelRatio(getTargetPixelRatio('play'))
+		this._resetPixelRatio('play')
 		this._hidePlayTip?.()
 		this._syncChrome()
 		if (this.wasmEngine?.ready) this.enterPlayMode()
@@ -596,7 +640,7 @@ export class Viewer {
 		this.viewerMode = 'viewer'
 		this.isPaused = false
 		if (history.state?.mode === 'play') history.back()
-		this.renderer?.setPixelRatio(getTargetPixelRatio('viewer'))
+		this._resetPixelRatio('viewer')
 		this._hidePlayTip?.()
 		this._syncChrome()
 		this.exitPlayMode()
@@ -1841,18 +1885,14 @@ export class Viewer {
 		this.renderer?.setAnimationLoop(this._loop)
 	}
 	_createLoop() {
-		let frames = 0,
-			fps = 0
-		let lastFpsUpdate = performance.now()
-		// Skipped frames reset without recording, so the next present measures
-		// a live rate instead of averaging in the idle gap.
-		const rollFpsWindow = (timestamp: number, presented: boolean): boolean => {
-			if (timestamp - lastFpsUpdate <= 500) return false
-			if (presented) fps = Math.round((frames * 1000) / (timestamp - lastFpsUpdate))
-			lastFpsUpdate = timestamp
-			frames = 0
-			return true
-		}
+		// FPS counts only back-to-back presents, so neither the HUD nor quality
+		// adaptation averages in the idle gaps of the dirty-gated loop; a window
+		// without any reads as idle (0).
+		let frames = 0
+		let busyMs = 0
+		let lastTick = 0
+		let lastPresented = false
+		let windowStart = performance.now()
 		return timestamp => {
 			if (this.isPaused) this.wasmEngine?.resetStepClock(timestamp)
 			// Dirty-gated present: idle frames skip the present (and its matrix
@@ -1883,36 +1923,49 @@ export class Viewer {
 			if (dirty) {
 				if (stateDirty) this.renderApi?.flushMatrixUpdates(this.tableGroup)
 				this._present()
-				frames++
+				if (lastPresented) {
+					frames++
+					busyMs += timestamp - lastTick
+				}
+				// three resets `info` at the top of every loop frame, so sample right after a present.
+				const info = this.renderer?.info.render
+				if (info) this._frameStats = { draws: info.drawCalls, triangles: info.triangles }
 			}
+			lastPresented = dirty
+			lastTick = timestamp
 			// The HUD refreshes on every window roll, so mode/pause/engine state shows while idle too.
-			if (rollFpsWindow(timestamp, dirty)) this._renderHud(fps)
+			// Adaptation needs a real sample: a few lone intervals are noise, not a slow GPU.
+			if (timestamp - windowStart >= 500) {
+				const fps = busyMs > 0 ? Math.round((frames * 1000) / busyMs) : 0
+				this._renderHud(fps)
+				if (frames >= 8) this._adaptQuality(fps, timestamp)
+				frames = 0
+				busyMs = 0
+				windowStart = timestamp
+			}
 		}
 	}
 	_present() {
 		if (this.renderPipeline) this.renderPipeline.render()
 		else this.renderer?.render(this.scene, this.camera)
 	}
+	/** 2 Hz HUD refresh: the FPS pill always, the stats card only while it is open. */
 	_renderHud(fps) {
-		const mode = this.viewerMode === 'play' ? (this.isPaused ? 'PLAY PAUSED' : 'PLAY') : 'VIEWER'
-		const tris = this.renderer?.info?.render?.triangles ?? 0
-		const wasmReady = !!this.wasmEngine?.ready
-		renderStats(this.dom.stats, {
-			fps,
-			draws: this.renderer?.info?.render?.calls ?? 0,
-			trisFmt:
-				tris >= 1e6 ? `${(tris / 1e6).toFixed(1)}M` : tris >= 1e3 ? `${(tris / 1e3).toFixed(1)}k` : `${tris}`,
-			balls: this.wasmEngine?.ballCount ?? 0,
-			wasmLabel: wasmReady ? 'Ready' : 'Loading…',
-			wasmReady,
-			backend: this._rendererBackend,
-			mode,
-		})
-		const fpsEl = this.dom.fpsHud?.querySelector('.fps')
-		if (fpsEl) {
-			fpsEl.textContent = `${fps} fps`
-			fpsEl.className = `fps ${fpsClass(fps)}`.trim()
+		this._fps = fps
+		const pill = this.dom.hudToggle
+		if (pill) {
+			const label = fps ? `${fps} fps` : 'idle'
+			if (pill.textContent !== label) pill.textContent = label
+			pill.dataset.perf = perfTier(fps)
 		}
+		if (this.dom.debugPanel?.hidden !== false) return
+		this._renderStats({
+			mode: this.viewerMode === 'play' ? (this.isPaused ? 'paused' : 'play') : 'viewer',
+			backend: this._rendererBackend ?? '—',
+			...this._frameStats,
+			balls: this.wasmEngine?.ballCount ?? 0,
+			engineReady: !!this.wasmEngine?.ready,
+		})
 	}
 
 	_needsRender = false

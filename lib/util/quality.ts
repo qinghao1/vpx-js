@@ -106,13 +106,20 @@ export function getMaxLights(): number {
 
 // Render resolution as a fraction of device pixels (1 = native sharpness). Values are vpx-js tuned, not upstream.
 export function getTargetPixelRatio(mode?: string): number {
-	if (isLowQuality()) {
-		if (mode === 'play') return 0.65 // play mode: fewer pixels for FPS
-		try {
-			if (typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches) return 0.65
-		} catch {}
-		return 0.9 // low-quality desktop: near-native
-	}
+	return isLowQuality() ? getLowPixelRatio(mode) : getHighPixelRatio()
+}
+
+/** Tier floor: where the low tier (and runtime adaptation) starts. */
+export function getLowPixelRatio(mode?: string): number {
+	if (mode === 'play') return 0.65 // play mode: fewer pixels for FPS
+	try {
+		if (typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches) return 0.65
+	} catch {}
+	return 0.9 // low-quality desktop: near-native
+}
+
+/** Tier ceiling: native sharpness capped, since above 1.5x costs GPU with no visible gain. */
+export function getHighPixelRatio(): number {
 	const dpr = typeof devicePixelRatio !== 'undefined' ? devicePixelRatio : 1
 	try {
 		if (typeof window !== 'undefined' && window.innerWidth && window.innerHeight) {
@@ -120,5 +127,45 @@ export function getTargetPixelRatio(mode?: string): number {
 			if (area > 1920 * 1080) return Math.min(dpr, 1)
 		}
 	} catch {}
-	return Math.min(dpr, 1.5) // cap DPR: above 1.5x costs GPU with no visible gain
+	return Math.min(dpr, 1.5)
+}
+
+/**
+ * An explicit `?quality=`/`?low`/`?high` pin opts out of runtime adaptation:
+ * the URL states the tier, so measured fps must not override it.
+ */
+export function isQualityPinned(): boolean {
+	try {
+		if (typeof location === 'undefined') return false
+		const p = new URLSearchParams(location.search)
+		return p.has('quality') || p.has('low') || p.has('mobile') || p.has('high')
+	} catch {
+		return false
+	}
+}
+
+/**
+ * Runtime adaptation bounds and hysteresis. The controller starts at the
+ * tier floor and climbs only on sustained headroom, so weak and thermally
+ * throttled phones settle instead of oscillating. Generic across iPhone and
+ * Android: the only signal is measured fps, never device identity.
+ */
+export const ADAPT_QUALITY = {
+	upFps: 55,
+	downFps: 45,
+	grow: 1.25,
+	shrink: 0.8,
+	intervalMs: 3000,
+} as const
+
+/** Pure step: next pixel ratio for the measured fps, clamped to [floor, ceil]. */
+export function adaptPixelRatio(current: number, avgFps: number, floor: number, ceil: number): number {
+	const round = (v: number) => Math.round(v * 100) / 100
+	// Bounds can move under a live ratio (resize across the area threshold or
+	// a DPR change): snap back instead of stepping nowhere.
+	if (current > ceil) return ceil
+	if (current < floor) return floor
+	if (avgFps >= ADAPT_QUALITY.upFps && current < ceil) return Math.min(ceil, round(current * ADAPT_QUALITY.grow))
+	if (avgFps < ADAPT_QUALITY.downFps && current > floor) return Math.max(floor, round(current * ADAPT_QUALITY.shrink))
+	return current
 }
