@@ -43,7 +43,7 @@ const url = `http://localhost:${server.address().port}${BASE_PATH}?vpx=test/fixt
 
 const checks = []
 const check = (ok, name, detail = '') => {
-	checks.push(ok)
+	checks.push({ ok, name: detail ? `${name} — ${detail}` : name })
 	console.log(`${ok ? '✓' : '✗'} ${name}${detail ? ` — ${detail}` : ''}`)
 }
 
@@ -93,5 +93,15 @@ try {
 	await browser.close()
 	server.close()
 }
-console.log(`${checks.filter(Boolean).length}/${checks.length} pages checks passed`)
-process.exit(checks.every(Boolean) ? 0 : 1)
+const passed = checks.filter(c => c.ok).length
+console.log(`${passed}/${checks.length} pages checks passed`)
+if (passed !== checks.length) {
+	// Surface failing check names as a CI annotation (job logs need auth).
+	console.log(
+		`::error::pages-e2e failed: ${checks
+			.filter(c => !c.ok)
+			.map(c => c.name)
+			.join(' | ')}`,
+	)
+	process.exit(1)
+}
