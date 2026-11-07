@@ -152,12 +152,13 @@ emsdk_ver="$(emcc --version 2>/dev/null | head -n1 | grep -oE '[0-9]+\.[0-9]+\.[
   printf '  "emsdk": "%s",\n' "$emsdk_ver"
   printf '  "buildType": "%s",\n' "$BUILD_TYPE"
   printf '  "patches": {\n'
-  shopt -s nullglob
-  series=("$PATCH_DIR"/*.patch)
-  shopt -u nullglob
+  # Tracked patches only: the manifest describes the committed tree (what CI
+  # sees), so in-progress untracked patches never leak into it. Hashes still
+  # come from the working tree — exactly what was just built.
+  mapfile -t series < <(git -C "$ROOT" ls-files -- 'wasm/modules/headless/patches/*.patch')
   for i in "${!series[@]}"; do
     name="$(basename "${series[$i]}")"
-    hash="$(sha256sum "${series[$i]}" | cut -d' ' -f1)"
+    hash="$(sha256sum "$ROOT/${series[$i]}" | cut -d' ' -f1)"
     if (( i < ${#series[@]} - 1 )); then comma=","; else comma=""; fi
     printf '    "%s": "%s"%s\n' "$name" "$hash" "$comma"
   done

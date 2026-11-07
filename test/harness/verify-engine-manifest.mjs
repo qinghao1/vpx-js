@@ -12,7 +12,7 @@
 
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -43,23 +43,29 @@ try {
 if (info) {
 	const pinned = execFileSync('git', ['rev-parse', 'HEAD:external/vpinball'], { cwd: root, encoding: 'utf8' }).trim()
 	if (info.vpinball !== pinned) fail(`engine built from vpinball ${info.vpinball}, tree pins ${pinned}`)
-	const patchDir = join(root, 'wasm', 'modules', 'headless', 'patches')
+	// Tracked patches only, mirroring the manifest writer: in-progress untracked
+	// patches are invisible to this gate (CI sees the committed tree).
+	const tracked = execFileSync('git', ['ls-files', '--', 'wasm/modules/headless/patches/*.patch'], {
+		cwd: root,
+		encoding: 'utf8',
+	})
+		.split('\n')
+		.map(line => line.trim())
+		.filter(line => line.endsWith('.patch'))
 	const onDisk = Object.fromEntries(
-		readdirSync(patchDir)
-			.filter(file => file.endsWith('.patch'))
-			.sort()
-			.map(file => [
-				file,
-				createHash('sha256')
-					.update(readFileSync(join(patchDir, file)))
-					.digest('hex'),
-			]),
+		tracked.map(file => [
+			file.split('/').pop(),
+			createHash('sha256')
+				.update(readFileSync(join(root, file)))
+				.digest('hex'),
+		]),
 	)
 	const recorded = info.patches ?? {}
 	for (const [file, hash] of Object.entries(onDisk))
-		if (recorded[file] !== hash) fail(`patch ${file} changed since the engine was built`)
+		if (!(file in recorded)) fail(`patch ${file} not included in the engine build`)
+		else if (recorded[file] !== hash) fail(`patch ${file} changed since the engine was built`)
 	for (const file of Object.keys(recorded))
-		if (!(file in onDisk)) fail(`patch ${file} recorded in build-info.json but missing on disk`)
+		if (!(file in onDisk)) fail(`patch ${file} recorded in build-info.json but missing from the tree`)
 }
 
 if (failures.length > 0) {
