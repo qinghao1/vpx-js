@@ -63,4 +63,9 @@ describe('adaptPixelRatio', () => {
 		expect(adaptPixelRatio(1.5, 60, 0.65, 1.0)).toBe(1.0)
 		expect(adaptPixelRatio(0.5, 30, 0.65, 1.5)).toBe(0.65)
 	})
+
+	it('holds the ceiling when the floor exceeds it', () => {
+		expect(adaptPixelRatio(0.9, 60, 0.9, 0.5)).toBe(0.5)
+		expect(adaptPixelRatio(0.5, 30, 0.9, 0.5)).toBe(0.5)
+	})
 })

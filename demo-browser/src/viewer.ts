@@ -205,9 +205,7 @@ export class Viewer {
 		this.renderPipeline = null
 		this.renderer = null
 		this._loop = null
-		// Runtime adaptation owns the ratio from here on: the floor is the
-		// tier value, the ceiling is full quality, and only measured fps
-		// moves it between them (never on a pinned ?quality= URL).
+		// Adaptation owns the ratio from here on: only measured fps moves it (never on a pinned ?quality= URL).
 		this._resetPixelRatio(this.viewerMode, false)
 		this._lastAdapt = 0
 		this._deviceLossCount = 0
@@ -432,7 +430,7 @@ export class Viewer {
 		if (this.renderer) this.renderer.setPixelRatio(this._pixelRatio)
 		this.renderer?.setSize(width, height)
 	}
-	/** Re-anchor the adaptive ratio (boot and mode switches); the tier value is the new floor. */
+	/** Mode switches change the tier, so re-anchor ratio and floor together. */
 	_resetPixelRatio(mode, apply = true) {
 		this._pixelRatio = getTargetPixelRatio(mode)
 		this._qualityFloor = getLowPixelRatio(mode)
@@ -440,8 +438,7 @@ export class Viewer {
 		if (apply) this.renderer?.setPixelRatio(this._pixelRatio)
 	}
 	/**
-	 * Generic fps-driven quality: climb toward full resolution on sustained
-	 * headroom, back off when the GPU (or its thermal budget) falls behind.
+	 * Back off when the GPU (or its thermal budget) falls behind.
 	 * Pinned `?quality=` URLs opt out; idle windows present nothing, so they
 	 * never step the ratio down.
 	 */

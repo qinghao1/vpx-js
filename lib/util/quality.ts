@@ -109,7 +109,6 @@ export function getTargetPixelRatio(mode?: string): number {
 	return isLowQuality() ? getLowPixelRatio(mode) : getHighPixelRatio()
 }
 
-/** Tier floor: where the low tier (and runtime adaptation) starts. */
 export function getLowPixelRatio(mode?: string): number {
 	if (mode === 'play') return 0.65 // play mode: fewer pixels for FPS
 	try {
@@ -145,10 +144,9 @@ export function isQualityPinned(): boolean {
 }
 
 /**
- * Runtime adaptation bounds and hysteresis. The controller starts at the
- * tier floor and climbs only on sustained headroom, so weak and thermally
- * throttled phones settle instead of oscillating. Generic across iPhone and
- * Android: the only signal is measured fps, never device identity.
+ * Climb only on sustained headroom so weak and thermally throttled phones
+ * settle instead of oscillating. Generic across iPhone and Android: the
+ * only signal is measured fps, never device identity.
  */
 export const ADAPT_QUALITY = {
 	upFps: 55,
@@ -158,9 +156,11 @@ export const ADAPT_QUALITY = {
 	intervalMs: 3000,
 } as const
 
-/** Pure step: next pixel ratio for the measured fps, clamped to [floor, ceil]. */
 export function adaptPixelRatio(current: number, avgFps: number, floor: number, ceil: number): number {
 	const round = (v: number) => Math.round(v * 100) / 100
+	// Degenerate range (zoomed-out DPR below the tier floor): the ceiling is
+	// physical — rendering above device pixels is pure waste — so hold it.
+	if (floor > ceil) return ceil
 	// Bounds can move under a live ratio (resize across the area threshold or
 	// a DPR change): snap back instead of stepping nowhere.
 	if (current > ceil) return ceil
